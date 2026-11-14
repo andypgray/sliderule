@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Regenerates the NuGet lock files on a Dependabot NuGet branch and commits them locally, so the job that
-# runs it tests what Dependabot proposed. On any other ref it does nothing.
+# runs it tests what Dependabot proposed. With --no-commit it leaves them uncommitted. On any other ref it
+# does nothing.
 #
 # Dependabot bumps a PackageReference and that project's own packages.lock.json, but leaves the lock file
 # of every project downstream of it stale, so a NuGet update PR arrives failing NU1004 at Restore, before
@@ -16,7 +17,8 @@
 #   - The commit is local and never pushed. A GITHUB_TOKEN push could not re-trigger the PR's checks
 #     anyway, and a standing write credential is a poor trade for a weekly convenience PR. It exists so
 #     pack-check's `<version>+<commit>` assertion still names the commit SourceLink embedded, and so
-#     nothing packs from a dirty tree.
+#     nothing packs from a dirty tree. A job that sends HEAD to GitHub passes --no-commit: code scanning's
+#     SARIF upload names the checked-out commit, and GitHub refuses one that was never pushed.
 #   - The head ref, not the actor: GITHUB_HEAD_REF is empty on push, so main is untouched; a maintainer
 #     re-running the workflow gets the same answer; and a github-actions bump does not pay for a restore
 #     it has no use for.
@@ -24,6 +26,16 @@
 # The PR still cannot reach all-green by itself. The lock-files job stays red until a human puts the
 # relock commit on the branch, which is the one signal worth acting on.
 set -euo pipefail
+
+commit=true
+case "${1:-}" in
+  '') ;;
+  --no-commit) commit=false ;;
+  *)
+    echo "::error::relock.sh takes no argument but --no-commit, not '$1'." >&2
+    exit 2
+    ;;
+esac
 
 case "${GITHUB_HEAD_REF:-}" in
   dependabot/nuget/*) ;;
@@ -34,6 +46,10 @@ case "${GITHUB_HEAD_REF:-}" in
 esac
 
 CI='' dotnet restore SlideRule.slnx --force-evaluate
+if [ "$commit" = false ]; then
+  echo "Lock files regenerated and left uncommitted."
+  exit 0
+fi
 git config user.name 'github-actions[bot]'
 git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 git add -- '*packages.lock.json'

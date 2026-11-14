@@ -1776,9 +1776,11 @@ jobs:
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: '10.0.x'
-      # Relock for Dependabot NuGet PRs, so the build below is of the bump.
+      # Relock for Dependabot NuGet PRs, so the build below is of the bump. Uncommitted, because the
+      # action's SARIF upload names HEAD as the analysed commit, and code scanning refuses a commit that
+      # was never pushed.
       - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
-        run: bash .github/scripts/relock.sh
+        run: bash .github/scripts/relock.sh --no-commit
       # Build the whole solution (CLI + the arch spec) so --no-build can run the check over
       # the real MSBuildWorkspace, exactly as build-and-test does. The solution and the spec come
       # from sliderule.json at the repository root: the self-solution has many Core-referencing
