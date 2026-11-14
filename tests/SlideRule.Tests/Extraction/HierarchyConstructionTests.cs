@@ -1,8 +1,10 @@
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Tests.Checking;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Extraction;
@@ -72,6 +74,60 @@ public sealed class HierarchyConstructionTests
 
         inherited.ShouldContain("System.Diagnostics.DebuggerDisplayAttribute");
         inherited.ShouldNotContain("System.Runtime.CompilerServices.TypeForwardedFromAttribute");
+    }
+
+    // An abstract base read from metadata passes its attributes down as a concrete one does.
+    [Fact]
+    public void InheritedAttributes_AbstractMetadataBase_PassesItsAttributesDown()
+    {
+        CSharpCompilation vendor = CompilationFactory.CreateCompilation(
+            "Vendor", [CompilationFactory.CoreLibrary], ("Vendor.cs", """
+                                                                      namespace Vendor;
+                                                                      public sealed class BrandedAttribute : System.Attribute {}
+                                                                      [Branded] public abstract class Widget {}
+                                                                      """));
+        CompilationInput app = CompilationFactory.CompileAgainstPackages(
+            "App", [vendor], ("Fancy.cs", "namespace App; public class Fancy : Vendor.Widget {}"));
+
+        Harness.Extract([app])
+            .Type("App.Fancy")
+            .InheritedAttributes.DefinitionNames()
+            .ShouldBe(["Vendor.BrandedAttribute"]);
+    }
+
+    // Two unrelated assemblies supply one undeclared name, so both fragments' externals collapse onto one node, and
+    // the derived type reads what the first fragment to record that name read from it, as every other fact of the
+    // node does: the holder only names the base in a field, so a reading taken from the deriving fragment's own
+    // view, a union, or the last recording would each give another answer.
+    [Theory]
+    [InlineData("[Branded]", true, new[] { "Vendor.BrandedAttribute" })]
+    [InlineData("[Branded]", false, new[] { "Vendor.PlainAttribute" })]
+    [InlineData("", true, new string[0])]
+    public void InheritedAttributes_ABaseTwoAssembliesSupply_ReadsTheFirstRecordedCopy(
+        string holderWidgetAttribute, bool holderFirst, string[] expected)
+    {
+        CSharpCompilation vendorA = CompilationFactory.CreateCompilation(
+            "VendorA", [CompilationFactory.CoreLibrary], ("Vendor.cs", $$"""
+                                                                         namespace Vendor;
+                                                                         public sealed class BrandedAttribute : System.Attribute {}
+                                                                         {{holderWidgetAttribute}} public class Widget {}
+                                                                         """));
+        CSharpCompilation vendorB = CompilationFactory.CreateCompilation(
+            "VendorB", [CompilationFactory.CoreLibrary], ("Vendor.cs", """
+                                                                       namespace Vendor;
+                                                                       public sealed class PlainAttribute : System.Attribute {}
+                                                                       [Plain] public class Widget {}
+                                                                       """));
+        CompilationInput holder = CompilationFactory.CompileAgainstPackages(
+            "Holder", [vendorA], ("Holder.cs", "namespace Holder; public class Box { public Vendor.Widget Widget; }"));
+        CompilationInput app = CompilationFactory.CompileAgainstPackages(
+            "App", [vendorB], ("Fancy.cs", "namespace App; public class Fancy : Vendor.Widget {}"));
+        List<CompilationInput> inputs = holderFirst ? [holder, app] : [app, holder];
+
+        Harness.Extract(inputs)
+            .Type("App.Fancy")
+            .InheritedAttributes.DefinitionNames()
+            .ShouldBe(expected);
     }
 
     [Fact]

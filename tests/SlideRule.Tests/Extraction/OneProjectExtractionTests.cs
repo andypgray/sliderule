@@ -267,6 +267,40 @@ public sealed class OneProjectExtractionTests
             .ShouldBe(["Domain.TaggedAttribute"]);
     }
 
+    // The own project names the sibling's type and never its base, so the base reaches the view only through the
+    // sibling's own hierarchy, and what it passes down is read there.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExtractOneProject_ASiblingTypeOverAThirdAssemblysAttributedBase_InheritsTheAttribute(bool asImage)
+    {
+        // Arrange
+        CSharpCompilation vendor = CompilationFactory.CreateCompilation(
+            "Vendor", [CompilationFactory.CoreLibrary], ("Vendor.cs", """
+                                                                      namespace Vendor;
+                                                                      public sealed class BrandedAttribute : System.Attribute {}
+                                                                      [Branded] public class Widget {}
+                                                                      """));
+        CSharpCompilation domain = CompilationFactory.CreateCompilation(
+            SiblingAssemblyName,
+            [CompilationFactory.CoreLibrary, CompilationFactory.Reference(vendor, asImage)],
+            ("Domain.cs", "namespace Domain; public class Order : Vendor.Widget {}"));
+        CompilationInput own = Input(
+            [
+                CompilationFactory.CoreLibrary, CompilationFactory.Reference(domain, asImage),
+                CompilationFactory.Reference(vendor, asImage)
+            ],
+            ("Web.cs", "namespace Web; public class Checkout { public Domain.Order Order; }"));
+
+        // Act
+        CodebaseModel oneProject = FragmentMerger.Merge(FragmentExtractor.ExtractOneProject(own, SiblingMap(), Ct));
+
+        // Assert
+        oneProject.Type("Domain.Order")
+            .InheritedAttributes.DefinitionNames()
+            .ShouldBe(["Vendor.BrandedAttribute"]);
+    }
+
     // A conditional attribute class is written on the base's source and left out of its image, so a whole-solution
     // merge reads what a base the solution declares passes down from that base's own fragment, never from how a
     // referring compilation happened to see it.

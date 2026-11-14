@@ -452,8 +452,9 @@ internal static class FragmentExtractor
         private readonly Dictionary<ISymbol, string> _memberSymbolIds = new(SymbolEqualityComparer.Default);
 #pragma warning restore RS1024
 
-        // The memos behind InheritableAttributesOf and UsageInherits: a base such as a framework controller is
-        // walked once per descendant, and an attribute class is asked once per base that wears it.
+        // The memos behind InheritableAttributesOf and UsageInherits: a type minted into several homes, as the
+        // one-project view's side fragments are, is read once, and an attribute class is asked once per type that
+        // wears it.
 #pragma warning disable RS1024 // false positive, as above
         private readonly Dictionary<INamedTypeSymbol, IReadOnlyList<FragmentConstruction>> _inheritableAttributes =
             new(SymbolEqualityComparer.Default);
@@ -643,15 +644,10 @@ internal static class FragmentExtractor
                 .ToList();
 
             var baseChain = new List<FragmentConstruction>();
-            var baseAttributes = new List<IReadOnlyList<FragmentConstruction>>();
             for (INamedTypeSymbol? current = symbol.BaseType; current is not null; current = current.BaseType)
-            {
                 baseChain.Add(Construction(current)); // nearest-first; derivation order is meaningful, so not sorted
-                baseAttributes.Add(InheritableAttributesOf(current.OriginalDefinition));
-            }
 
             builder.BaseTypeChain = baseChain;
-            builder.BaseAttributes = baseAttributes;
             builder.PassedDown = InheritableAttributesOf(symbol.OriginalDefinition);
 
             builder.AttributeConstructions = attributeClasses
@@ -1180,7 +1176,7 @@ internal static class FragmentExtractor
         {
             if (_declared.ContainsKey(fqn) || _externals.ContainsKey(fqn)) return;
 
-            _externals[fqn] = new FragmentExternal(ExtractFacts(definition, fqn), definition.ContainingAssembly?.Name ?? "");
+            _externals[fqn] = MintExternal(definition, fqn, definition.ContainingAssembly?.Name ?? "");
             if (_siblingProjects is not null) SortOneProjectName(definition, fqn);
         }
 
@@ -1310,9 +1306,22 @@ internal static class FragmentExtractor
                 ? _compilation.Assembly.Name
                 : definition.ContainingAssembly?.Name ?? "";
 
-            side.Externals[fqn] = new FragmentExternal(ExtractFacts(definition, fqn), assemblyName);
+            side.Externals[fqn] = MintExternal(definition, fqn, assemblyName);
 
             return fqn;
+        }
+
+        // The one mint both homes share. What a type passes down is read only where it can be a base: the merge keeps
+        // the first fragment's record of an external, so the list must come from the symbol alone, never from the
+        // route that reached it, or a fragment that met the type another way would win the table with an empty list.
+        private FragmentExternal MintExternal(INamedTypeSymbol definition, string fqn, string assemblyName)
+        {
+            IReadOnlyList<FragmentConstruction> passedDown =
+                definition is { TypeKind: RoslynTypeKind.Class, IsSealed: false, IsStatic: false }
+                    ? InheritableAttributesOf(definition)
+                    : [];
+
+            return new FragmentExternal(ExtractFacts(definition, fqn), assemblyName, passedDown);
         }
 
         // Whether the own assembly declares a type of the same namespace, name and arity, found by walking down the
@@ -1518,7 +1527,6 @@ internal static class FragmentExtractor
         public IReadOnlyList<FragmentConstruction> BaseTypeChain { get; set; } = [];
         public IReadOnlyList<FragmentConstruction> AttributeConstructions { get; set; } = [];
         public IReadOnlyList<FragmentConstruction> PassedDown { get; set; } = [];
-        public IReadOnlyList<IReadOnlyList<FragmentConstruction>> BaseAttributes { get; set; } = [];
 
         public FragmentType ToFragmentType()
         {
@@ -1532,7 +1540,6 @@ internal static class FragmentExtractor
                 BaseTypeChain,
                 AttributeConstructions,
                 PassedDown,
-                BaseAttributes,
                 Members.Select(m => m.Member).ToList());
         }
     }

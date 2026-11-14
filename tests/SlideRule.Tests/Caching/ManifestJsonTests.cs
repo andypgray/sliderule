@@ -305,7 +305,6 @@ public sealed class ManifestJsonTests
             BaseTypeChain: [construction],
             AttributeConstructions: [construction],
             PassedDown: [construction],
-            BaseAttributes: [[construction]],
             DeclaredMembers: [member]);
 
         TypeFacts externalFacts = typeFacts with
@@ -313,7 +312,7 @@ public sealed class ManifestJsonTests
             FullName = "System.Exception", SymbolId = "T:System.Exception", Name = "Exception", Namespace = "System",
             Kind = TypeKind.Class
         };
-        var external = new FragmentExternal(externalFacts, "System.Runtime");
+        var external = new FragmentExternal(externalFacts, "System.Runtime", PassedDown: [construction]);
 
         var edge = new FragmentEdge("N.Widget", "N.Msg", [site]);
         var memberEdge = new FragmentMemberEdge("N.Widget", "N.Msg", "Body", "P:N.Msg.Body", MemberKind.Property, [site]);

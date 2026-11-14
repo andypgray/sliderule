@@ -216,6 +216,21 @@ public sealed class PackageShadowedNameTests
     }
 
     [Fact]
+    public void Merge_ABaseOnBothSidesOfTheSplit_PassesDownWhatEachBindingDeclares()
+    {
+        // The package's Widget and the stand-in wear different attributes, so a type inheriting the other side's
+        // attribute, or both, can only have read the base through the wrong node.
+        CodebaseModel model = ExtractInheritedAttributeBed();
+
+        model.Type("Product.Fancy")
+            .InheritedAttributes.DefinitionNames()
+            .ShouldBe(["Vendor.BrandedAttribute"]);
+        model.Type("Product.Tests.TestWidget")
+            .InheritedAttributes.DefinitionNames()
+            .ShouldBe(["Vendor.PlainAttribute"]);
+    }
+
+    [Fact]
     public void Check_ProductMustNotReferenceTests_PassesOverAShadowedName()
     {
         // The layering rule the shadowed name must not trip. Green alone would prove
@@ -393,6 +408,38 @@ public sealed class PackageShadowedNameTests
                                                                                                  namespace Vendor;
                                                                                                  public class Fault : System.Exception {}
                                                                                                  """));
+
+        return Harness.Extract([product, tests]);
+    }
+
+    // A bed of its own for the same reason as the catch bed: a base on both sides of the split, each side carrying
+    // an attribute the other lacks.
+    private static CodebaseModel ExtractInheritedAttributeBed()
+    {
+        CSharpCompilation vendor = CompilationFactory.CreateCompilation(
+            "Vendor", [CompilationFactory.CoreLibrary], ("Vendor.cs", """
+                                                                      namespace Vendor;
+                                                                      public sealed class BrandedAttribute : System.Attribute {}
+                                                                      [Branded] public class Widget {}
+                                                                      """));
+
+        CompilationInput product = CompilationFactory.CompileAgainstPackages(
+            "Product", [vendor], ("Fancy.cs", """
+                                              namespace Product;
+                                              public class Fancy : Vendor.Widget {}
+                                              """));
+
+        CompilationInput tests = CompilationFactory.Compile(
+            "Product.Tests",
+            ("Mocks/Vendor.cs", """
+                                namespace Vendor;
+                                public sealed class PlainAttribute : System.Attribute {}
+                                [Plain] public class Widget {}
+                                """),
+            ("TestWidget.cs", """
+                              namespace Product.Tests;
+                              public class TestWidget : Vendor.Widget {}
+                              """));
 
         return Harness.Extract([product, tests]);
     }

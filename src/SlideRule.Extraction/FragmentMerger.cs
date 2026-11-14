@@ -115,6 +115,11 @@ internal static class FragmentMerger
         private readonly Dictionary<string, SortedSet<string>> _multiFrameworkWinners = new(StringComparer.Ordinal);
         private readonly Dictionary<NodeKey, TypeNode> _nodes = new();
 
+        // Node → what it passes to its descendants: a declared node's winning declaration, read from its own
+        // compilation, or an external or shadow node's first-recorded external. A node that passes nothing has no
+        // entry, which is most nodes.
+        private readonly Dictionary<TypeNode, IReadOnlyList<FragmentConstruction>> _passedDown = new();
+
         // Assembly name → the project whose fragments produce it, read to tell which declarer's copy of a shared
         // name a compilation bound.
         private readonly AssemblyProducers _projectsByAssembly = new();
@@ -191,7 +196,7 @@ internal static class FragmentMerger
             }
 
             foreach (DeclarerRoster roster in _rosters.Values)
-                PopulateInheritedAttributes(roster.Node, roster.Winning);
+                PopulateInheritedAttributes(roster.Node);
 
             // One fragment at a time rather than one family at a time, so each family reads the supplier map and
             // the project of the fragment that observed it. Nothing here is order-sensitive: every site and
@@ -251,6 +256,7 @@ internal static class FragmentMerger
                 var node = declared.Facts.ToTypeNode(fragment.ProjectName, isExternal: false);
                 _nodes[NodeKey.Unshadowed(fqn)] = node;
                 _rosters[fqn] = roster = new DeclarerRoster(node, declared, fragmentIndex);
+                if (declared.PassedDown.Count > 0) _passedDown[node] = declared.PassedDown;
             }
             else
             {
@@ -475,22 +481,16 @@ internal static class FragmentMerger
                 .ToList();
         }
 
-        // Run once every hierarchy is resolved, so each base is its node. A base the solution declares contributes
-        // what its own winning declaration passes down, read from its own compilation, because an image can lack an
-        // attribute its source declares; any other base contributes
-        // what the referring fragment read from it. A type nothing passes anything to keeps the empty default, which
-        // is most types, so the set is made only once a base contributes.
-        private void PopulateInheritedAttributes(TypeNode node, FragmentType declared)
+        // Run once every hierarchy is resolved, so each base is its node and each node's entry in _passedDown is
+        // written. A base the solution declares contributes what its source passes down, because an image can lack
+        // an attribute its source declares, and a shadow contributes what its own assembly's copy passes down.
+        private void PopulateInheritedAttributes(TypeNode node)
         {
             HashSet<FragmentConstruction>? inherited = null;
-            for (var i = 0; i < node.BaseTypeChain.Count; i++)
+            foreach (TypeConstruction baseConstruction in node.BaseTypeChain)
             {
-                TypeNode baseNode = node.BaseTypeChain[i].Definition;
-                bool declaredHere = _rosters.TryGetValue(baseNode.FullName, out DeclarerRoster? baseRoster)
-                                    && ReferenceEquals(baseRoster.Node, baseNode);
-                IReadOnlyList<FragmentConstruction> passed =
-                    declaredHere ? baseRoster!.Winning.PassedDown : declared.BaseAttributes[i];
-                if (passed.Count == 0) continue;
+                if (!_passedDown.TryGetValue(baseConstruction.Definition, out IReadOnlyList<FragmentConstruction>? passed))
+                    continue;
 
                 inherited ??= new HashSet<FragmentConstruction>();
                 inherited.UnionWith(passed);
@@ -642,6 +642,7 @@ internal static class FragmentMerger
             FragmentExternal external = _externalFacts[nodeKey];
             node = external.Facts.ToTypeNode(external.AssemblyName, isExternal: true);
             _nodes[nodeKey] = node;
+            if (external.PassedDown.Count > 0) _passedDown[node] = external.PassedDown;
             return node;
         }
 

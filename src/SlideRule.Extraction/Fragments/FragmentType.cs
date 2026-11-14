@@ -7,14 +7,12 @@ namespace SlideRule.Extraction.Fragments;
 /// <remarks>
 ///     Each list's order is part of the serialized form and must survive a round trip:
 ///     <see cref="Interfaces" /> and <see cref="Attributes" /> are in symbol order, unsorted;
-///     <see cref="AllInterfaces" />, <see cref="AttributeConstructions" />, <see cref="PassedDown" /> and each list
-///     of <see cref="BaseAttributes" /> are ordinal by constructed name;
-///     <see cref="BaseTypeChain" /> is nearest-first and never sorted; <see cref="DeclaredMembers" /> is
-///     ordinal by <see cref="MemberFacts.SymbolId" />. <see cref="BaseTypeFullName" /> is null for interfaces
-///     and <see cref="object" />. The two inherited-attribute slots are recorded by name and mint no external node:
-///     <see cref="PassedDown" /> is what this type's own declaration passes to its descendants, read from its own
-///     compilation, and <see cref="BaseAttributes" /> holds, index for index with <see cref="BaseTypeChain" />, what
-///     each base passes down as this compilation reads it.
+///     <see cref="AllInterfaces" />, <see cref="AttributeConstructions" /> and <see cref="PassedDown" /> are ordinal
+///     by constructed name; <see cref="BaseTypeChain" /> is nearest-first and never sorted;
+///     <see cref="DeclaredMembers" /> is ordinal by <see cref="MemberFacts.SymbolId" />.
+///     <see cref="BaseTypeFullName" /> is null for interfaces and <see cref="object" />. <see cref="PassedDown" /> is
+///     what this type's own declaration passes to its descendants, read from its own compilation and recorded by
+///     name, so it mints no external node.
 /// </remarks>
 internal sealed record FragmentType(
     TypeFacts Facts,
@@ -26,5 +24,4 @@ internal sealed record FragmentType(
     IReadOnlyList<FragmentConstruction> BaseTypeChain,
     IReadOnlyList<FragmentConstruction> AttributeConstructions,
     IReadOnlyList<FragmentConstruction> PassedDown,
-    IReadOnlyList<IReadOnlyList<FragmentConstruction>> BaseAttributes,
     IReadOnlyList<FragmentMember> DeclaredMembers);
