@@ -4,17 +4,17 @@
     "net10.0": {
       "Basic.CompilerLog.Util": {
         "type": "Direct",
-        "requested": "[0.9.65, )",
-        "resolved": "0.9.65",
-        "contentHash": "ruuJsO8nnyV/sdiOYVjRxlpJdhvnZKPua/AL7jAzUgqnOq71paNC8H8gzeQiB3+LujWbXD3wXKgjkvz8kDRfDQ==",
+        "requested": "[0.9.66, )",
+        "resolved": "0.9.66",
+        "contentHash": "dDnEFB5eFVqAmBXj3BbUDbzHkglyrD7iDBSN9QteUAOwedpPdAIsM4TOoTdzu4c0af4WgKU1GeRRHBMt2pZw3w==",
         "dependencies": {
-          "MSBuild.StructuredLogger": "2.3.246",
+          "MSBuild.StructuredLogger": "2.3.269",
           "MessagePack": "3.1.12",
-          "Microsoft.Bcl.Memory": "10.0.13",
+          "Microsoft.Bcl.Memory": "10.0.14",
           "Microsoft.CodeAnalysis": "4.8.0",
           "Microsoft.CodeAnalysis.CSharp": "4.8.0",
           "Microsoft.CodeAnalysis.VisualBasic": "4.8.0",
-          "Microsoft.Extensions.ObjectPool": "10.0.13"
+          "Microsoft.Extensions.ObjectPool": "10.0.14"
         }
       },
       "Microsoft.Build": {
@@ -130,9 +130,9 @@
       },
       "MSBuild.StructuredLogger": {
         "type": "Direct",
-        "requested": "[2.3.246, )",
-        "resolved": "2.3.246",
-        "contentHash": "W7sQrvBS9KzipO7TuL35RsahjDIWxjieK1x9SasTHcu8jbTUyUSxPxnwmt5I19WyMvytatI0TqpL3xF4XL9mhw==",
+        "requested": "[2.3.269, )",
+        "resolved": "2.3.269",
+        "contentHash": "m3mgwxcJ3cl8+FA8k99lwIjGybfJsDdcnkrVZheTyr/WQS+2DV55tgc7AQsBfOstJfNYNFXhBsXvi28fjAbD1Q==",
         "dependencies": {
           "Microsoft.Build.Framework": "17.5.0",
           "Microsoft.Build.Utilities.Core": "17.5.0"
@@ -185,8 +185,8 @@
       },
       "Microsoft.Bcl.Memory": {
         "type": "Transitive",
-        "resolved": "10.0.13",
-        "contentHash": "AOGTKbd+0Xzi/ZsU1n6TwHJqcZqVVRg1iLLNh+D2mQ3++lIRGcuSfH+TYosuqCo3259s0giL+mFJ2rxAf+xDSQ=="
+        "resolved": "10.0.14",
+        "contentHash": "jo1HIWeMOhYoyGrFVIGYdLEDsioD+djIXSqtzIpv3bp4bk/d/K58vYdJGlWBh9AqFaTPUUMtTdl2a9mcf/wduA=="
       },
       "Microsoft.CodeAnalysis.Analyzers": {
         "type": "Transitive",
@@ -276,8 +276,8 @@
       },
       "Microsoft.Extensions.ObjectPool": {
         "type": "Transitive",
-        "resolved": "10.0.13",
-        "contentHash": "NX3bhcc0WitPKAVc9Zfi8jeEPClhfEmobUJM4a4bkWhJcBt5IWg6lCrItUoFy4whLjU+atXktURYCweQlR7wfg=="
+        "resolved": "10.0.14",
+        "contentHash": "nBvu7Mxct9qBt37meuwloqVp3FxnitlvfbLmwkVMVWIxJTSKJnLg7ve53l4vUBwB/VcKfYJL6nlp8+hYAZyM4Q=="
       },
       "Microsoft.Extensions.Options": {
         "type": "Transitive",
