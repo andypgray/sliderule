@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `render` prints a warning on stderr when Codex would cut the files it writes short. By default Codex reads
+  32 KiB of the `AGENTS.md` files from the repository root down to the directory it was started in, cuts the
+  file that crosses the limit and skips the rest. The warning names the root `AGENTS.md` when it is over the
+  limit on its own, and otherwise the card whose total with the files above it is largest, and gives the
+  size and the fixes.
+- `render` prints a warning on stderr for each `AGENTS.override.md` next to a file it writes. Codex reads
+  that file in place of `AGENTS.md` in its directory, even when it is empty, so its sessions never see the
+  managed block or the card there.
+
 ### Fixed
 
 - On Linux and macOS, the MSBuild note printed next to a load failure now reads

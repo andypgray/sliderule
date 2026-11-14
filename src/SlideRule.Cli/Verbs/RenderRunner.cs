@@ -133,6 +133,12 @@ internal sealed class RenderRunner(
         if (CodexInstructionBudget.Warning(solutionDirectory, sizes) is { } cut)
             await error.WriteLineAsync($"warning: {cut}");
 
+        // An AGENTS.override.md beside a file this run writes is what Codex reads in its place, so that file never
+        // reaches a Codex session at all.
+        IEnumerable<string> written = composition.Files.Select(file => file.Path);
+        foreach (string hidden in CodexOverrideFiles.Warnings(solutionDirectory, written))
+            await error.WriteLineAsync($"warning: {hidden}");
+
         // Composed and read back before the first byte of any target hits disk. A file that does not read
         // back as it was written is a defect in this tool rather than in the spec, and the answer to one is
         // to render nothing at all — not to leave a fresh block and fresh cards standing beside a model file

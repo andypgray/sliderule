@@ -50,6 +50,16 @@ public sealed class RenderCommandE2ETests : IDisposable
     private const string TripwireReason =
         "A tripwire compares against a diff, which one project's compilation does not carry.";
 
+    // What render says of an AGENTS.override.md beside the root block, and beside the Domain card.
+    private const string RootOverrideWarning =
+        "warning: Codex reads AGENTS.override.md in place of AGENTS.md, so its sessions miss the managed block; "
+        + "move the override's text into AGENTS.md outside the managed block, or remove AGENTS.override.md.";
+
+    private const string DomainOverrideWarning =
+        "warning: Codex reads MyApp.Domain/AGENTS.override.md in place of MyApp.Domain/AGENTS.md, so sessions "
+        + "started in MyApp.Domain or below it miss that card; move the override's text into "
+        + "MyApp.Domain/AGENTS.md outside the managed block, or remove MyApp.Domain/AGENTS.override.md.";
+
     // What a fresh MyAppRenderSpec render reports: its three cards, and, where it writes the model file, that
     // line with the rule split beneath it.
     private const string RenderSpecCardsWritten =
@@ -243,6 +253,8 @@ public sealed class RenderCommandE2ETests : IDisposable
     private string WebAgents => _workspace.PathOf("MyApp.Web", "AGENTS.md");
     private string DomainAgents => _workspace.PathOf("MyApp.Domain", "AGENTS.md");
     private string Architecture => _workspace.PathOf("ARCHITECTURE.md");
+    private string RootOverride => _workspace.PathOf("AGENTS.override.md");
+    private string DomainOverride => _workspace.PathOf("MyApp.Domain", "AGENTS.override.md");
 
     [Fact]
     public async Task Render_Fresh_WritesPinnedRootAndScopeFilesAndNoLayerCards()
@@ -810,6 +822,65 @@ public sealed class RenderCommandE2ETests : IDisposable
             .ShouldBe(rendered);
     }
 
+    // ── AGENTS.override.md, which Codex reads in place of AGENTS.md ─────────────────────────────────────────
+
+    [Fact]
+    public async Task Render_AnOverrideBesideTheRoot_WarnsThatCodexSessionsMissTheBlock()
+    {
+        File.WriteAllText(RootOverride, "Notes for Codex only.\n");
+
+        CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
+
+        result.ShouldSucceed();
+        result.ShouldPrint(RenderSpecCardsWritten);
+        CodexOverrideWarnings(result).ShouldBe([RootOverrideWarning], result.Transcript());
+    }
+
+    [Fact]
+    public async Task Render_AnOverrideBesideACard_WarnsNamingTheCardAndItsDirectory()
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(DomainOverride)!);
+        File.WriteAllText(DomainOverride, "Notes for Codex only.\n");
+
+        CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
+
+        result.ShouldSucceed();
+        result.ShouldPrint(RenderSpecCardsWritten);
+        CodexOverrideWarnings(result).ShouldBe([DomainOverrideWarning], result.Transcript());
+    }
+
+    [Fact]
+    public async Task Render_AnEmptyOverride_StillWarns()
+    {
+        // Codex chooses the override before it reads it, so an empty one still stands in for the root block.
+        File.WriteAllText(RootOverride, "");
+
+        CliResult result = await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll);
+
+        result.ShouldSucceed();
+        CodexOverrideWarnings(result).ShouldBe([RootOverrideWarning], result.Transcript());
+    }
+
+    [Fact]
+    public async Task RenderCheck_OverridesBesideTheRootAndACard_WarnsRootFirstAndStillReportsThemCurrent()
+    {
+        // Arrange
+        (await CliRunner.InvokeAsync("render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll))
+            .ShouldSucceed();
+        File.WriteAllText(DomainOverride, "Notes for Codex only.\n");
+        File.WriteAllText(RootOverride, "Notes for Codex only.\n");
+
+        // Act
+        CliResult result = await CliRunner.InvokeAsync(
+            "render", _workspace.SolutionPath, "--spec", CliRunner.RenderSpecDll, "--check");
+
+        // Assert
+        result.ShouldSucceed();
+        result.ShouldPrint(
+            "current AGENTS.md\ncurrent MyApp.Legacy.Billing/AGENTS.md\ncurrent MyApp.Domain/AGENTS.md");
+        CodexOverrideWarnings(result).ShouldBe([RootOverrideWarning, DomainOverrideWarning], result.Transcript());
+    }
+
     [Fact]
     public async Task Render_AMalformedCard_IsRefusedBeforeTheRootIsWritten()
     {
@@ -945,6 +1016,15 @@ public sealed class RenderCommandE2ETests : IDisposable
     {
         const string line = "Hand-written notes for agents working in this directory.\n";
         return string.Concat(Enumerable.Repeat(line, atLeast / line.Length + 1));
+    }
+
+    // Every stderr line that names an AGENTS.override.md, in the order render printed them.
+    private static IReadOnlyList<string> CodexOverrideWarnings(CliResult result)
+    {
+        return result.Err.NormalizedLines()
+            .Split('\n')
+            .Where(line => line.Contains("AGENTS.override.md", StringComparison.Ordinal))
+            .ToList();
     }
 
     // A file's size on disk, as the Codex budget warning prints it.

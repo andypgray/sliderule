@@ -28,6 +28,8 @@ A repository that already has a `CLAUDE.md` brings the managed block in with one
 
 Codex reads the `AGENTS.md` files from the repository root down to the directory it was started in, and by default it stops after 32 KiB of them combined. The file that crosses the limit is cut short, and any file after it is skipped. `render` prints a warning on stderr when the files it writes would pass that limit, either the root `AGENTS.md` alone or a card together with the files above it. The warning gives the size and two fixes, raising `project_doc_max_bytes` in Codex's `config.toml` or shortening the file. OpenAI's [AGENTS.md guide](https://learn.chatgpt.com/docs/agent-configuration/agents-md) describes the lookup.
 
+In any directory that holds an `AGENTS.override.md`, Codex reads that file in place of `AGENTS.md`, even when it is empty. `render` prints a warning on stderr for each override next to a file it writes, naming the file the override hides and two fixes: moving the override's text into `AGENTS.md` outside the managed block, or removing the override.
+
 ## Connecting the MCP server
 
 Install the tool first, as [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#requirements) shows. An MCP client launches the tool with the `mcp` command, and the server speaks stdio. In a project's `.mcp.json`, the entry looks like this:
