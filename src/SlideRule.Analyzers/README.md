@@ -169,13 +169,13 @@ only the early warning.
 
 The analyzer runs a full extraction of the project inside the compiler, and that extraction is nearly
 all of its cost. These figures come from a large open-source web application. In a command-line
-build the compile step of its largest project went from 58.1 s to 85.6 s, and a class library's from
-13.9 s to 16.4 s. In the editor, re-analysing one file after an edit took 0.7 ms at the median and
-33 ms at the 95th percentile, over the same project's 1,174 authored files. Over its 803 generated
-Razor files the median was 15 ms.
+build the analyzer made the compile step of its largest project 47% longer, and a class library's
+18% longer. The editor figures are one run's, on an 8-core Windows 10 workstation in September 2026.
+Re-analysing one file after an edit took 0.7 ms at the median and 33 ms at the 95th percentile, over
+the same project's 1,174 authored files. Over its 803 generated Razor files the median was 15 ms.
 
-Reading the model file adds a fixed cost of about a quarter of a second, even to a project with no
-rule to check. The compiler server that `dotnet build` uses by default keeps what it read until the
+Reading the model file adds a fixed cost to every project, even one with no rule to check. On the
+same workstation in September 2026 it was about a quarter of a second. The compiler server that `dotnet build` uses by default keeps what it read until the
 file changes, so a project compiled after that read skips it. A build with
 `-p:UseSharedCompilation=false` runs each project in a compiler process of its own, so every project
 pays it.
@@ -190,7 +190,7 @@ One property, `SlideRuleTier`, chooses where the analyzer reports:
 - `build` reports once per project at the end of its compilation. It is a command-line mode, and
   [What each editor shows](#what-each-editor-shows) covers the editors under it. It costs more,
   because it runs on one thread where `live` analyses several documents at once. The same largest
-  project compiled in 104.8 s under `build`.
+  project compiled 22% slower under `build` than under `live`.
 - `off` turns the analyzer off for a project, or for a configuration.
 
 The value is case-insensitive, and an unknown value counts as `live`. Set it on the command line

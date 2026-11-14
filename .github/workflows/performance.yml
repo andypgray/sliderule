@@ -1,0 +1,63 @@
+name: Performance
+
+# Performance as ratios measured inside one job. A runner label fixes the image and the core count, never the
+# hardware, so an absolute time describes the machine a run happened to get. Each ratio's two terms are
+# measured minutes apart on the same runner, and the job summary carries them with the run's provenance: the
+# runner image and version, the CPU model it reports, the date, the commit and a link to the run.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Two beds of different sizes: this repository, and the pinned eShopOnWeb showcase fork. The script rotates
+  # the arm order every round and discards the first check after every build, so the once-per-build warm-up
+  # never lands inside a measured arm.
+  ratios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
+        run: bash .github/scripts/relock.sh
+      # The binaries being timed live outside both beds, so a clean build of this repository's bed cannot
+      # rewrite them mid-measurement.
+      - name: Build the SlideRule CLI and copy it out of the tree
+        run: |
+          dotnet build src/SlideRule.Cli/SlideRule.Cli.csproj -c Release -p:RestoreLockedMode=true
+          cp -r src/SlideRule.Cli/bin/Release/net10.0 "$RUNNER_TEMP/cli"
+      # The build arm runs without a restore, and building the spec restores only the projects it references,
+      # so the whole solution is restored first.
+      - name: Prepare this repository as a bed
+        run: |
+          bed="$RUNNER_TEMP/self-bed"
+          git worktree add --detach "$bed" HEAD
+          dotnet restore "$bed/SlideRule.slnx"
+          dotnet build "$bed/arch/SlideRule.Architecture/SlideRule.Architecture.csproj" --no-restore
+          {
+            echo "SELF_SOLUTION=$bed/SlideRule.slnx"
+            echo "SELF_SPEC=$bed/arch/SlideRule.Architecture/SlideRule.Architecture.csproj"
+          } >> "$GITHUB_ENV"
+      - name: Fetch and build the pinned showcase fork
+        run: |
+          . .github/scripts/showcase-fork.sh
+          fetch_showcase_fork "$RUNNER_TEMP/showcase"
+      - name: Test the measuring script's guards
+        run: python3 -m unittest discover -s .github/scripts -p "test_*.py" -v
+      - name: Measure the ratios and write them to the job summary
+        run: >-
+          python3 .github/scripts/perf_ratios.py
+          --cli "$RUNNER_TEMP/cli/sliderule-cli.dll"
+          --bed SlideRule "$SELF_SOLUTION" "$SELF_SPEC"
+          --bed eShopOnWeb "$SHOWCASE_SOLUTION" "$SHOWCASE_SPEC"

@@ -38,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   byte. Otherwise the hook checks in its own process, as before. Both processes first remove the shell's own
   variables and list each `PATH` directory once. On Windows a server the client starts directly still sees a
   different `PATH` from a hook run through Git's bash, so it never serves a stop. On this repository, whose server
-  starts through Git's `sh`, a stop after a one-line edit took 5 seconds through the server and 26 seconds without it. `SLIDERULE_HOOK_TIMEOUT` tells the hook your
+  starts through Git's `sh`, a stop after a one-line edit took about a fifth as long through the server as without it. `SLIDERULE_HOOK_TIMEOUT` gives the hook your
   client's timeout where it is not Claude Code's 600 seconds, and `SLIDERULE_DISABLE_WARM_HOOK` keeps every stop
   in the hook's own process.
 - `check --timings` writes the wall-clock time of each phase of the run to stderr after the report, from
@@ -366,7 +366,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   such a context could deadlock.
 - Extracting a field or property initializer now takes time in proportion to its size. Before, each method
   call, object creation, `?.` call and type name in it, such as a type argument, a cast or a qualified name,
-  bound the whole initializer again, so an initializer of 400 rows took 28.8 s where it now takes 0.3 s.
+  bound the whole initializer again, so an initializer of 400 rows now extracts about 96 times faster.
   The build analyzer, the xUnit adapter and every command and MCP tool that reads the code run this
   extraction, and what it extracts is unchanged.
 - `--diff-base` and `arch_check`'s `diffBase` now count a file moved since the ref as changed at both its

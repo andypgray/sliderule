@@ -2072,24 +2072,10 @@ jobs:
       # Relock for Dependabot NuGet PRs, so the builds below are of the bump.
       - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
         run: bash .github/scripts/relock.sh
-      # The pin names a commit, which a shallow fetch reaches without its history. The audit is off
-      # because the replay quotes no advisory, and the advisories change with the date.
       - name: Fetch and build the pinned showcase fork
         run: |
-          pin=examples/eShopOnWeb/showcase.json
-          root="$RUNNER_TEMP/showcase"
-          git init -q "$root"
-          git -C "$root" fetch -q --depth 1 "$(jq -r '.fork.repository' "$pin")" "$(jq -r '.fork.commit' "$pin")"
-          git -C "$root" checkout -q FETCH_HEAD
-          solution="$root/$(jq -r '.solution' "$pin")"
-          spec="$root/$(jq -r '.specProject' "$pin")"
-          dotnet restore "$solution" -p:NuGetAudit=false
-          dotnet build "$spec" --no-restore
-          {
-            echo "SHOWCASE_ROOT=$root"
-            echo "SHOWCASE_SOLUTION=$solution"
-            echo "SHOWCASE_SPEC=$spec"
-          } >> "$GITHUB_ENV"
+          . .github/scripts/showcase-fork.sh
+          fetch_showcase_fork "$RUNNER_TEMP/showcase"
       # The test project references the CLI, so this one build serves the checks and the tests below.
       - name: Build the SlideRule CLI and the test project
         run: dotnet build tests/SlideRule.Tests/SlideRule.Tests.csproj -p:RestoreLockedMode=true
