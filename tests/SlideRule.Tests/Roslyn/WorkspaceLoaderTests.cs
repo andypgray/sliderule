@@ -29,7 +29,8 @@ namespace SlideRule.Tests.Roslyn;
 ///     </para>
 ///     <para>
 ///         The closure load's refusals: a subset the solution cannot express as a filter answers null, so the caller
-///         loads the whole solution instead, and it answers before any workspace opens.
+///         loads the whole solution instead, and it answers before any workspace opens. An SDK the pin cannot resolve is
+///         the exception: it propagates as the refusal, since the whole solution's load would refuse the same way.
 ///     </para>
 ///     <para>
 ///         The load warnings the workspace itself never reports, each driven through a real load: an <c>Analyzer</c>
@@ -86,6 +87,20 @@ public sealed class WorkspaceLoaderTests
         LoadedSolution? loaded = await WorkspaceLoader.LoadClosureAsync(solution, [temp.PathOf("A", "A.csproj")], ct: Ct);
 
         loaded.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task LoadClosureAsync_UnderAnUnresolvableSdkPin_ThrowsTheRefusalRatherThanReturningNull()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("loader-closure");
+        (string pin, string solution) = ScratchProjects.WriteBrokenPinBed(temp);
+        string project = temp.PathOf("Lib", "Lib.csproj");
+
+        var refusal = await Should.ThrowAsync<UserErrorException>(() => WorkspaceLoader.LoadClosureAsync(solution, [project], ct: Ct));
+
+        refusal.Message.ShouldStartWith(
+            $"The .NET host could not resolve an SDK for version {ScratchProjects.UnresolvableSdkVersion}, which "
+            + $"'{pin}' pins, so the solution's projects cannot be loaded.");
     }
 
     [Fact]

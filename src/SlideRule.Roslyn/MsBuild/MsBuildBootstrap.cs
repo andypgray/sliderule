@@ -1,4 +1,5 @@
 using Microsoft.Build.Locator;
+using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Hosting;
 
 namespace SlideRule.Roslyn.MsBuild;
@@ -154,7 +155,7 @@ internal static class MsBuildBootstrap
             if (best is not null) return RegisterFromVsInstance(best);
         }
 
-        MSBuildLocator.RegisterDefaults();
+        RegisterDefaults();
         return new MsBuildSelection(DescribeDefaultFallback(whyNone));
     }
 
@@ -196,7 +197,7 @@ internal static class MsBuildBootstrap
         if (!registered)
         {
             // VS install missing MSBuild — extremely unusual but degrade gracefully.
-            MSBuildLocator.RegisterDefaults();
+            RegisterDefaults();
             return new MsBuildSelection(
                 $"MSBuildLocator default (selected '{instance.Name}' had no MSBuild at '{msBuildBin}')");
         }
@@ -235,6 +236,20 @@ internal static class MsBuildBootstrap
         catch (InvalidOperationException)
         {
             MSBuildLocator.RegisterMSBuildPath(msBuildBin);
+        }
+    }
+
+    // The default registration resolves the SDK from the working directory, so a global.json there pinning an
+    // SDK the host cannot resolve fails it; that failure is worded here, and anything else passes through.
+    private static void RegisterDefaults()
+    {
+        try
+        {
+            MSBuildLocator.RegisterDefaults();
+        }
+        catch (InvalidOperationException ex) when (SdkResolutionRefusal.DetailOf(ex) is not null)
+        {
+            throw SdkResolutionRefusal.ForRegistration(Environment.CurrentDirectory, ex);
         }
     }
 

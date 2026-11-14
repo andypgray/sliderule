@@ -60,7 +60,8 @@ internal static class WorkspaceLoader
     ///     <see cref="LoadedSolution.LoadDiagnosticsWith" />, never the messages'.
     /// </remarks>
     /// <exception cref="UserErrorException">
-    ///     The <c>.slnf</c> filter at <paramref name="solutionPath" /> could not be read.
+    ///     The <c>.slnf</c> filter at <paramref name="solutionPath" /> could not be read, or the .NET host could not
+    ///     resolve the SDK a <c>global.json</c> pins for the solution or one of its projects.
     /// </exception>
     // MethodImplOptions.NoInlining keeps the JIT from resolving MSBuild/Roslyn assemblies before
     // MSBuildLocator registration in non-test hosts; in tests registration happens in a
@@ -156,8 +157,11 @@ internal static class WorkspaceLoader
             await File.WriteAllTextAsync(filterPath, filterText, ct).ConfigureAwait(false);
             return await LoadAsync(filterPath, diagnosticLog, ct).ConfigureAwait(false);
         }
+        // An SDK the pin cannot resolve fails the whole solution's load as surely as this one's, so that refusal
+        // propagates rather than sending the caller to a reload that would refuse the same way.
         catch (Exception ex) when (ex is UserErrorException or IOException or UnauthorizedAccessException
-                                       or FormatException or XmlException)
+                                       or FormatException or XmlException
+                                   && !SdkResolutionRefusal.IsRefusal(ex))
         {
             return null;
         }
@@ -235,6 +239,8 @@ internal static class WorkspaceLoader
                + "disk, so any code it generates is absent from the model.";
     }
 
+    // An unresolvable SDK pin escapes OpenSolutionAsync from the build host as a bare exception whose message alone
+    // carries hostfxr's text; it is caught first, so a filter under a broken pin is not misreported as unreadable.
     // Roslyn's SolutionFilterReader signals every filter fault by throwing a bare Exception out of
     // OpenSolutionAsync, measured as the same "Failed to load solution filter" for malformed JSON, a missing
     // 'solution' key, a solution path that does not resolve and a project entry naming a non-member; unmapped
@@ -246,6 +252,10 @@ internal static class WorkspaceLoader
         try
         {
             return await workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException && SdkResolutionRefusal.DetailOf(ex) is not null)
+        {
+            throw SdkResolutionRefusal.ForLoad(solutionPath, ex);
         }
         catch (Exception ex) when (ex is not OperationCanceledException
                                    && SolutionProjectFileParser.IsFilterFormat(solutionPath))

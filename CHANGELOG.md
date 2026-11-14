@@ -36,6 +36,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Every command and MCP tool that loads the solution now refuses when a `global.json` pins an SDK the .NET
+  host cannot resolve. The refusal names the pinned version and the file, quotes the host, and gives the
+  ways out: the repository's own instruction when the pin supplies one, installing that SDK or
+  updating the pin, and putting a dotnet root that has it first on `PATH`. The tools used to answer
+  `An exception of type System.InvalidOperationException was thrown: Error while calling hostfxr function
+  hostfxr_resolve_sdk2. Error code: -2147450725 Detailed error: ...`, and the CLI printed a stack trace. On
+  Linux and macOS, a command or the MCP server started from a directory under such a pin now refuses the
+  same way before MSBuild registers, where it printed a stack trace and the server stopped at startup.
 - On Linux and macOS, the MSBuild note printed next to a load failure now reads
   `MSBuild for this run: MSBuildLocator default (the .NET SDK's MSBuild).` It said vswhere had found no
   Visual Studio and suggested `SLIDERULE_VS_INSTALL_PATH`, but vswhere runs only on Windows and the variable

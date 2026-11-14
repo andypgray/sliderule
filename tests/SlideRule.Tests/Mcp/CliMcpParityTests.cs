@@ -183,6 +183,37 @@ public sealed class CliMcpParityTests
     }
 
     [Fact]
+    public async Task HarnessK_UnresolvableSdkPin_GraphRefusesWithTheCliWording()
+    {
+        // Arrange — the pin's own errorMessage replaces hostfxr's text, whose list of installed SDKs differs by
+        // machine, so the whole refusal pins. The bound is generous: Roslyn waits up to a minute for its build host.
+        using TempDirectory bed = TestTempRoot.Fresh("sdk-pin");
+        (string pin, string solution) = ScratchProjects.WriteBrokenPinBed(bed);
+        using var bounded = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        bounded.CancelAfter(TimeSpan.FromMinutes(3));
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(solution, null), bounded.Token);
+
+        // Act
+        CliResult cold = await CliRunner.InvokeColdAsync("graph", solution);
+        CallToolResult graph = await harness.Client.CallToolAsync("arch_graph", cancellationToken: bounded.Token);
+
+        // Assert
+        string version = ScratchProjects.UnresolvableSdkVersion;
+        cold.ShouldRefuseWithExactly(
+            $"The .NET host could not resolve an SDK for version {version}, which '{pin}' pins, so the solution's "
+            + "projects cannot be loaded.\n"
+            + "The .NET host said:\n"
+            + $"  {ScratchProjects.PinInstruction}\n"
+            + $"Follow the repository's instruction above; otherwise, install SDK {version}, or update '{pin}' to "
+            + "name an installed SDK.\n"
+            + "If the SDK is installed under another dotnet root, put that root first on PATH.\n"
+            + "Running from another directory does not help: each project resolves its SDK from its own directory.");
+        graph.ShouldHaveRefused()
+            .ShouldBeTheSameTextAs(cold.Err);
+    }
+
+    [Fact]
     public async Task HarnessB_CleanSpec_Check_MatchesCli()
     {
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(

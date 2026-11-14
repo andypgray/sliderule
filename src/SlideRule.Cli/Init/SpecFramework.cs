@@ -1,6 +1,6 @@
 using System.Globalization;
-using System.Text.Json;
 using SlideRule.Roslyn;
+using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Cli.Init;
 
@@ -59,15 +59,9 @@ internal static class SpecFramework
     /// </summary>
     internal static (int? Major, string? File) SdkPin(string directory)
     {
-        for (DirectoryInfo? current = new(directory); current is not null; current = current.Parent)
-        {
-            string candidate = Path.Combine(current.FullName, "global.json");
-            if (!File.Exists(candidate)) continue;
+        if (GlobalJsonPin.Nearest(directory) is not { } pin) return (null, null);
 
-            return (SdkMajor(File.ReadAllText(candidate)), candidate);
-        }
-
-        return (null, null);
+        return (SdkMajor(pin), pin.File);
     }
 
     // net48, net472, net35: .NET Framework's short monikers are "net" and two or three digits, with no dot.
@@ -87,39 +81,14 @@ internal static class SpecFramework
     }
 
     // The major of sdk.version, or null where the file names none or does not parse: the SDK itself refuses a
-    // malformed global.json, and that refusal names the file better than one here would.
-    private static int? SdkMajor(string globalJson)
+    // malformed global.json, and that refusal names the file better than one here would. Under the two
+    // cross-major rollForward policies the pinned version is a floor, not a ceiling: a newer installed SDK builds
+    // it, so there is no major to honour.
+    private static int? SdkMajor(GlobalJsonPin pin)
     {
-        JsonDocumentOptions options = new()
-        {
-            CommentHandling = JsonCommentHandling.Skip,
-            AllowTrailingCommas = true
-        };
-        try
-        {
-            using JsonDocument document = JsonDocument.Parse(globalJson, options);
-            if (document.RootElement.ValueKind != JsonValueKind.Object
-                || !document.RootElement.TryGetProperty("sdk", out JsonElement sdk)
-                || sdk.ValueKind != JsonValueKind.Object
-                || !sdk.TryGetProperty("version", out JsonElement version)
-                || version.ValueKind != JsonValueKind.String
-                || RollsForwardAcrossMajors(sdk))
-                return null;
+        if (pin.Version is not { } version || pin.RollForward is "major" or "latestMajor") return null;
 
-            string major = version.GetString()!.Split('.')[0];
-            return int.TryParse(major, NumberStyles.None, CultureInfo.InvariantCulture, out int value) ? value : null;
-        }
-        catch (JsonException)
-        {
-            return null;
-        }
-    }
-
-    // Under these two policies the pinned version is a floor, not a ceiling: a newer installed SDK builds it.
-    private static bool RollsForwardAcrossMajors(JsonElement sdk)
-    {
-        return sdk.TryGetProperty("rollForward", out JsonElement rollForward)
-               && rollForward.ValueKind == JsonValueKind.String
-               && rollForward.GetString() is "major" or "latestMajor";
+        string major = version.Split('.')[0];
+        return int.TryParse(major, NumberStyles.None, CultureInfo.InvariantCulture, out int value) ? value : null;
     }
 }
