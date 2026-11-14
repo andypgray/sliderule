@@ -548,6 +548,8 @@ jobs:
       #    recipe gives a strong-named product.
       # E: code style enforced in the build, with a file header required at error. The spec files are the
       #    repository's code, so the recipe has the agent write the header rather than opt out of the style.
+      # E2: an expression-body style enforced at error, IDE0022 on a one-statement Define; the cure is the
+      #    expression body the message asks for.
       # F: a TargetFrameworks list in the root props without the spec's framework. Restore follows the list
       #    while a singular element decides the build, which is NETSDK1005; the plural element overrides both.
       #    The control needs a net9.0 reference pack, so this leg's feed adds nuget.org behind the mapping.
@@ -557,6 +559,11 @@ jobs:
       #    lock file left behind a version change, NU1004, and the cure is a forced re-evaluation.
       # H: package source mapping that maps nothing to SlideRule, NU1100. A package folder that already holds
       #    the package answers the restore without consulting the mapping, so this leg gets a cold one.
+      # H2: a nuget.config that clears every source for one of the repository's own, NU1101 on SlideRule,
+      #    without mapping and with every id mapped to that feed. The cure is a spec-local nuget.config adding
+      #    the source that serves SlideRule, mapping it only where the repository maps. Every control is cold.
+      # I: versionless package references a Directory.Build.targets adds, NU1015 that a Remove in the spec
+      #    csproj cannot reach; the cure switches the targets file off for the spec project.
       - name: Scaffold the documented spec project under inherited repository policy, and check it
         run: |
           . .github/scripts/local-pack.sh
@@ -566,9 +573,10 @@ jobs:
           spec_scaffold_cut "$version"
 
           # A strong-name key for leg D, made before NUGET_PACKAGES points at a scaffold's folder. The program
-          # writes the key pair and prints the public key a strong-named product's InternalsVisibleTo grant names:
-          # the strong-name header, then the key blob with the signing algorithm in it, since the provider exports
-          # an exchange key.
+          # writes the key pair, and the public key a strong-named product's InternalsVisibleTo grant names: the
+          # strong-name header, then the key blob with the signing algorithm in it, since the provider exports an
+          # exchange key. The public key goes to a file, because dotnet run prints the build's own warnings (a
+          # NuGet audit warning on a package the SDK references, for one) on the stdout the program would share.
           mkdir -p "$RUNNER_TEMP/keygen"
           cat > "$RUNNER_TEMP/keygen/key.cs" <<'CS'
           using System.Security.Cryptography;
@@ -578,12 +586,13 @@ jobs:
           byte[] key = rsa.ExportCspBlob(includePrivateParameters: false);
           BitConverter.GetBytes(0x00002400).CopyTo(key, 4);
           byte[] blob = [0x00, 0x24, 0x00, 0x00, 0x04, 0x80, 0x00, 0x00, .. BitConverter.GetBytes(key.Length), .. key];
-          Console.WriteLine(Convert.ToHexStringLower(blob));
+          File.WriteAllText(args[1], Convert.ToHexStringLower(blob));
           CS
           key="$RUNNER_TEMP/keygen/scaffold.snk"
-          publickey="$(dotnet run "$RUNNER_TEMP/keygen/key.cs" -- "$key")"
+          dotnet run "$RUNNER_TEMP/keygen/key.cs" -- "$key" "$RUNNER_TEMP/keygen/publickey.txt"
+          publickey="$(cat "$RUNNER_TEMP/keygen/publickey.txt")"
           [[ "$publickey" =~ ^0024000004800000[0-9a-f]+$ ]] || {
-            echo "::error::The key helper printed '$publickey', not a strong-name public key blob"
+            echo "::error::The key helper wrote '$publickey', not a strong-name public key blob"
             exit 1
           }
 
@@ -720,6 +729,44 @@ jobs:
             exit 1
           }
 
+          # ── Leg E2: an expression-body style enforced in the build ───────────────────────────────
+          # The style reds a one-statement method with a block body. The checked rule moves into the recipe's own
+          # class, so the class the recipe publishes is the one the style reds and the one the recipe's fix cures.
+          exprbody="$RUNNER_TEMP/packageref-exprbody"
+          scaffold "$exprbody"
+          cat > "$exprbody/Directory.Build.props" <<'PROPS'
+          <Project>
+              <PropertyGroup>
+                  <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+              </PropertyGroup>
+          </Project>
+          PROPS
+          cat > "$exprbody/.editorconfig" <<'EDITORCONFIG'
+          root = true
+
+          [*.cs]
+          csharp_style_expression_bodied_methods = true
+          dotnet_diagnostic.IDE0022.severity = error
+          EDITORCONFIG
+          exprspec="$exprbody/arch/MyApp.Architecture/ArchitectureSpec.cs"
+          sed -n '/arch\.Rule(/,/;$/p' "$exprbody/arch/MyApp.Architecture/CheckedRule.cs" > "$RUNNER_TEMP/exprbody-rule.txt"
+          rm "$exprbody/arch/MyApp.Architecture/CheckedRule.cs"
+          sed -i "/^    {\$/r $RUNNER_TEMP/exprbody-rule.txt" "$exprspec"
+
+          build_fails_with "$exprbody/MyApp.slnx" "$RUNNER_TEMP/exprbody-block.log" 'ArchitectureSpec\.cs\([0-9]+,[0-9]+\): error IDE0022' \
+            "The recipe's spec class holding one rule in a block body did not fail with IDE0022 under an enforced expression-body style — the troubleshooting entry's IDE0022 example describes a failure this leg can no longer show"
+
+          sed -i -e '/^    {$/d' -e '/^    }$/d' -e 's|public void Define(Arch arch)$|public void Define(Arch arch) =>|' "$exprspec"
+          dotnet build "$exprbody/MyApp.slnx" || {
+            echo "::error::The scaffold did not build under an enforced expression-body style once its one-statement Define was expression-bodied, the fix the recipe gives for IDE0022"
+            cat "$exprspec"
+            exit 1
+          }
+          sliderule check "$exprbody/MyApp.slnx" || {
+            echo "::error::The expression-bodied spec built under enforced code style but was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
           # ── Leg F: a TargetFrameworks list in the root props without the spec's framework ────────
           tfms="$RUNNER_TEMP/packageref-tfms"
           scaffold "$tfms" mapped_pack_feed
@@ -847,6 +894,126 @@ jobs:
             echo "::error::The scaffolded spec project built under package source mapping but was not discovered, or did not pass over conforming code"
             exit 1
           }
+
+          # ── Leg H2: no repository source serves SlideRule, cured by a spec-local nuget.config ────
+          # The repository's nuget.config clears every source and lists only a feed of its own, an empty folder
+          # here, the shape of a repository on curated mirrors or on one authenticated feed. The cure adds the
+          # source that serves SlideRule beside the spec csproj and clears nothing, with the local pack standing in
+          # for nuget.org. Each control restores into a package folder of its own with no obj/ left by the one
+          # before, because SlideRule cached by an earlier restore satisfies a restore that should fail.
+          cleared="$RUNNER_TEMP/packageref-cleared"
+          # cleared_feed <root> [mapping]: the repository's nuget.config, with an optional packageSourceMapping block.
+          cleared_feed() {
+          mkdir -p "$1/.own-feed"
+          cat > "$1/nuget.config" <<CONFIG
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+              <packageSources>
+                  <clear />
+                  <add key="own-feed" value="$1/.own-feed" />
+              </packageSources>
+          $2
+          </configuration>
+          CONFIG
+          }
+          # cleared_mapped_feed <root>: the same, mapping every id to the repository's feed.
+          cleared_mapped_feed() {
+            cleared_feed "$1" '    <packageSourceMapping>
+                  <packageSource key="own-feed">
+                      <package pattern="*" />
+                  </packageSource>
+              </packageSourceMapping>'
+          }
+          # spec_local_feed <root> [mapping]: the cure, a nuget.config beside the spec csproj that adds the local
+          # pack and clears nothing, with an optional packageSourceMapping block.
+          spec_local_feed() {
+          cat > "$1/arch/MyApp.Architecture/nuget.config" <<CONFIG
+          <?xml version="1.0" encoding="utf-8"?>
+          <configuration>
+              <packageSources>
+                  <add key="local-pack" value="$GITHUB_WORKSPACE/artifacts" />
+              </packageSources>
+          $2
+          </configuration>
+          CONFIG
+          }
+          # cold <root> <control>: a package folder of the control's own, and no restore output left in the tree.
+          cold() {
+            rm -rf "$1/src/MyApp/obj" "$1/arch/MyApp.Architecture/obj"
+            export NUGET_PACKAGES="$1/.packages-$2"
+          }
+
+          scaffold "$cleared/unmapped" cleared_feed
+          cold "$cleared/unmapped" negative
+          build_fails_with "$cleared/unmapped/MyApp.slnx" "$RUNNER_TEMP/cleared-unserved.log" 'error NU1101: Unable to find package SlideRule\.' \
+            "The scaffold under a nuget.config that clears every source and lists only the repository's own feed did not produce NU1101 on SlideRule — the troubleshooting entry for it describes a failure this leg can no longer show"
+          spec_local_feed "$cleared/unmapped"
+          cold "$cleared/unmapped" cure
+          dotnet build "$cleared/unmapped/MyApp.slnx" || {
+            echo "::error::The scaffold did not restore once a nuget.config beside the spec csproj added the source that serves SlideRule, the cure the recipe gives for NU1101 on SlideRule"
+            exit 1
+          }
+          require_contract_from_pack "$version" "The scaffold with a spec-local nuget.config"
+
+          scaffold "$cleared/mapped" cleared_mapped_feed
+          spec_local_feed "$cleared/mapped"
+          cold "$cleared/mapped" negative
+          build_fails_with "$cleared/mapped/MyApp.slnx" "$RUNNER_TEMP/cleared-mapped-unpatterned.log" 'error NU1101: Unable to find package SlideRule\.' \
+            "A spec-local nuget.config that adds the source serving SlideRule but maps nothing to it, under a repository mapping every id to its own feed, did not produce NU1101 — the two patterns are no longer shown to be what cures it"
+          spec_local_feed "$cleared/mapped" '    <packageSourceMapping>
+                  <packageSource key="local-pack">
+                      <package pattern="SlideRule" />
+                      <package pattern="SlideRule.*" />
+                  </packageSource>
+              </packageSourceMapping>'
+          cold "$cleared/mapped" cure
+          dotnet build "$cleared/mapped/MyApp.slnx" || {
+            echo "::error::The scaffold did not restore under a repository mapping every id to its own feed once the spec-local nuget.config mapped SlideRule and SlideRule.* to the source that serves them, the cure the recipe gives"
+            exit 1
+          }
+          require_contract_from_pack "$version" "The scaffold with a mapped spec-local nuget.config"
+
+          # ── Leg I: versionless package references a Directory.Build.targets adds ─────────────────
+          # A targets file imports after the project body, so the Remove the recipe gives for a props file's
+          # references runs before the item exists. SlideRule.Analyzers stands in for the repository's tooling,
+          # since the local pack serves it and it declares no dependencies.
+          targets="$RUNNER_TEMP/packageref-targets"
+          scaffold "$targets"
+          cat > "$targets/Directory.Packages.props" <<PROPS
+          <Project>
+              <PropertyGroup>
+                  <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+              </PropertyGroup>
+              <ItemGroup>
+                  <PackageVersion Include="SlideRule.Analyzers" Version="$version" />
+              </ItemGroup>
+          </Project>
+          PROPS
+          cat > "$targets/Directory.Build.targets" <<'TARGETS'
+          <Project>
+              <ItemGroup>
+                  <PackageReference Include="SlideRule.Analyzers" PrivateAssets="all" />
+              </ItemGroup>
+          </Project>
+          TARGETS
+          export NUGET_PACKAGES="$targets/.packages"
+          targetscsproj="$targets/arch/MyApp.Architecture/MyApp.Architecture.csproj"
+          cp "$targetscsproj" "$RUNNER_TEMP/targets-csproj.orig"
+
+          build_fails_with "$targets/MyApp.slnx" "$RUNNER_TEMP/targets-verbatim.log" 'error NU1015.*SlideRule\.Analyzers' \
+            "The scaffold under a Directory.Build.targets adding a versionless package reference did not produce NU1015 — the recipe's sentence on that case describes a failure this leg can no longer show"
+
+          sed -i 's|</Project>|    <ItemGroup>\n        <PackageReference Remove="SlideRule.Analyzers" />\n    </ItemGroup>\n</Project>|' "$targetscsproj"
+          build_fails_with "$targets/MyApp.slnx" "$RUNNER_TEMP/targets-remove.log" 'error NU1015.*SlideRule\.Analyzers' \
+            "A PackageReference Remove in the scaffold csproj cured NU1015 from a Directory.Build.targets, which the recipe says it cannot, so the leg no longer shows why ImportDirectoryBuildTargets is the cure"
+
+          cp "$RUNNER_TEMP/targets-csproj.orig" "$targetscsproj"
+          sed -i 's|<PropertyGroup>|<PropertyGroup>\n        <ImportDirectoryBuildTargets>false</ImportDirectoryBuildTargets>|' "$targetscsproj"
+          dotnet build "$targets/MyApp.slnx" || {
+            echo "::error::The scaffold under a Directory.Build.targets adding a versionless package reference did not build once its csproj set ImportDirectoryBuildTargets to false, the cure the recipe gives"
+            exit 1
+          }
+          require_contract_from_pack "$version" "The scaffold with ImportDirectoryBuildTargets off"
 
       # The legs above hand-write the scaffold the recipe publishes; sliderule init writes the same one from the
       # installed tool, cut from the recipe embedded in it, adds it to the solution, writes sliderule.json, builds

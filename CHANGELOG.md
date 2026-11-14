@@ -33,6 +33,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default.
   A Migrate rule keeps its whole counter-prior paragraph and a quarantined scope keeps its sanctioned
   surface. The cards are unchanged.
+- The `derive_spec` recipe's list of errors answers three more that its spec project can meet. NU1101 or a
+  401 NU1301 on SlideRule means no source the repository configures serves the package. The fix is a
+  `nuget.config` beside the spec csproj that adds nuget.org, mapping SlideRule to it only where the
+  repository already maps its sources, and the agent tells the human that the spec restores from nuget.org.
+  NU1015 from versionless references that a `Directory.Build.targets` adds survives a `Remove` in the spec
+  csproj, because targets import after the project body, so the recipe sets
+  `<ImportDirectoryBuildTargets>false</ImportDirectoryBuildTargets>` there. An `IDE` code-style error on a
+  spec file, not only IDE0073, gets the fix its message names, such as an expression-bodied `Define` for
+  IDE0022.
 
 ### Fixed
 

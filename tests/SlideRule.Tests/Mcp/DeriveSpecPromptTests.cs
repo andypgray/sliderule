@@ -52,7 +52,7 @@ public sealed class DeriveSpecPromptTests
     ///         codebases rather than by a character count.
     ///     </para>
     /// </remarks>
-    private const int ServedBodyCeiling = 72_750;
+    private const int ServedBodyCeiling = 73_500;
 
     // The text only the receipt's fence carries, which picks that fence out of the recipe's others.
     private const string ReceiptMarker = "curation: pending";
@@ -222,12 +222,17 @@ public sealed class DeriveSpecPromptTests
         string text = await ShouldServeRecipeAsync();
 
         // Assert — each warning sits where its trap is met: an SDK pinned below 10 at the scaffold's framework, a
-        // props file's versionless package references under the central-management opt-out, a strong-named
-        // product's keyed grant beside the internal-type anchor, MVC action names under the async-suffix rule, a
-        // test host's registrations under the captive-dependency rule, and the analyzer rollout in the next steps
-        // handed to the human.
+        // props file's versionless package references under the central-management opt-out and a targets file's
+        // beyond a Remove's reach, a repository whose sources do not serve SlideRule and the mapping condition on
+        // its cure, a code-style error beyond the header rule, a strong-named product's keyed grant beside the
+        // internal-type anchor, MVC action names under the async-suffix rule, a test host's registrations under
+        // the captive-dependency rule, and the analyzer rollout in the next steps handed to the human.
         text.ShouldContain("NETSDK1045");
         text.ShouldContain("NU1015");
+        text.ShouldContain("<ImportDirectoryBuildTargets>false</ImportDirectoryBuildTargets>");
+        text.ShouldContain("Add a `nuget.config` beside the spec csproj that adds nuget.org");
+        text.ShouldContain("where it maps none, add none");
+        text.ShouldContain("IDE0022");
         text.ShouldContain("A strong-named product's grant must name the spec's public key (`, PublicKey=…`)");
         text.ShouldContain("take the controllers out first");
         text.ShouldContain("test projects included");
