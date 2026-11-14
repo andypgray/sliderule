@@ -18,9 +18,10 @@ namespace SlideRule.Tests.Cli;
 ///         <see cref="DiagnosticInjectingSolutionSource" /> over this repository's own solution and its
 ///         arch-spec csproj: the workspace path needs a solution whose spec resolves <em>through</em> that
 ///         workspace. MyApp declares no spec project, so the convention and csproj branches refuse there
-///         before a workspace is ever consulted, and a built-DLL <c>--spec</c> takes the fast path instead.
-///         The genuinely-partial load lives in <see cref="PartialLoadWorkspaceE2ETests" />; what this class
-///         owns is which channel the failures reach.
+///         before a workspace is ever consulted, and a built-DLL <c>--spec</c> takes the fast path instead. A
+///         replayed cache record renders the failures it recorded, for a built DLL as for the convention, which
+///         the LayoutApp fixture's spec project lets one test pair. A load that is itself partial is tested in
+///         <see cref="PartialLoadWorkspaceE2ETests" />; what this class owns is which channel the failures reach.
 ///     </para>
 /// </remarks>
 public sealed class ExplainWorkspaceDiagnosticsE2ETests
@@ -52,6 +53,32 @@ public sealed class ExplainWorkspaceDiagnosticsE2ETests
 
         result.ShouldSucceed("layering/domain-independent (enforce)");
         result.Err.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Explain_RecordReplayed_RendersTheRecordedDiagnosticsForTheBuiltDllAsForTheConvention()
+    {
+        // Two checks through a source that injects a load failure record it beside each spec form's resolution.
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
+        using var cache = new TempCacheRoot("explain-diagnostics");
+        string dll = LayoutAppFixture.BuiltSpecDll(workspace);
+        var injecting = new CountingSolutionSource(new DiagnosticInjectingSolutionSource([LoadDiagnostic]));
+        await ShouldCheckCleanAsync(workspace, null, cache.Root, injecting);
+        await ShouldCheckCleanAsync(workspace, dll, cache.Root, injecting);
+
+        CacheRun convention = await CacheRuns.ExplainAsync(workspace.SolutionPath, LayoutAppFixture.RuleId, null, cache.Root);
+        CacheRun built = await CacheRuns.ExplainAsync(workspace.SolutionPath, LayoutAppFixture.RuleId, dll, cache.Root);
+
+        convention.Result.Err.ShouldContain($"warning: {LoadDiagnostic}");
+        built.Result.Err.ShouldBe(convention.Result.Err);
+        (convention.AcquireCount, built.AcquireCount).ShouldBe((0, 0));
+    }
+
+    private static async Task ShouldCheckCleanAsync(
+        TempFixtureWorkspace workspace, string? spec, string cacheRoot, CountingSolutionSource source)
+    {
+        CacheRun check = await CacheRuns.CheckAsync(workspace.SolutionPath, spec, cacheRoot, source: source);
+        check.Result.Exit.ShouldBe(0, check.Result.Transcript());
     }
 
     private static Task<CliResult> RunAsync(ExplainRequest request)

@@ -28,15 +28,16 @@ namespace SlideRule.Cli.Verbs;
 ///     <para>
 ///         <b>Never a gate.</b> A workspace opened for resolution can fail partially; the rule form renders the
 ///         composed diagnostics to stderr and still answers, because the model it dumps comes from the spec,
-///         not the codebase — a load failure cannot make the answer wrong. A built-DLL spec reaches a workspace
-///         only where a warm one is already loaded, so elsewhere it renders no load diagnostics. The type and path
+///         not the codebase — a load failure cannot make the answer wrong. A replayed cache record renders the load
+///         diagnostics it recorded, for every spec kind. A built-DLL spec reaches a workspace only where a warm one
+///         is already loaded, so with neither a warm workspace nor a record it renders none. The type and path
 ///         forms answer from the codebase, which a load failure can leave short, so they also announce an
 ///         incomplete or narrowed model at the top of the answer, which is <c>arch_explain</c>'s only channel.
 ///     </para>
 ///     <para>
 ///         <b>It fronts the persisted extraction cache</b> (<c>--no-cache</c> opts out), and the rule form is
-///         what the cache does the most for: it never extracts at all, so on a hit the recorded resolution
-///         replays and the run opens <em>no workspace</em> — the whole of what a convention or csproj
+///         what the cache does the most for: it never extracts at all, so on a hit or a partial the recorded
+///         resolution replays and the run opens <em>no workspace</em> — the whole of what a convention or csproj
 ///         <c>--spec</c> costs. Nothing in that form reads absence as evidence: an unknown rule ID is a refusal
 ///         against the spec's own rule list, which no cache state can shorten.
 ///     </para>

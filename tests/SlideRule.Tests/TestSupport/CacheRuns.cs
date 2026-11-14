@@ -26,8 +26,9 @@ internal sealed record CacheRun(
 /// <summary>
 ///     Runs a cache-wired verb in process over a persisted cache rooted at a caller-supplied directory, through a
 ///     <see cref="CountingSolutionSource" /> the result hands back. <see cref="CheckAsync" /> and
-///     <see cref="GraphAsync" /> build the JSON-mode request for their verb; any other verb passes its runner and
-///     its request to <see cref="RunAsync{TRunner}" />.
+///     <see cref="GraphAsync" /> build the JSON-mode request for their verb, and <see cref="ExplainAsync" /> the
+///     rule form of <c>explain</c>; any other verb passes its runner and its request to
+///     <see cref="RunAsync{TRunner}" />.
 /// </summary>
 internal static class CacheRuns
 {
@@ -69,6 +70,24 @@ internal static class CacheRuns
         return RunAsync(
             cacheRoot,
             static (output, error, counting, environment) => new GraphRunner(output, error, counting, environment),
+            runner => runner.RunAsync(request, Ct),
+            source);
+    }
+
+    /// <summary>
+    ///     One run of <c>explain <paramref name="ruleId" /></c> with <paramref name="spec" /> over
+    ///     <paramref name="solution" />. A null <paramref name="spec" /> leaves the spec to discovery; a null
+    ///     <paramref name="source" /> counts over a cold source.
+    /// </summary>
+    internal static Task<CacheRun> ExplainAsync(
+        string solution, string ruleId, string? spec, string cacheRoot, bool noCache = false,
+        CountingSolutionSource? source = null)
+    {
+        var request = new ExplainRequest(ruleId, solution, spec, SolutionPaths.SolutionDirectoryOf(solution), noCache);
+
+        return RunAsync(
+            cacheRoot,
+            static (output, error, counting, environment) => new ExplainRunner(output, error, counting, environment),
             runner => runner.RunAsync(request, Ct),
             source);
     }

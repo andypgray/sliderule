@@ -62,6 +62,21 @@ public sealed class CodebaseSourceMemoTests
     }
 
     [Fact]
+    public async Task ExtractAsync_OnASpecOnlySourceWithNoWorkspace_Refuses()
+    {
+        using var cache = new TempCacheRoot("spec-only");
+        var counting = new CountingSolutionSource();
+        using var source = await CodebaseSource.CreateSpecOnlyAsync(
+            counting, FakeEnvironment.WithCacheRoot(cache.Root), CliRunner.MyAppSolution, CliRunner.ViolatedSpecDll,
+            false, Ct);
+
+        var refusal =
+            await Should.ThrowAsync<InvalidOperationException>(() => source.ExtractAsync([], Ct));
+
+        (refusal.Message, counting.AcquireCount).ShouldBe(("A spec-only source never extracts.", 0));
+    }
+
+    [Fact]
     public async Task ExtractAsync_TwiceWithTheSameExclusion_HandsBackTheModelItAlreadyBuilt()
     {
         using var fixture = new TempFixtureWorkspace();

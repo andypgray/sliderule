@@ -1,20 +1,22 @@
 using Shouldly;
 using SlideRule.Cli;
 using SlideRule.Cli.Verbs;
+using SlideRule.Roslyn.Caching;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Cli;
 
-/// <summary>The two ways <c>baseline rename</c> reaches a model, and what neither of them does.</summary>
+/// <summary>The ways <c>baseline rename</c> reaches a model, and what none of them does.</summary>
 /// <remarks>
 ///     <para>
-///         A convention or csproj <c>--spec</c> opens a workspace for resolution only: the load's diagnostics are
-///         rendered, a failed project does not refuse the run as it refuses <c>init</c>, and nothing is extracted.
-///         A built-DLL <c>--spec</c> takes the fast path and opens no workspace at all. Both rows end in one of
-///         the file-work refusals, so the run exits 2 on the rename's own sentence and writes nothing, which is
-///         what lets them run over this repository's solution and the committed MyApp fixture.
+///         A convention or csproj <c>--spec</c> with no cache record opens a workspace for resolution only: the
+///         load's diagnostics are rendered, a failed project does not refuse the run as it refuses <c>init</c>, and
+///         nothing is extracted. A built-DLL <c>--spec</c> opens no workspace at all, and neither does a spec whose
+///         resolution a cache records, a partial cache included. Every row ends in one of the file-work refusals, so
+///         the run exits 2 on the rename's own sentence and writes nothing, which is what lets them run over this
+///         repository's solution, the committed MyApp fixture and a copy of LayoutApp.
 ///     </para>
 ///     <para>
 ///         The workspace row runs over this repository's own solution and arch-spec csproj, as
@@ -80,6 +82,34 @@ public sealed class BaselineRenameWorkspaceE2ETests
         result.ShouldRefuseWith(
             "rule 'data-access/no-inline-sql' already has a baseline section in "
             + "arch/baselines/data-access/no-inline-sql.json; nothing was renamed.");
+        counting.AcquireCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Rename_ConventionSpecOverAPartialCache_ReplaysTheRecordAndOpensNoWorkspace()
+    {
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
+        using var cache = new TempCacheRoot("baseline-rename");
+        CacheRun check = await CacheRuns.CheckAsync(workspace.SolutionPath, null, cache.Root);
+        check.Result.Exit.ShouldBe(0, check.Result.Transcript());
+        FixtureEdits.InsertMember(workspace.PathOf("LayoutApp.Core", "Ledger.cs"), "\n    private const int Unread = 0;\n");
+        new ExtractionCacheStore(workspace.SolutionPath, cache.Root).ReadAndValidate(Ct)
+            .Outcome.ShouldBe(CacheOutcome.Partial);
+        var counting = new CountingSolutionSource();
+        FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cache.Root);
+        BaselineRequest request = BaselineRequests.Rename(
+                "layout/old-name", LayoutAppFixture.RuleId, SolutionPaths.SolutionDirectoryOf(workspace.SolutionPath))
+            with
+            {
+                Solution = workspace.SolutionPath
+            };
+
+        CliResult result = await CliResult.CapturedAsync((output, error) =>
+            CommandEntryPoint.RunAsync(
+                () => new BaselineRunner(output, error, counting, environment).RunAsync(request, Ct), error, Ct));
+
+        result.ShouldRefuseWith(
+            $"rule '{LayoutAppFixture.RuleId}' is not ratcheted — only Migrate and Quarantine containment rules carry baselines.");
         counting.AcquireCount.ShouldBe(0);
     }
 }

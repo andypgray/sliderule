@@ -70,6 +70,14 @@ internal sealed record CacheReadResult(
 }
 
 /// <summary>
+///     The result of <see cref="ExtractionCacheStore.TryReadSpecResolutions" />: the recorded spec resolutions and the
+///     recorded load verdict of a cache whose structural inputs still hold.
+/// </summary>
+internal sealed record SpecRecordRead(
+    IReadOnlyList<SpecResolutionRecord> SpecResolutions,
+    WorkspaceDiagnostics LoadDiagnostics);
+
+/// <summary>
 ///     What a <see cref="CacheOutcome.Partial" /> validation already knows about disk, handed on so the capture
 ///     that follows the re-extraction reads only what changed rather than every document of the solution.
 /// </summary>
@@ -540,24 +548,74 @@ internal sealed class ExtractionCacheStore
         }
     }
 
-    private CacheReadResult ValidateCore(CancellationToken ct)
+    /// <summary>
+    ///     The recorded spec resolutions and load verdict, read with no MSBuild and no document read, or null when
+    ///     there is no cache or its structural inputs no longer hold. Writes nothing, and never throws (bar
+    ///     cancellation).
+    /// </summary>
+    /// <remarks>
+    ///     Shares the structural head with <see cref="ReadAndValidate" />, so it answers exactly when that head
+    ///     passes. A per-project failure after it, such as a cone directory that cannot be listed, makes
+    ///     <see cref="ReadAndValidate" /> a miss and does not affect this read: a record holds structural facts
+    ///     only, and no per-project change moves which project builds the spec.
+    /// </remarks>
+    public SpecRecordRead? TryReadSpecResolutions(CancellationToken ct = default)
     {
-        LastRemappedDocuments = NoDocuments;
+        try
+        {
+            if (ReadStructurallyValid(ct) is not { Manifest: var manifest }) return null;
 
+            return new SpecRecordRead(manifest.SpecResolutions, LoadDiagnosticsOf(manifest));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // An unreadable cache is no record, so the caller resolves the spec cold.
+            return null;
+        }
+    }
+
+    // The manifest with its refreshed structural stamps when the head both reads share passes: the file parses,
+    // its schema and tool versions are current, no structural input changed, and no foreign cone grew.
+    private (CacheManifest Manifest, IReadOnlyList<FileStamp> RefreshedStructural)? ReadStructurallyValid(
+        CancellationToken ct)
+    {
         CacheManifest? manifest = TryRead();
-        if (manifest is null) return CacheReadResult.Miss();
-        if (manifest.SchemaVersion != CurrentSchemaVersion) return CacheReadResult.Miss();
-        if (!string.Equals(manifest.ToolVersion, FileStamping.CurrentToolVersion, StringComparison.Ordinal)) return CacheReadResult.Miss();
+        if (manifest is null) return null;
+        if (manifest.SchemaVersion != CurrentSchemaVersion) return null;
+        if (!string.Equals(manifest.ToolVersion, FileStamping.CurrentToolVersion, StringComparison.Ordinal)) return null;
 
         // Structural sweep — any existence flip or content change is a full miss.
         if (FileStamping.SweepStructural(
                 manifest.StructuralStamps, () => Interlocked.Increment(ref contentHashCount), ct, out _)
             is not { } refreshedStructural)
-            return CacheReadResult.Miss();
+            return null;
 
         // A foreign project's edits were already swept as structural stamps; an add to its cone is the one change
         // the sweep cannot see.
-        if (ForeignConeGrew(manifest.ForeignProjects)) return CacheReadResult.Miss();
+        if (ForeignConeGrew(manifest.ForeignProjects)) return null;
+
+        return (manifest, refreshedStructural);
+    }
+
+    // The merge's notes and multi-targeted projects are empty: nothing persists them, because a hit re-merges the
+    // stored fragments and produces both afresh.
+    private static WorkspaceDiagnostics LoadDiagnosticsOf(CacheManifest manifest)
+    {
+        return WorkspaceDiagnostics.OfLoad(
+            loadFailures: manifest.Diagnostics,
+            failedProjects: manifest.FailedProjects,
+            uncheckedProjects: manifest.UncheckedProjects,
+            restoreFailedProjects: manifest.RestoreFailedProjects,
+            unsupportedProjects: manifest.UnsupportedProjects,
+            missingProjects: manifest.MissingProjects);
+    }
+
+    private CacheReadResult ValidateCore(CancellationToken ct)
+    {
+        LastRemappedDocuments = NoDocuments;
+
+        if (ReadStructurallyValid(ct) is not { Manifest: var manifest, RefreshedStructural: var refreshedStructural })
+            return CacheReadResult.Miss();
 
         Dictionary<string, string?> structuralShaByPath = BuildStructuralShaLookup(refreshedStructural);
 
@@ -598,15 +656,7 @@ internal sealed class ExtractionCacheStore
         IReadOnlyList<CodebaseFragment> replayedFragments = Replay(manifest.Fragments, mapsByProject, dirtyProjects);
         LastRemappedDocuments = RemappedDocumentsOf(mapsByProject, dirtyProjects);
 
-        // The merge's notes and multi-targeted projects are empty: nothing persists them, because a hit re-merges
-        // the stored fragments and produces both afresh.
-        WorkspaceDiagnostics loadDiagnostics = WorkspaceDiagnostics.OfLoad(
-            loadFailures: manifest.Diagnostics,
-            failedProjects: manifest.FailedProjects,
-            uncheckedProjects: manifest.UncheckedProjects,
-            restoreFailedProjects: manifest.RestoreFailedProjects,
-            unsupportedProjects: manifest.UnsupportedProjects,
-            missingProjects: manifest.MissingProjects);
+        WorkspaceDiagnostics loadDiagnostics = LoadDiagnosticsOf(manifest);
 
         if (dirtyProjects.Count == 0)
         {

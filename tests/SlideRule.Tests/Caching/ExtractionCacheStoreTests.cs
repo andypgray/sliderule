@@ -381,6 +381,97 @@ public sealed class ExtractionCacheStoreTests
         store.ShouldValidateAsAPureStatHit();
     }
 
+    /// <summary>
+    ///     The spec-record read and the full read share one structural verdict: the record answers exactly when the
+    ///     full read is a hit or a partial, and a structural miss misses both.
+    /// </summary>
+    [Theory]
+    [InlineData("unchanged", "Hit")]
+    [InlineData("source edited", "Partial")]
+    [InlineData("schema version", "Miss")]
+    [InlineData("tool version", "Miss")]
+    [InlineData("project file edited", "Miss")]
+    [InlineData("foreign cone grew", "Miss")]
+    public void TryReadSpecResolutions_AnswersExactlyWhenReadAndValidateHitsOrIsPartial(string change, string outcome)
+    {
+        // Arrange
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", ["Legacy"], ("A.cs", "class A {}"));
+        solution.AddForeignProject("Legacy", ("Ledger.vb", "Class Ledger\nEnd Class\n"));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.ShouldWrite(solution.Projects, WithSpecRecord(solution), solution.ForeignProjects);
+
+        // Act
+        ApplyChange(solution, change);
+        SpecRecordRead? record = store.TryReadSpecResolutions(Ct);
+        CacheReadResult full = store.ReadAndValidate(Ct);
+
+        // Assert — the full outcome confirms the change took effect, and the record pairs with it.
+        var expected = Enum.Parse<CacheOutcome>(outcome);
+        (full.Outcome, record is not null).ShouldBe((expected, expected != CacheOutcome.Miss));
+        if (record is null) return;
+
+        record.SpecResolutions.Select(r => r.SpecProjectName)
+            .ShouldBe(["Spec"]);
+        record.LoadDiagnostics.LoadFailures.ShouldBe(["diag"]);
+    }
+
+    [Fact]
+    public void TryReadSpecResolutions_ConeDirectoryUnlistable_AnswersWhileReadAndValidateMisses()
+    {
+        // Arrange
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", "class A {}"));
+        solution.AddProject("B", [], ("B.cs", "class B {}"));
+        solution.AddStrayFile("B", Path.Combine("Denied", "Notes.txt"), "notes\n");
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.ShouldWrite(solution.Projects, WithSpecRecord(solution));
+
+        // Act — a per-project cone walk that throws comes after the structural head the two reads share.
+        using ScopedDirectoryDenial denial = ScopedDirectoryDenial.Deny(Path.Combine(solution.Root, "B", "Denied"));
+        SpecRecordRead? record = store.TryReadSpecResolutions(Ct);
+        CacheReadResult full = store.ReadAndValidate(Ct);
+
+        // Assert
+        string recorded = string.Join(", ", record?.SpecResolutions.Select(r => r.SpecProjectName) ?? ["(no answer)"]);
+        (full.Outcome, recorded).ShouldBe((CacheOutcome.Miss, "Spec"));
+    }
+
+    [Fact]
+    public void TryReadSpecResolutions_WritesNothingAndHashesNoDocument()
+    {
+        // Arrange — a document whose mtime moved with its bytes unchanged, which a full read re-hashes and
+        // promotes, and a project file in the same state, which the structural head re-hashes.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", "class A {}"));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.ShouldWrite(solution.Projects, WithSpecRecord(solution));
+        File.SetLastWriteTimeUtc(solution.PathOf("A", "A.cs"), DateTime.UtcNow.AddHours(-1));
+        File.SetLastWriteTimeUtc(solution.PathOf("A", "A.csproj"), DateTime.UtcNow.AddHours(-1));
+        byte[] written = File.ReadAllBytes(solution.CacheFilePath);
+        long before = store.ContentHashCount;
+
+        // Act
+        store.TryReadSpecResolutions(Ct)
+            .ShouldNotBeNull();
+
+        // Assert — the project file's re-hash alone, and the file as written.
+        (store.ContentHashCount - before).ShouldBe(1);
+        File.ReadAllBytes(solution.CacheFilePath)
+            .ShouldBe(written);
+
+        // The arrangement is one a full read promotes: it re-hashes both files and rewrites the cache.
+        long beforeFull = store.ContentHashCount;
+        store.ReadAndValidate(Ct)
+            .Outcome.ShouldBe(CacheOutcome.Hit);
+        (store.ContentHashCount - beforeFull).ShouldBe(2);
+        File.ReadAllBytes(solution.CacheFilePath)
+            .ShouldNotBe(written);
+    }
+
     [Fact]
     public void ReadAndValidate_DependencyContentChanged_DirtySetIncludesMerkleDependents()
     {
@@ -1156,6 +1247,42 @@ public sealed class ExtractionCacheStoreTests
     private static ExtractionResult TrivialExtraction(SyntheticSolution solution)
     {
         return SitedExtraction(solution);
+    }
+
+    // The same, recording one convention-spec resolution, so a read of the records has one to hand back.
+    private static ExtractionResult WithSpecRecord(SyntheticSolution solution)
+    {
+        return TrivialExtraction(solution) with
+        {
+            SpecResolutions = [new SpecResolutionRecord("", "Spec", ["Spec"], [], null, null)]
+        };
+    }
+
+    // One change per row of the read-agreement theory, each a cause the two reads must agree on.
+    private static void ApplyChange(SyntheticSolution solution, string change)
+    {
+        switch (change)
+        {
+            case "unchanged":
+                return;
+            case "source edited":
+                RewriteBackdated(solution.PathOf("A", "A.cs"), "class A { int x; }");
+                return;
+            case "schema version":
+                solution.MutateCacheJson(root => root["SchemaVersion"] = 999);
+                return;
+            case "tool version":
+                solution.MutateCacheJson(root => root["ToolVersion"] = "0.0.0-not-this-build");
+                return;
+            case "project file edited":
+                RewriteBackdated(solution.PathOf("A", "A.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk.Web\" />\n");
+                return;
+            case "foreign cone grew":
+                solution.AddStrayFile("Legacy", "Other.vb", "Class Other\nEnd Class\n");
+                return;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(change), change, "no such change");
+        }
     }
 
     // The same, with the one load diagnostic whose replay the caller is about to read back.

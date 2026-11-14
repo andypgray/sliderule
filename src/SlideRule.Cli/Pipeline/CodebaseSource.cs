@@ -20,7 +20,10 @@ namespace SlideRule.Cli.Pipeline;
 /// </summary>
 internal enum CodebaseSourceOutcome
 {
-    /// <summary>Every project was clean: the model was merged from cached fragments with no workspace opened.</summary>
+    /// <summary>
+    ///     Served from the cache with no workspace opened: every project was clean and the model was merged from
+    ///     cached fragments, or, for a spec-only source, the recorded spec resolution replayed.
+    /// </summary>
     Hit,
 
     /// <summary>Some projects were dirty: the clean fragments were reused, only the dirty ones re-extracted.</summary>
@@ -207,6 +210,67 @@ internal sealed class CodebaseSource : IDisposable
         CancellationToken ct)
     {
         string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory, environment);
+        return await CreateWithSpecAtAsync(source, environment, solutionPath, spec, noCache, ct);
+    }
+
+    /// <summary>
+    ///     Prepares a source for a verb that reads the spec and never the code, over the discovered
+    ///     <paramref name="solutionPath" />. Its model is the one every other verb would load; it opens a workspace
+    ///     only for a csproj or convention spec that neither a warm source nor a cache record can answer.
+    /// </summary>
+    /// <remarks>
+    ///     A partial cache answers as a hit does, because a record holds only structural facts, and an edit to the
+    ///     spec project's own sources, the stale spec a caller is asking about, is what makes a cache partial. With
+    ///     no record, a DLL spec is loaded as given and names no project, so no sources are compared. The source
+    ///     never extracts, so it writes nothing.
+    /// </remarks>
+    public static async Task<CodebaseSource> CreateSpecOnlyAsync(
+        ISolutionSource source,
+        IEnvironment environment,
+        string solutionPath,
+        string? spec,
+        bool noCache,
+        CancellationToken ct)
+    {
+        if (source.HoldsLoaded(solutionPath))
+            return await CreateWithSpecAtAsync(source, environment, solutionPath, spec, noCache, ct);
+
+        ExtractionCacheStore? store = noCache ? null : TryCreateStore(solutionPath, environment);
+        string normalized = NormalizeSpecArgument(spec);
+        CodebaseSourceOutcome uncached = store is null ? CodebaseSourceOutcome.Disabled : CodebaseSourceOutcome.Miss;
+
+        if (store is not null
+            && ReadSpecRecordsTimed(store, ct) is { } read
+            && ResolveSpecOnHitTimed(spec, read.SpecResolutions) is { } replayed)
+        {
+            ArchitectureModel replayedModel = LoadSpecModelTimed(source, replayed.DllPath);
+            return new CodebaseSource(
+                CodebaseSourceOutcome.Hit, solutionPath, read.LoadDiagnostics, replayedModel, replayed, null, null,
+                CacheReadResult.Miss(), normalized);
+        }
+
+        if (SpecResolver.TryResolveWithoutSolution(spec) is { } bare)
+        {
+            ArchitectureModel bareModel = LoadSpecModelTimed(source, bare.DllPath);
+            return new CodebaseSource(
+                uncached, solutionPath, WorkspaceDiagnostics.None, bareModel, bare, null, null, CacheReadResult.Miss(),
+                normalized);
+        }
+
+        return await CreateColdWithSpecAsync(
+            source, solutionPath, spec, normalized, null, CacheReadResult.Miss(), uncached, ct);
+    }
+
+    // The shared seam over a discovered solution: a hit replays the spec with no workspace, anything else
+    // acquires one.
+    private static async Task<CodebaseSource> CreateWithSpecAtAsync(
+        ISolutionSource source,
+        IEnvironment environment,
+        string solutionPath,
+        string? spec,
+        bool noCache,
+        CancellationToken ct)
+    {
         ExtractionCacheStore? store = noCache ? null : TryCreateStore(solutionPath, environment);
         string normalized = NormalizeSpecArgument(spec);
 
@@ -282,6 +346,9 @@ internal sealed class CodebaseSource : IDisposable
     private async Task<CodebaseModel> ExtractCoreAsync(
         IReadOnlyCollection<string> excludeProjectNames, CancellationToken ct)
     {
+        if (handle is null && store is null)
+            throw new InvalidOperationException("A spec-only source never extracts.");
+
         if (WarmCodebaseProducer() is { } warmCodebase)
         {
             // The warm MCP path: the session store (SessionFragmentStore) produces the model, and its
@@ -300,8 +367,8 @@ internal sealed class CodebaseSource : IDisposable
     }
 
     // The warm path's producer when this run takes it: a cold-loaded handle carrying a session codebase, and
-    // no persisted store to prefer over it. Null whenever a persisted store is live, which every hit has, since
-    // the store path serves every caller from the fragments it also writes back.
+    // no persisted store to prefer over it. Null whenever a persisted store is live, which every hit that
+    // extracts has, since the store path serves every caller from the fragments it also writes back.
     private Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>?
         WarmCodebaseProducer()
     {
@@ -567,32 +634,19 @@ internal sealed class CodebaseSource : IDisposable
             record.IntermediateAssemblyPath, record.ProjectFilePath);
     }
 
-    /// <summary>
-    ///     The resolution a validated cache recorded for the DLL <paramref name="spec" />, replayed with no workspace,
-    ///     or null when there is no cache, it does not validate, or it holds no record for that argument.
-    /// </summary>
-    /// <remarks>
-    ///     A partial serves as well as a hit, because a record holds only structural facts and a partial is never a
-    ///     structural change. It has to: an edit to the spec project's own sources, the stale spec a caller is
-    ///     asking about, is what makes the read partial.
-    /// </remarks>
-    internal static SpecResolution? TryReplayRecordedSpec(
-        IEnvironment environment, string solutionPath, string spec, CancellationToken ct)
-    {
-        ExtractionCacheStore? store = TryCreateStore(solutionPath, environment);
-        if (store is null) return null;
-
-        CacheReadResult read = ReadTimed(store, ct);
-        return read.Outcome is CacheOutcome.Hit or CacheOutcome.Partial
-            ? ResolveSpecOnHitTimed(spec, read.SpecResolutions)
-            : null;
-    }
-
     private static CacheReadResult ReadTimed(ExtractionCacheStore store, CancellationToken ct)
     {
         using (PhaseTimings.Measure(TimedPhase.CacheRead))
         {
             return store.ReadAndValidate(ct);
+        }
+    }
+
+    private static SpecRecordRead? ReadSpecRecordsTimed(ExtractionCacheStore store, CancellationToken ct)
+    {
+        using (PhaseTimings.Measure(TimedPhase.CacheRead))
+        {
+            return store.TryReadSpecResolutions(ct);
         }
     }
 

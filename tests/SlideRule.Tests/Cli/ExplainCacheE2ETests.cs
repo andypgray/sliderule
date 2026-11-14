@@ -1,4 +1,6 @@
 using Shouldly;
+using SlideRule.Cli.Pipeline;
+using SlideRule.Roslyn.Caching;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -17,7 +19,9 @@ namespace SlideRule.Tests.Cli;
 ///         ever filling it. It never calls <c>ExtractAsync</c> — the model it dumps is the spec's — so it
 ///         reaches neither the fingerprint nor the write-back, and a miss leaves the root empty. What a hit
 ///         spares it is correspondingly the whole of its cost rather than a share of it: the recorded
-///         resolution replays, the model loads from the DLL it names, and no design-time build runs.
+///         resolution replays, the model loads from the DLL it names, and no design-time build runs. A partial
+///         slot serves it as well as a hit, because the record holds only structural facts and an edit to a
+///         source is never a structural change.
 ///     </para>
 ///     <para>
 ///         Every run is by convention rather than <c>--spec</c>, because the recorded resolution is keyed on
@@ -54,6 +58,50 @@ public sealed class ExplainCacheE2ETests
 
         cached.Loads.ShouldBe(0); // the whole of what a convention --spec costs, skipped
         cached.ShouldMatchTheOutputOf(cold);
+    }
+
+    [Fact]
+    public async Task Explain_OnAPartialSlot_AnswersWithNoWorkspaceAndIsByteIdentical()
+    {
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
+        using var cache = new TempCacheRoot("explain-cache");
+
+        CliResult cold = await ExplainAsync(workspace, cache.Root);
+        CliResult check = await RunAsync(cache.Root, "check", workspace.SolutionPath);
+        check.ShouldSucceed($"pass {RuleId}");
+
+        // An edit to a source outside the spec project leaves the slot partial, which no full validation serves.
+        FixtureEdits.InsertMember(workspace.PathOf("LayoutApp.Core", "Ledger.cs"), "\n    private const int Unread = 0;\n");
+        new ExtractionCacheStore(workspace.SolutionPath, cache.Root).ReadAndValidate(Ct)
+            .Outcome.ShouldBe(CacheOutcome.Partial);
+
+        CliResult partial = await ExplainAsync(workspace, cache.Root);
+
+        partial.Loads.ShouldBe(0);
+        partial.ShouldMatchTheOutputOf(cold);
+    }
+
+    [Fact]
+    public async Task Explain_OnAPartialSlotWithNoRecordForItsSpec_LoadsTheWholeSolutionAndWritesNothing()
+    {
+        // graph fills the slot and records no spec, so the partial below holds nothing explain can replay.
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
+        using var cache = new TempCacheRoot("explain-cache");
+        CacheRun graph = await CacheRuns.GraphAsync(workspace.SolutionPath, cache.Root);
+        graph.Result.Exit.ShouldBe(0, graph.Result.Transcript());
+        FixtureEdits.InsertMember(workspace.PathOf("LayoutApp.Core", "Ledger.cs"), "\n    private const int Unread = 0;\n");
+        new ExtractionCacheStore(workspace.SolutionPath, cache.Root).ReadAndValidate(Ct)
+            .Outcome.ShouldBe(CacheOutcome.Partial);
+        string cacheFile = CacheLocations.CacheFilePath(workspace.SolutionPath, cache.Root);
+        byte[] written = File.ReadAllBytes(cacheFile);
+
+        CacheRun explain = await CacheRuns.ExplainAsync(workspace.SolutionPath, RuleId, null, cache.Root);
+
+        explain.Result.ShouldSucceed($"{RuleId} (enforce)");
+        (explain.Outcome, explain.AcquireCount, explain.Source.ClosureRequests.Count)
+            .ShouldBe((CodebaseSourceOutcome.Miss, 1, 0));
+        File.ReadAllBytes(cacheFile)
+            .ShouldBe(written);
     }
 
     [Fact]

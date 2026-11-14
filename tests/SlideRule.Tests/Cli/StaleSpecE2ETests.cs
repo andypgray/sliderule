@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Shouldly;
+using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Verbs;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
@@ -120,18 +121,18 @@ public sealed class StaleSpecE2ETests
         using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
         using var cache = new TempCacheRoot("stale-spec");
         string dll = LayoutAppFixture.BuiltSpecDll(workspace);
-        string[] explain = ["explain", LayoutAppFixture.RuleId, workspace.SolutionPath, "--spec", dll];
-        CliResult fresh = await RunColdAsync(cache.Root, explain);
-        fresh.ShouldSucceed();
+        CacheRun fresh = await ExplainTheDllAsync(cache.Root, workspace, dll);
+        fresh.Result.ShouldSucceed();
 
         using ScopedFile? earlyEdit = editBeforeTheRecordingCheck ? LayoutAppFixture.EditSpecAfterBuild(workspace) : null;
         await ShouldRecordTheDllWithACheckAsync(cache.Root, workspace, dll);
         using ScopedFile? lateEdit = editBeforeTheRecordingCheck ? null : LayoutAppFixture.EditSpecAfterBuild(workspace);
-        CliResult stale = await RunColdAsync(cache.Root, explain);
+        CacheRun stale = await ExplainTheDllAsync(cache.Root, workspace, dll);
 
-        stale.Out.ShouldBe(LayoutAppFixture.StaleSpecSentence + Environment.NewLine + Environment.NewLine + fresh.Out);
-        stale.Err.ShouldBe(Warning + Environment.NewLine);
-        stale.Loads.ShouldBe(0);
+        stale.Result.Out.ShouldBe(
+            LayoutAppFixture.StaleSpecSentence + Environment.NewLine + Environment.NewLine + fresh.Result.Out);
+        stale.Result.Err.ShouldBe(Warning + Environment.NewLine);
+        (stale.Outcome, stale.AcquireCount).ShouldBe((CodebaseSourceOutcome.Hit, 0));
     }
 
     [Theory]
@@ -146,14 +147,13 @@ public sealed class StaleSpecE2ETests
         string dll = LayoutAppFixture.BuiltSpecDll(workspace);
         if (recordedAndBypassed) await ShouldRecordTheDllWithACheckAsync(cache.Root, workspace, dll);
 
-        string[] noCache = recordedAndBypassed ? ["--no-cache"] : [];
-        CliResult result = await RunColdAsync(
-            cache.Root, ["explain", LayoutAppFixture.RuleId, workspace.SolutionPath, "--spec", dll, .. noCache]);
+        CacheRun run = await ExplainTheDllAsync(cache.Root, workspace, dll, noCache: recordedAndBypassed);
 
-        result.ShouldSucceed();
-        result.Out.ShouldNotContain(LayoutAppFixture.StaleSpecSentence);
-        result.Err.ShouldBeEmpty();
-        result.Loads.ShouldBe(0);
+        run.Result.ShouldSucceed();
+        run.Result.Out.ShouldNotContain(LayoutAppFixture.StaleSpecSentence);
+        run.Result.Err.ShouldBeEmpty();
+        CodebaseSourceOutcome expected = recordedAndBypassed ? CodebaseSourceOutcome.Disabled : CodebaseSourceOutcome.Miss;
+        (run.Outcome, run.AcquireCount).ShouldBe((expected, 0));
     }
 
     [Fact]
@@ -220,6 +220,14 @@ public sealed class StaleSpecE2ETests
     {
         CliResult recording = await RunAsync(cacheRoot, "check", workspace.SolutionPath, "--spec", dll);
         recording.ShouldSucceed($"pass {LayoutAppFixture.RuleId}");
+    }
+
+    // The rule form of explain in process over a cold source, with the spec passed as its built DLL, so the run's
+    // cache outcome and acquisitions can be read beside its output.
+    private static Task<CacheRun> ExplainTheDllAsync(
+        string cacheRoot, TempFixtureWorkspace workspace, string dll, bool noCache = false)
+    {
+        return CacheRuns.ExplainAsync(workspace.SolutionPath, LayoutAppFixture.RuleId, dll, cacheRoot, noCache);
     }
 
     // The check the hook verb runs, in process, over the convention spec.

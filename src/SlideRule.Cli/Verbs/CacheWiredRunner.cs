@@ -6,7 +6,6 @@ using SlideRule.Codebase;
 using SlideRule.Hosting;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
-using SlideRule.Roslyn.Solutions;
 
 namespace SlideRule.Cli.Verbs;
 
@@ -18,7 +17,7 @@ namespace SlideRule.Cli.Verbs;
 ///     Stdout and stderr are byte-identical whichever path a run takes, which is the whole claim the cache has to
 ///     earn, so the observables reach the terminal only under <c>check --timings</c>, as its cache line on stderr.
 ///     The base class does not decide the policy: each runner spells its own as the <c>noCache</c> argument it
-///     passes <see cref="CodebaseSource.CreateWithSpecAsync" />.
+///     passes the <see cref="CodebaseSource" /> it reads through.
 /// </remarks>
 internal abstract class CacheWiredRunner(
     ISolutionSource source,
@@ -114,54 +113,27 @@ internal abstract class CacheWiredRunner(
     ///     not null comes with a solution directory that is not null either.
     /// </summary>
     /// <remarks>
-    ///     A convention or csproj spec is resolved through the shared acquisition seam, which replays a cached
-    ///     resolution or loads the workspace for resolution alone and never extracts, so the model is the model
-    ///     every other verb would have loaded; its diagnostics are composed like every other verb's, so the
-    ///     MSBuild-selection note accompanies the load failures. A built-DLL spec never makes this path load a
-    ///     workspace: whether the DLL is a member's built output, and so whether its sources are compared, is
-    ///     answered by what is already on hand, a warm source holding the solution loaded (which takes the shared
-    ///     seam) or the resolution a validated cache recorded for the DLL, and otherwise left unasked with no
-    ///     verdict. A missing DLL is refused first; when the directory is required the solution is discovered
-    ///     next, so a missing solution is reported before a DLL that fails to load.
+    ///     A missing DLL is refused first and the solution is discovered next, so a missing solution is reported
+    ///     before a DLL that fails to load. A DLL spec with no solution found is loaded as given and nothing is
+    ///     compared; every other path goes through <see cref="CodebaseSource.CreateSpecOnlyAsync" />, and its load
+    ///     diagnostics and stale-spec line render as every other verb's do.
     /// </remarks>
     protected async Task<(ArchitectureModel Model, string? SolutionDirectory, StaleSpec? StaleSpec)> LoadSpecModelAsync(
         string? solution, string? spec, string workingDirectory, bool noCache, bool needsSolutionDirectory,
         TextWriter error, CancellationToken ct)
     {
-        SpecResolution? withoutSolution = SpecResolver.TryResolveWithoutSolution(spec);
-        if (withoutSolution is not null)
-        {
-            string? solutionPath = needsSolutionDirectory
-                ? ModelPipeline.DiscoverSolution(solution, workingDirectory, Environment)
-                : TryDiscoverSolution(solution, workingDirectory);
-            if (solutionPath is null || !SolutionSource.HoldsLoaded(solutionPath))
-                return LoadDllSpecModel(solutionPath, spec!, withoutSolution, noCache, error, ct);
-        }
+        SpecResolution? dll = SpecResolver.TryResolveWithoutSolution(spec);
+        string? solutionPath = dll is null || needsSolutionDirectory
+            ? ModelPipeline.DiscoverSolution(solution, workingDirectory, Environment)
+            : TryDiscoverSolution(solution, workingDirectory);
+        if (solutionPath is null) return (SolutionSource.LoadSpecModel(dll!.DllPath), null, null);
 
-        using var source = await CodebaseSource.CreateWithSpecAsync(
-            SolutionSource, Environment, solution, spec, workingDirectory, noCache, ct);
+        using var source = await CodebaseSource.CreateSpecOnlyAsync(
+            SolutionSource, Environment, solutionPath, spec, noCache, ct);
         WorkspaceDiagnosticsRenderer.Render(error, source);
         RecordCacheOutcome(source);
 
         return (source.Model, source.SolutionDirectory, source.StaleSpec);
-    }
-
-    // The built-DLL path with no workspace: the cache's record for the DLL, when there is one, names the project
-    // whose sources are compared; without one the DLL is loaded as given and nothing is compared.
-    private (ArchitectureModel Model, string? SolutionDirectory, StaleSpec? StaleSpec) LoadDllSpecModel(
-        string? solutionPath, string spec, SpecResolution withoutSolution, bool noCache, TextWriter error,
-        CancellationToken ct)
-    {
-        if (solutionPath is null) return (SolutionSource.LoadSpecModel(withoutSolution.DllPath), null, null);
-
-        string anchor = SolutionProjectFileParser.AnchorDirectory(solutionPath);
-        SpecResolution? recorded = noCache ? null : CodebaseSource.TryReplayRecordedSpec(Environment, solutionPath, spec, ct);
-        SpecResolution resolution = recorded ?? withoutSolution;
-
-        ArchitectureModel model = SolutionSource.LoadSpecModel(resolution.DllPath);
-        StaleSpec? stale = SpecSourceComparison.Compare(resolution);
-        StaleSpecNotice.Render(error, stale, anchor);
-        return (model, anchor, stale);
     }
 
     // Discovery for a verb that answers without a solution when none is found.

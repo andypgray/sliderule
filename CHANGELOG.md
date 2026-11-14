@@ -68,6 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `explain <rule-id>` and `baseline rename` open no workspace when the cache records the spec's resolution, even
+  after a source edit leaves some projects to re-extract. They read only the spec, and the record holds only what
+  determines which project builds it. A convention or `.csproj` spec used to load the edited projects first.
+- `explain <rule-id>` and `baseline rename` with a spec passed as a built DLL print the load warnings the cache
+  recorded on stderr, as they do for a `.csproj` or convention spec.
 - A run that replays a saved build capture reads the binlog once. The capture records each C# project's
   references to projects in other languages, which the replay used to read from the binlog a second time. As
   after any upgrade, a capture saved by an earlier version is not replayed: each run falls back to a
