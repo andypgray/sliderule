@@ -15,6 +15,9 @@ internal sealed class CapturingLoggerProvider : ILoggerProvider
 {
     private readonly ConcurrentQueue<LogEntry> _entries = new();
 
+    /// <summary>Every captured entry, in arrival order.</summary>
+    public IReadOnlyList<LogEntry> Entries => _entries.ToList();
+
     /// <summary>The captured entries at <see cref="LogLevel.Warning" /> — the level the filter uses for unexpected failures.</summary>
     public IReadOnlyList<LogEntry> Warnings => _entries.Where(entry => entry.Level == LogLevel.Warning)
         .ToList();

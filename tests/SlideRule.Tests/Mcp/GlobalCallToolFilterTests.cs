@@ -40,6 +40,36 @@ public sealed class GlobalCallToolFilterTests
     public static TheoryData<string[]?> KeysWithoutPath => new() { (string[]?)null, { [] } };
 
     [Fact]
+    public async Task CallTool_WaitsForTheWarmWorkSlot_ThatAHookCheckAlsoTakes()
+    {
+        // Arrange: the slot held, as a hook check the server is answering holds it.
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.MyAppWithViolatedSpec(), Ct);
+        var admission = (WarmWorkAdmission)harness.Services.GetService(typeof(WarmWorkAdmission))!;
+        WarmWorkAdmission.Lease held = await admission.EnterAsync(Ct);
+        Task<CallToolResult> call;
+        Task first;
+
+        // Act
+        try
+        {
+            call = harness.Client.CallToolAsync(
+                    "arch_explain", new Dictionary<string, object?> { ["ruleId"] = "nope/nope" }, cancellationToken: Ct)
+                .AsTask();
+            first = await Task.WhenAny(call, Task.Delay(TimeSpan.FromSeconds(1), Ct));
+        }
+        finally
+        {
+            held.Dispose();
+        }
+
+        // Assert: the call waited for the slot, then ran once it was free.
+        first.ShouldNotBeSameAs(call, "The tool call ran while other warm work held the slot.");
+        (await call).ShouldHaveRefused()
+            .ShouldStartWith("Unknown rule ID 'nope/nope'.");
+    }
+
+    [Fact]
     public async Task CallTool_UserError_ReturnsErrorResultAndLogsNothing()
     {
         // Arrange — arch_explain of an unknown rule ID throws UserErrorException on the DLL fast path.

@@ -42,6 +42,18 @@ internal static class SlideRuleEnvVars
     /// </summary>
     internal const string HookStateDirectory = "SLIDERULE_HOOK_STATE_DIR";
 
+    /// <summary>
+    ///     The seconds the hook's client gives it before killing it, in place of the documented Claude Code default;
+    ///     anything but a positive whole number leaves the default.
+    /// </summary>
+    internal const string HookTimeout = "SLIDERULE_HOOK_TIMEOUT";
+
+    /// <summary>
+    ///     <c>true</c> makes <c>sliderule hook</c> check in its own process even when a live MCP server for the same
+    ///     solution could answer.
+    /// </summary>
+    internal const string DisableWarmHook = "SLIDERULE_DISABLE_WARM_HOOK";
+
     /// <summary>The launching agent session's id, set by Claude Code.</summary>
     internal const string ClaudeCodeSessionId = "CLAUDE_CODE_SESSION_ID";
 

@@ -6,8 +6,8 @@ namespace SlideRule.Roslyn;
 
 /// <summary>
 ///     An immutable view of a <see cref="WorkspaceSession" />'s solution as of one
-///     <see cref="WorkspaceSession.GetCurrentAsync" /> call: the reconciled solution, with references that did
-///     not resolve dropped, and the facts of the load that produced it.
+///     <see cref="WorkspaceSession.GetCurrentAsync(string, CancellationToken)" /> call: the reconciled solution, with
+///     references that did not resolve dropped, and the facts of the load that produced it.
 /// </summary>
 /// <remarks>
 ///     The solution is a Roslyn immutable snapshot and stays readable after the session reloads or is

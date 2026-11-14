@@ -38,8 +38,12 @@ internal static class GlobalCallToolFilter
             filters.AddCallToolFilter(next => async (context, cancellationToken) =>
             {
                 IdleTimeoutWatchdog.EnterCall();
+                // The one warm-work slot a hook check also takes, so a stop's request is declined rather than queued
+                // behind this call. Required for the same reason as the budget below.
+                var admission = context.Server.Services!.GetRequiredService<WarmWorkAdmission>();
                 try
                 {
+                    using WarmWorkAdmission.Lease admitted = await admission.EnterAsync(cancellationToken);
                     CallToolResult result;
                     try
                     {

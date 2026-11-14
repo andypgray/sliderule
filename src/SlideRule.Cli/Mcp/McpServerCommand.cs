@@ -4,6 +4,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using Serilog;
+using SlideRule.Cli.Hooks.Handoff;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Mcp.Pipeline;
 using SlideRule.Cli.Mcp.Prompts;
@@ -14,6 +16,7 @@ using SlideRule.Roslyn;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Roslyn.MsBuild;
 using SlideRule.Roslyn.Sessions;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace SlideRule.Cli.Mcp;
 
@@ -62,6 +65,9 @@ internal static class McpServerCommand
         ParentProcessWatcher.Start(environment.IsFlagSet(SlideRuleEnvVars.DisableParentWatch));
         IdleTimeoutWatchdog.Start(environment.GetVariable(SlideRuleEnvVars.IdleTimeoutMinutes));
 
+        // Before registration, which rewrites variables the hook's own fingerprint never sees.
+        HandoffBinding? handoff = bindingFailure is null ? TryBindHandoff(binding, environment) : null;
+
         EnsureMsBuildRegistered();
 
         HostApplicationBuilder builder = Host.CreateApplicationBuilder();
@@ -73,6 +79,7 @@ internal static class McpServerCommand
         builder.Services.AddSingleton<IEnvironment>(environment);
         builder.Services.AddSingleton(binding);
         AddToolServices(builder.Services);
+        if (handoff is not null) AddHandoffServices(builder.Services, handoff);
 
         builder.Services
             .AddMcpServer(options => ConfigureServer(options, ServerInstructions.For(bindingFailure)))
@@ -138,11 +145,12 @@ internal static class McpServerCommand
 
         services.AddSingleton(_ => new SpecResolutionCache());
 
-        services.AddSingleton<ISolutionSource>(provider =>
-        {
-            var environment = provider.GetRequiredService<IEnvironment>();
-            if (environment.IsFlagSet(SlideRuleEnvVars.DisableWarmWorkspace)) return new ColdSolutionSource();
+        // With the warm workspace off no hand-off is served, so tool calls have no hook check to keep the slot for.
+        services.AddSingleton(provider => new WarmWorkAdmission(
+            serializes: !provider.GetRequiredService<IEnvironment>().IsFlagSet(SlideRuleEnvVars.DisableWarmWorkspace)));
 
+        services.AddSingleton(provider =>
+        {
             var session = provider.GetRequiredService<WorkspaceSession>();
             var store = provider.GetRequiredService<SessionFragmentStore>();
             var specs = provider.GetRequiredService<SpecModelCache>();
@@ -150,6 +158,57 @@ internal static class McpServerCommand
             ServerShutdown.RegisterDisposer(session.DisposeAsync);
             return new WarmSolutionSource(session, store, specs, resolutions);
         });
+
+        services.AddSingleton<ISolutionSource>(provider =>
+        {
+            var environment = provider.GetRequiredService<IEnvironment>();
+            if (environment.IsFlagSet(SlideRuleEnvVars.DisableWarmWorkspace)) return new ColdSolutionSource();
+
+            return provider.GetRequiredService<WarmSolutionSource>();
+        });
+    }
+
+    /// <summary>
+    ///     Registers the hand-off listener for <paramref name="handoff" />: the server a hook reaches to borrow this
+    ///     server's warm workspace.
+    /// </summary>
+    /// <remarks>
+    ///     The listener's stop is registered with <see cref="ServerShutdown" /> before anything it depends on is built,
+    ///     so a watchdog's exit stops it accepting before the session it serves is disposed.
+    /// </remarks>
+    internal static void AddHandoffServices(IServiceCollection services, HandoffBinding handoff)
+    {
+        services.AddSingleton(provider =>
+        {
+            var stopping = new CancellationTokenSource();
+            ServerShutdown.RegisterDisposer(() => new ValueTask(stopping.CancelAsync()));
+            return new HandoffServer(
+                provider.GetRequiredService<WorkspaceSession>(),
+                provider.GetRequiredService<WarmSolutionSource>(),
+                provider.GetRequiredService<WarmWorkAdmission>(),
+                provider.GetRequiredService<IEnvironment>(),
+                handoff,
+                provider.GetRequiredService<ILogger<HandoffServer>>(),
+                stopping.Token);
+        });
+        services.AddHostedService<HandoffListener>();
+    }
+
+    // Null when the server should not listen: the warm workspace is off, or the binding does not resolve here,
+    // which every tool call will report in its own words.
+    private static HandoffBinding? TryBindHandoff(McpServerBinding binding, IEnvironment environment)
+    {
+        if (environment.IsFlagSet(SlideRuleEnvVars.DisableWarmWorkspace)) return null;
+
+        try
+        {
+            return HandoffBinding.For(binding, environment);
+        }
+        catch (UserErrorException ex)
+        {
+            Log.Warning(ex, "Hand-off off: the bound solution does not resolve");
+            return null;
+        }
     }
 
     /// <summary>

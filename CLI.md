@@ -827,7 +827,7 @@ On Windows, SlideRule discovers installations through `vswhere` with `-all -prer
 
 ## Environment variables
 
-SlideRule reads the variables below. The `SLIDERULE_*` variables configure SlideRule; the others belong to Claude Code or the operating system. Blank, negative or unparsable idle-timeout values keep the default. The two disable flags accept `true` in any case; parent watching runs only on Windows. The file-log level accepts Serilog or Microsoft names, with unrecognised values using the default. The hook state directory replaces the temporary directory. Home and Claude configuration paths locate user `CLAUDE.md` files, which are excluded from the instruction files `render` checks for an import of its block.
+SlideRule reads the variables below. The `SLIDERULE_*` variables configure SlideRule; the others belong to Claude Code or the operating system. Blank, negative or unparsable idle-timeout values keep the default, as do hook-timeout values that are not a positive whole number. The disable flags accept `true` in any case; parent watching runs only on Windows. The file-log level accepts Serilog or Microsoft names, with unrecognised values using the default. The hook state directory replaces the temporary directory. Home and Claude configuration paths locate user `CLAUDE.md` files, which are excluded from the instruction files `render` checks for an import of its block.
 
 | Variable | Set by | What it does |
 |---|---|---|
@@ -839,6 +839,8 @@ SlideRule reads the variables below. The `SLIDERULE_*` variables configure Slide
 | `SLIDERULE_DISABLE_WARM_WORKSPACE` | you | `true` makes the MCP server load the solution on every call |
 | `SLIDERULE_LOG_LEVEL` | you | the MCP server's log level, `Warning` by default |
 | `SLIDERULE_HOOK_STATE_DIR` | you | where `hook` keeps its per-session state |
+| `SLIDERULE_HOOK_TIMEOUT` | you | the seconds your client gives `hook` before killing it; 600 by default |
+| `SLIDERULE_DISABLE_WARM_HOOK` | you | `true` makes `hook` check in its own process, never through a live MCP server |
 | `CLAUDE_CODE_SESSION_ID` | Claude Code | tags the MCP server's log lines |
 | `CLAUDE_PROJECT_DIR` | Claude Code | the project directory `hook` checks |
 | `MAX_MCP_OUTPUT_TOKENS` | Claude Code | sizes the MCP [reply budget](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-response-budget) |

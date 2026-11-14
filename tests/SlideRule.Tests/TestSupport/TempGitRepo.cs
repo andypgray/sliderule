@@ -28,10 +28,19 @@ internal sealed class TempGitRepo : IDisposable
     public TempGitRepo([CallerFilePath] string callerFilePath = "")
     {
         _workspace = new TempFixtureWorkspace(callerFilePath: callerFilePath);
-        File.WriteAllText(Path.Combine(Root, ".gitignore"), "bin/\nobj/\n");
-        GitCommand.Run(Root, "init");
-        GitCommand.Run(Root, "add", "-A");
-        GitCommand.Commit(Root, "-m", "fixture baseline");
+        CommitAsRepository(Root);
+    }
+
+    /// <summary>
+    ///     Makes <paramref name="root" /> a git repository with its tree committed at HEAD and <c>bin/</c> and
+    ///     <c>obj/</c> ignored, as the constructor does for its own tree.
+    /// </summary>
+    internal static void CommitAsRepository(string root)
+    {
+        File.WriteAllText(Path.Combine(root, ".gitignore"), "bin/\nobj/\n");
+        GitCommand.Run(root, "init");
+        GitCommand.Run(root, "add", "-A");
+        GitCommand.Commit(root, "-m", "fixture baseline");
     }
 
     /// <summary>Absolute path to the committed solution file.</summary>

@@ -31,6 +31,11 @@ internal sealed class FakeEnvironment : IEnvironment
         return _variables.GetValueOrDefault(name);
     }
 
+    public IReadOnlyDictionary<string, string> Variables()
+    {
+        return new Dictionary<string, string>(_variables, StringComparer.Ordinal);
+    }
+
     /// <summary>Sets (or, with a <c>null</c> value, clears) an environment variable.</summary>
     /// <returns><c>this</c>, for chaining.</returns>
     public FakeEnvironment SetVariable(string name, string? value)
@@ -41,5 +46,10 @@ internal sealed class FakeEnvironment : IEnvironment
             _variables[name] = value;
 
         return this;
+    }
+
+    void IEnvironment.SetVariable(string name, string? value)
+    {
+        SetVariable(name, value);
     }
 }

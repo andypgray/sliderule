@@ -280,11 +280,22 @@ public sealed class HookReadmeTests
                 .GetString() ?? "");
     }
 
-    // The product's environment variables that configure the hook verb, read off the one inventory that names them.
+    // Whether args, the tool's name left off, parse to the hook verb and invoke its own action rather than an
+    // option's, such as help. Must agree with ClaudeSettingsMerge.RunsHookRunner, which is how install-hook reads an
+    // entry as the hook.
+    private static bool InvokesTheVerbItself(IReadOnlyList<string> args)
+    {
+        ParseResult parsed = FencedCommands.Parse(args);
+        return CliEntry.IsHookVerb(parsed) && ReferenceEquals(parsed.Action, parsed.CommandResult.Command.Action);
+    }
+
+    // The product's environment variables that configure the hook verb, read off the one inventory that names them:
+    // a hook knob is named SLIDERULE_HOOK_<knob>, or SLIDERULE_<switch>_HOOK where it mirrors a server switch.
     private static IEnumerable<string> HookVariables()
     {
         return DeclaredConstants.Of<string>(typeof(SlideRuleEnvVars))
-            .Where(static name => name.StartsWith("SLIDERULE_HOOK_", StringComparison.Ordinal));
+            .Where(static name => name.StartsWith("SLIDERULE_HOOK_", StringComparison.Ordinal)
+                                  || name.EndsWith("_HOOK", StringComparison.Ordinal));
     }
 
     // A script directly under hooks/, such as the MCP launcher.

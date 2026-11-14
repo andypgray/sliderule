@@ -365,6 +365,24 @@ public sealed class WarmWorkspaceMcpTests
     }
 
     [Fact]
+    public async Task WarmWorkAdmission_WarmWorkspaceDisabled_AdmitsASecondCallerWhileTheFirstHoldsIt()
+    {
+        // With no hand-off served there is no hook check to keep the slot for, so tool calls run side by side.
+        // Arrange
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.MyAppWithCleanSpec(), Ct);
+        harness.Environment.SetVariable(SlideRuleEnvVars.DisableWarmWorkspace, "true");
+        var admission = harness.Services.GetRequiredService<WarmWorkAdmission>();
+        using WarmWorkAdmission.Lease first = await admission.EnterAsync(Ct);
+
+        // Act
+        using WarmWorkAdmission.Lease? second = await admission.TryEnterAsync(TimeSpan.Zero, Ct);
+
+        // Assert
+        second.ShouldNotBeNull();
+    }
+
+    [Fact]
     public async Task TwoConcurrentToolCalls_BothSucceed()
     {
         // Arrange

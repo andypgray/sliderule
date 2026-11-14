@@ -2,6 +2,7 @@ using System.CommandLine;
 using System.CommandLine.Help;
 using System.CommandLine.Parsing;
 using SlideRule.Cli.Hooks;
+using SlideRule.Cli.Hooks.Handoff;
 using SlideRule.Cli.Init;
 using SlideRule.Cli.Mcp;
 using SlideRule.Cli.Mcp.Infrastructure;
@@ -805,7 +806,8 @@ internal static class CommandFactory
                 parseResult.GetValue(maxRounds),
                 Directory.GetCurrentDirectory()),
             (request, output, error, ct) => new HookRunner(
-                    output, error, input, environment, new InProcessHookCheck(hostSource, environment))
+                    output, error, input, environment,
+                    WarmHookCheck.ForThisProcess(new InProcessHookCheck(hostSource, environment), environment))
                 .RunAsync(request, ct),
             HookRunner.RunReportingConfigErrorAsync);
 

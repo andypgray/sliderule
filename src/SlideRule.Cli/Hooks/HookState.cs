@@ -25,6 +25,7 @@ internal sealed class HookState
     private const string CheckFile = "check";
     private const string TreeFile = "tree";
     private const string TreesDirectory = "trees";
+    private const string HandoffFile = "handoff";
     private const string GreenWord = "green";
     private const string RedWord = "red";
     private const string PromptWord = "prompt";
@@ -146,6 +147,15 @@ internal sealed class HookState
     {
         string word = green ? GreenWord : RedWord;
         Write(VerdictFile, $"{word}\n{TreeText(tree)}");
+    }
+
+    /// <summary>
+    ///     Records how the last check's warm hand-off went, for whoever reads the state directory to learn whether
+    ///     a stop was answered warm.
+    /// </summary>
+    public void RecordHandoff(string outcome)
+    {
+        Write(HandoffFile, outcome + "\n");
     }
 
     /// <summary>Records <paramref name="tree" /> as the tree the prompt in flight found.</summary>

@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Roslyn;
+using SlideRule.Roslyn.Sessions;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -299,10 +300,12 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         // ReSharper disable once DisposeOnUsingVariable
         await session.DisposeAsync();
 
-        // Assert — a second dispose is a no-op, and post-dispose access is a clean ObjectDisposedException.
+        // Assert — a second dispose is a no-op, post-dispose access is a clean ObjectDisposedException, and a
+        // disposed session no longer reports the solution it held as loaded.
         // ReSharper disable once DisposeOnUsingVariable
         await Should.NotThrowAsync(async () => await session.DisposeAsync());
         await Should.ThrowAsync<ObjectDisposedException>(async () => await session.GetCurrentAsync(fixture.SolutionPath, Ct));
+        session.IsLoaded(fixture.SolutionPath).ShouldBeFalse();
     }
 
     [Fact]
@@ -313,12 +316,172 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         await using var session = new WorkspaceSession();
         string bogusSolution = fixture.PathOf("DoesNotExist.sln");
 
-        // Act — a bad path throws; the session resets to unloaded so the next call retries cleanly.
+        // Act — a bad path throws, and drops the solution loaded before it; the session resets to unloaded so the
+        // next call retries cleanly.
+        bool loadedBeforeAnyCall = session.IsLoaded(fixture.SolutionPath);
+        await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        bool loadedAfterFirstLoad = session.IsLoaded(fixture.SolutionPath);
         await Should.ThrowAsync<Exception>(async () => await session.GetCurrentAsync(bogusSolution, Ct));
+        bool goodLoadedAfterFailure = session.IsLoaded(fixture.SolutionPath);
+        bool bogusLoadedAfterFailure = session.IsLoaded(bogusSolution);
         WorkspaceSnapshot recovered = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
 
-        // Assert
+        // Assert — only a load that succeeded counts as loaded, only for the path it loaded, and only until the
+        // next load starts.
         recovered.Solution.Projects.ShouldNotBeEmpty();
+        loadedBeforeAnyCall.ShouldBeFalse();
+        loadedAfterFirstLoad.ShouldBeTrue();
+        goodLoadedAfterFailure.ShouldBeFalse();
+        bogusLoadedAfterFailure.ShouldBeFalse();
+        session.IsLoaded(fixture.SolutionPath).ShouldBeTrue();
+        session.IsLoaded(bogusSolution).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_ForcedRead_ListedFileItsStatVouchesFor_IsReadAgain()
+    {
+        // Arrange — every document stamped a day back and swept once, so each fingerprint is promoted and a plain
+        // reconcile reads nothing; that the plain call reads nothing is checked, or the row would prove no bypass.
+        WorkspaceSession session = shared.Session;
+        WorkspaceSnapshot first = await session.GetCurrentAsync(shared.SolutionPath, Ct);
+        FixtureEdits.BackdateAllDocuments(first);
+        await session.GetCurrentAsync(shared.SolutionPath, Ct);
+        long readsBeforePlain = session.SweepContentReads;
+        WorkspaceSnapshot settled = await session.GetCurrentAsync(shared.SolutionPath, Ct);
+        long plainReads = session.SweepContentReads - readsBeforePlain;
+        string moneyFile = Path.GetFullPath(shared.PathOf("MyApp.Domain", "Money.cs"));
+
+        // Act
+        ForcedReconcile forced = await session.GetCurrentAsync(shared.SolutionPath, [moneyFile], Ct);
+
+        // Assert — the listed file alone was read, in place, and the unchanged tree hands back the same snapshot.
+        plainReads.ShouldBe(0);
+        (session.SweepContentReads - readsBeforePlain).ShouldBe(1);
+        forced.Outcomes.ShouldContainKeyAndValue(moneyFile, ForcedReadOutcome.Read);
+        forced.Snapshot.ShouldBeSameAs(settled);
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_ForcedRead_ListedFileCannotBeRead_ReportsUnreadable()
+    {
+        // Arrange — an exclusive handle leaves the file's stat readable and its content not.
+        WorkspaceSession session = shared.Session;
+        await session.GetCurrentAsync(shared.SolutionPath, Ct);
+        long reloadsBefore = session.FullReloadCount;
+        string moneyFile = Path.GetFullPath(shared.PathOf("MyApp.Domain", "Money.cs"));
+
+        // Act
+        ForcedReconcile forced;
+        using (FileHold.Exclusive(moneyFile))
+        {
+            forced = await session.GetCurrentAsync(shared.SolutionPath, [moneyFile], Ct);
+        }
+
+        // Assert
+        forced.Outcomes.ShouldContainKeyAndValue(moneyFile, ForcedReadOutcome.Unreadable);
+        (session.FullReloadCount - reloadsBefore).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_ForcedRead_ListedFileNotInTheSolution_ReportsUntracked()
+    {
+        // Arrange — the <Compile Remove>'d stray sits in the project cone yet is no document, and no structural file.
+        WorkspaceSession session = shared.Session;
+        await session.GetCurrentAsync(shared.SolutionPath, Ct);
+        long reloadsBefore = session.FullReloadCount;
+        string stray = Path.GetFullPath(shared.PathOf("MyApp.Domain", "Snippets", "ExcludedScratch.cs"));
+        File.Exists(stray)
+            .ShouldBeTrue();
+
+        // Act
+        ForcedReconcile forced = await session.GetCurrentAsync(shared.SolutionPath, [stray], Ct);
+
+        // Assert
+        forced.Outcomes.ShouldContainKeyAndValue(stray, ForcedReadOutcome.Untracked);
+        (session.FullReloadCount - reloadsBefore).ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_ForcedRead_ListedProjectFile_ReloadsAndReportsEveryPathReloaded()
+    {
+        // Arrange — the project file's stat is left as the load recorded it, so only the listing can reload.
+        WorkspaceSession session = shared.Session;
+        WorkspaceSnapshot before = await session.GetCurrentAsync(shared.SolutionPath, Ct);
+        long reloadsBefore = session.FullReloadCount;
+        string projectFile = Path.GetFullPath(shared.PathOf("MyApp.Domain", "MyApp.Domain.csproj"));
+        string moneyFile = Path.GetFullPath(shared.PathOf("MyApp.Domain", "Money.cs"));
+
+        // Act
+        ForcedReconcile forced = await session.GetCurrentAsync(shared.SolutionPath, [projectFile, moneyFile], Ct);
+
+        // Assert
+        (session.FullReloadCount - reloadsBefore).ShouldBe(1);
+        forced.Snapshot.Generation.ShouldBeGreaterThan(before.Generation);
+        forced.Outcomes.ShouldContainKeyAndValue(projectFile, ForcedReadOutcome.Reloaded);
+        forced.Outcomes.ShouldContainKeyAndValue(moneyFile, ForcedReadOutcome.Reloaded);
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_ForcedRead_ListedFilesWrittenBeforeTheReload_ReportUnstable()
+    {
+        // Arrange — the session's commentary announces the forced reload after the call's opening stats and
+        // before the load, so a write made from it lands inside the call. The document's write also lands before
+        // the load takes its own stat of it, so only the call's opening stat can tell it moved.
+        using var fixture = new TempFixtureWorkspace();
+        string projectFile = Path.GetFullPath(fixture.PathOf("MyApp.Domain", "MyApp.Domain.csproj"));
+        string moneyFile = Path.GetFullPath(fixture.PathOf("MyApp.Domain", "Money.cs"));
+        await using var session = new WorkspaceSession(WriteBothOnForcedReload);
+        await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+
+        // Act
+        ForcedReconcile forced = await session.GetCurrentAsync(fixture.SolutionPath, [projectFile, moneyFile], Ct);
+
+        // Assert
+        forced.Outcomes.ShouldContainKeyAndValue(projectFile, ForcedReadOutcome.Unstable);
+        forced.Outcomes.ShouldContainKeyAndValue(moneyFile, ForcedReadOutcome.Unstable);
+        return;
+
+        void WriteBothOnForcedReload(string message)
+        {
+            if (!message.StartsWith("Structural file listed for a forced read", StringComparison.Ordinal)) return;
+
+            FixtureEdits.StampForward(projectFile);
+            FixtureEdits.EditOnDisk(moneyFile, content => content + "\n// written-during-the-reload\n");
+        }
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_ForcedRead_ListedDocumentWrittenDuringTheSweep_ReportsUnstable()
+    {
+        // Arrange — a second listed file held exclusively makes the sweep report it to the sink, mid-sweep, and the
+        // sink writes the first. Whichever of the two the sweep reaches first, the write lands after the call's
+        // opening stat and before its closing one.
+        using var fixture = new TempFixtureWorkspace();
+        string moneyFile = Path.GetFullPath(fixture.PathOf("MyApp.Domain", "Money.cs"));
+        string lockedFile = Path.GetFullPath(fixture.PathOf("MyApp.Domain", "PricingStrategy.cs"));
+        await using var session = new WorkspaceSession(WriteMoneyOnUnreadable);
+        await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        long reloadsBefore = session.FullReloadCount;
+
+        // Act
+        ForcedReconcile forced;
+        using (FileHold.Exclusive(lockedFile))
+        {
+            forced = await session.GetCurrentAsync(fixture.SolutionPath, [moneyFile, lockedFile], Ct);
+        }
+
+        // Assert — read in place, no reload, and the write still shows.
+        forced.Outcomes.ShouldContainKeyAndValue(moneyFile, ForcedReadOutcome.Unstable);
+        forced.Outcomes.ShouldContainKeyAndValue(lockedFile, ForcedReadOutcome.Unreadable);
+        (session.FullReloadCount - reloadsBefore).ShouldBe(0);
+        return;
+
+        void WriteMoneyOnUnreadable(string message)
+        {
+            if (!message.StartsWith("Skipping unreadable file during reconcile", StringComparison.Ordinal)) return;
+
+            FixtureEdits.EditOnDisk(moneyFile, content => content + "\n// written-during-the-sweep\n");
+        }
     }
 
     private static async Task<string> DocumentTextAsync(WorkspaceSnapshot snapshot, string path)

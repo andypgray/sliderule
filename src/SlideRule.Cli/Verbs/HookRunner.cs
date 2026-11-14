@@ -336,8 +336,11 @@ internal sealed class HookRunner(
         // is about; a stop that checked only its own tree names none.
         bool named = checks.Any(static check => !check.Tree.Own);
         foreach ((TreeTurn tree, HookCheckResult result) in checks)
-            if (GaveVerdict(result))
-                tree.State.RecordVerdict(result.ExitCode == ExitCodes.Clean, tree.Snapshot);
+        {
+            if (result.Handoff is { } handoff) tree.State.RecordHandoff(handoff);
+
+            if (GaveVerdict(result)) tree.State.RecordVerdict(result.ExitCode == ExitCodes.Clean, tree.Snapshot);
+        }
 
         List<(TreeTurn Tree, HookCheckResult Result)> failed = checks.Where(static check => !GaveVerdict(check.Result))
             .ToList();

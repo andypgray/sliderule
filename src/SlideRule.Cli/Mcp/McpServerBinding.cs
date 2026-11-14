@@ -50,6 +50,20 @@ internal sealed record McpServerBinding(string? Solution, string? Spec, string W
             NoBinlogReplay, ReportPartialModels, NoSarifFile, rules, grain);
     }
 
+    /// <summary>The check a hand-off server runs once to load its workspace, under the warm path's policy.</summary>
+    internal CheckRequest WarmUpRequest()
+    {
+        return new CheckRequest(
+            Solution, Spec, Json: false, DiffBase: null, WorkingDirectory, BypassPersistedCache, NoBinlogReplay,
+            AllowWorkspaceDiagnostics: false, NoSarifFile, Rules: null, DocumentGrain.Full, []);
+    }
+
+    /// <summary><paramref name="hookRequest" /> under the warm path's policy, for a hand-off server to run.</summary>
+    internal static CheckRequest UnderWarmPolicy(CheckRequest hookRequest)
+    {
+        return hookRequest with { NoCache = BypassPersistedCache, Binlog = NoBinlogReplay };
+    }
+
     /// <summary>The <c>arch_status</c> run: the whole burndown, which carries no narrowing knob.</summary>
     internal StatusRequest StatusRequest()
     {

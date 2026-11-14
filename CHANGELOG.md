@@ -32,6 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   live exception is read on its own, and the check covers type, member and project selections and exemplars. A
   package's type is excepted by `typeof(...)` or `arch.Namespace(...).Named(...)`, since `arch.Types` holds only
   the types the solution declares, and the hint says so.
+- `sliderule hook` sends a stop's check to a live `sliderule mcp` server when one is running for the same
+  solution and spec, from the same build, with the same environment and `global.json`. The server reads every
+  file the turn changed before it checks, and the report matches a check in the hook's own process byte for
+  byte. Otherwise the hook checks in its own process, as before. Both processes first remove the shell's own
+  variables and list each `PATH` directory once. On Windows a server the client starts directly still sees a
+  different `PATH` from a hook run through Git's bash, so it never serves a stop. On this repository, whose server
+  starts through Git's `sh`, a stop after a one-line edit took 5 seconds through the server and 26 seconds without it. `SLIDERULE_HOOK_TIMEOUT` tells the hook your
+  client's timeout where it is not Claude Code's 600 seconds, and `SLIDERULE_DISABLE_WARM_HOOK` keeps every stop
+  in the hook's own process.
 
 ### Changed
 

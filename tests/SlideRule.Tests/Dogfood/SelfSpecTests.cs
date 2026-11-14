@@ -559,8 +559,8 @@ public sealed class SelfSpecTests
     ///     The live oracle for <c>.Authored()</c>'s detection contract (GRAMMAR §5.2), so the difference
     ///     between the CLI project noun and the same selection narrowed to authored types is knowable
     ///     exactly. The JSON generator carries its attribute on the generated class, and partial
-    ///     declarations merge onto one symbol, so <c>SlideRuleJsonContext</c> lands on the generated side
-    ///     even though its declaration is hand-written: the attribute-on-the-generated-class arm of the
+    ///     declarations merge onto one symbol, so each JSON context the CLI declares lands on the generated
+    ///     side even though its declaration is hand-written: the attribute-on-the-generated-class arm of the
     ///     partial-type rule. <see cref="RoslynProject_MinusAuthored_IsExactlyTheGeneratorEmittedTypes" />
     ///     works that arm too, and carries the other one, <c>[GeneratedRegex]</c>'s
     ///     attribute-on-the-generated-method shape. Asserted as an equality rather than a containment,
@@ -582,7 +582,7 @@ public sealed class SelfSpecTests
             .SortedFullNames();
 
         declared.Except(authored)
-            .ShouldBe(["SlideRule.Cli.Rendering.SlideRuleJsonContext"]);
+            .ShouldBe(["SlideRule.Cli.Hooks.Handoff.HandoffJson", "SlideRule.Cli.Rendering.SlideRuleJsonContext"]);
 
         // The synthesized top-level-statements entry point is the nearest thing this project has to a type
         // nobody typed, and no generator emitted it — so it must survive the narrowing.

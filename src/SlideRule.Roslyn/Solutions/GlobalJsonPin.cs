@@ -23,18 +23,24 @@ internal sealed record GlobalJsonPin(
     };
 
     /// <summary>
-    ///     The nearest <c>global.json</c> at or above <paramref name="directory" />, the one the .NET host
-    ///     resolves an SDK from in that directory, or null when there is none.
+    ///     The path of the nearest <c>global.json</c> at or above <paramref name="directory" />, the one the .NET
+    ///     host resolves an SDK from in that directory, or null when there is none.
     /// </summary>
-    internal static GlobalJsonPin? Nearest(string directory)
+    internal static string? NearestFile(string directory)
     {
         for (DirectoryInfo? current = new(directory); current is not null; current = current.Parent)
         {
             string candidate = Path.Combine(current.FullName, FileName);
-            if (System.IO.File.Exists(candidate)) return Read(candidate);
+            if (System.IO.File.Exists(candidate)) return candidate;
         }
 
         return null;
+    }
+
+    /// <summary>The pin <see cref="NearestFile" /> finds, or null when there is none.</summary>
+    internal static GlobalJsonPin? Nearest(string directory)
+    {
+        return NearestFile(directory) is { } file ? Read(file) : null;
     }
 
     /// <summary>
@@ -49,7 +55,7 @@ internal sealed record GlobalJsonPin(
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return new GlobalJsonPin(file, null, null, false, null);
+            return Bare(file);
         }
     }
 
@@ -63,7 +69,7 @@ internal sealed record GlobalJsonPin(
             if (document.RootElement.ValueKind != JsonValueKind.Object
                 || !document.RootElement.TryGetProperty("sdk", out JsonElement sdk)
                 || sdk.ValueKind != JsonValueKind.Object)
-                return new GlobalJsonPin(file, null, null, false, null);
+                return Bare(file);
 
             return new GlobalJsonPin(
                 file,
@@ -74,8 +80,14 @@ internal sealed record GlobalJsonPin(
         }
         catch (JsonException)
         {
-            return new GlobalJsonPin(file, null, null, false, null);
+            return Bare(file);
         }
+    }
+
+    // A pin that names its file and nothing else: what an unreadable, malformed or sdk-less file reads as.
+    private static GlobalJsonPin Bare(string file)
+    {
+        return new GlobalJsonPin(file, null, null, false, null);
     }
 
     private static string? StringOf(JsonElement sdk, string name)

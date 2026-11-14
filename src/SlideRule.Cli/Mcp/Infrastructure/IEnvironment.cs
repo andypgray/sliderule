@@ -10,6 +10,12 @@ namespace SlideRule.Cli.Mcp.Infrastructure;
 internal interface IEnvironment
 {
     string? GetVariable(string name);
+
+    /// <summary>Every variable set, by name, as the process holds them now.</summary>
+    IReadOnlyDictionary<string, string> Variables();
+
+    /// <summary>Sets <paramref name="name" /> to <paramref name="value" />, or removes it when the value is <c>null</c>.</summary>
+    void SetVariable(string name, string? value);
 }
 
 /// <summary>

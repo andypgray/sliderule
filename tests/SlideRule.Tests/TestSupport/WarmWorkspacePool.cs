@@ -15,8 +15,8 @@ namespace SlideRule.Tests.TestSupport;
 ///     </para>
 ///     <para>
 ///         <b>Always reconciled.</b> Every acquisition goes through
-///         <see cref="WorkspaceSession.GetCurrentAsync" />, the same reconcile against disk that the warm MCP
-///         server runs in production, so a test that edits the tree (including
+///         <see cref="WorkspaceSession.GetCurrentAsync(string, CancellationToken)" />, the same reconcile against disk
+///         that the warm MCP server runs in production, so a test that edits the tree (including
 ///         <see cref="TempFixtureWorkspace" />'s reset back to pristine between tests) sees exactly what a
 ///         freshly opened workspace would.
 ///     </para>

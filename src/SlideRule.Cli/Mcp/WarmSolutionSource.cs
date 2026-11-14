@@ -1,6 +1,7 @@
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.SpecLoading;
 using SlideRule.Hosting;
+using SlideRule.Internal;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Sessions;
 using SlideRule.Roslyn.Solutions;
@@ -38,12 +39,16 @@ internal sealed class WarmSolutionSource(
     public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
         WorkspaceSnapshot snapshot = await session.GetCurrentAsync(solutionPath, ct);
-        return new SolutionHandle(
-            snapshot.Solution, snapshot.LoadDiagnostics, null, snapshot.ProjectFiles,
-            (exclude, declaredMembers, token) => store.GetCodebaseAsync(snapshot, exclude, declaredMembers, token),
-            (normalizedSpec, resolveFully) => resolutions.Resolve(normalizedSpec, snapshot.Generation, resolveFully),
-            snapshot.TargetFrameworks,
-            warmDeclaredMembers: () => DeclaredMembersFor(solutionPath, snapshot.Generation));
+        return HandleFor(snapshot, solutionPath);
+    }
+
+    /// <summary>
+    ///     A source that serves <paramref name="snapshot" />, taken for <paramref name="solutionPath" />, to every
+    ///     acquisition, through this source's store and caches, so a check run on it cannot reconcile again.
+    /// </summary>
+    internal ISolutionSource PinnedTo(WorkspaceSnapshot snapshot, string solutionPath)
+    {
+        return new PinnedSource(this, snapshot, Path.GetFullPath(solutionPath));
     }
 
     /// <inheritdoc />
@@ -83,5 +88,35 @@ internal sealed class WarmSolutionSource(
         return members;
     }
 
+    private SolutionHandle HandleFor(WorkspaceSnapshot snapshot, string solutionPath)
+    {
+        return new SolutionHandle(
+            snapshot.Solution, snapshot.LoadDiagnostics, null, snapshot.ProjectFiles,
+            (exclude, declaredMembers, token) => store.GetCodebaseAsync(snapshot, exclude, declaredMembers, token),
+            (normalizedSpec, resolveFully) => resolutions.Resolve(normalizedSpec, snapshot.Generation, resolveFully),
+            snapshot.TargetFrameworks,
+            warmDeclaredMembers: () => DeclaredMembersFor(solutionPath, snapshot.Generation));
+    }
+
     private sealed record DeclaredMembership(long Generation, IReadOnlySet<string>? Members);
+
+    // Refuses another solution rather than serving the pinned one for it: the caller certified this snapshot for
+    // its own solution only.
+    private sealed class PinnedSource(WarmSolutionSource owner, WorkspaceSnapshot snapshot, string solutionPath)
+        : ISolutionSource
+    {
+        public Task<SolutionHandle> AcquireAsync(string requested, CancellationToken ct)
+        {
+            if (!PathComparison.Comparer.Equals(Path.GetFullPath(requested), solutionPath))
+                throw new InvalidOperationException(
+                    $"A source pinned to {solutionPath} was asked for {requested}.");
+
+            return Task.FromResult(owner.HandleFor(snapshot, requested));
+        }
+
+        public ArchitectureModel LoadSpecModel(string specDllPath)
+        {
+            return owner.LoadSpecModel(specDllPath);
+        }
+    }
 }

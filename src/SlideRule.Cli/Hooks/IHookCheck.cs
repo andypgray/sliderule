@@ -13,5 +13,8 @@ internal interface IHookCheck
     Task<HookCheckResult> RunAsync(CheckRequest request, CancellationToken ct);
 }
 
-/// <summary>A check run's exit code, one of <see cref="ExitCodes" />, and what it wrote, each channel apart.</summary>
-internal sealed record HookCheckResult(int ExitCode, string Output, string Error);
+/// <summary>
+///     A check run's exit code, one of <see cref="ExitCodes" />, and what it wrote, each channel apart, with how a
+///     warm hand-off went (a <see cref="Handoff.HandoffOutcomes" /> word), or null where none was tried.
+/// </summary>
+internal sealed record HookCheckResult(int ExitCode, string Output, string Error, string? Handoff = null);

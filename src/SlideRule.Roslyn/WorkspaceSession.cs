@@ -3,27 +3,28 @@ using Microsoft.CodeAnalysis.Text;
 using SlideRule.Internal;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Roslyn.Sessions;
 using SlideRule.Roslyn.Solutions;
 using SlideRule.Roslyn.Threading;
 
 namespace SlideRule.Roslyn;
 
 /// <summary>
-///     A loaded solution kept alive for a host that reads it many times. Each <see cref="GetCurrentAsync" />
-///     reconciles the solution against disk and hands back an immutable <see cref="WorkspaceSnapshot" />. The
-///     session owns the MSBuild workspace and the out-of-process build host behind it, so dispose it when the
-///     host shuts down. For a single read, use <see cref="WorkspaceLoader" /> instead.
+///     A loaded solution kept alive for a host that reads it many times. Each
+///     <see cref="GetCurrentAsync(string, CancellationToken)" /> reconciles the solution against disk and hands back
+///     an immutable <see cref="WorkspaceSnapshot" />. The session owns the MSBuild workspace and the out-of-process
+///     build host behind it, so dispose it when the host shuts down. For a single read, use
+///     <see cref="WorkspaceLoader" /> instead.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Nothing is loaded until the first <see cref="GetCurrentAsync" />, which pays the whole solution load; later
-///         calls pay only the reconcile. A structural change (the solution or filter file, the solution a filter
-///         references, a project file, a restore assets file, or any of the
+///         Nothing is loaded until the first <see cref="GetCurrentAsync(string, CancellationToken)" />, which pays the
+///         whole solution load; later calls pay only the reconcile. A structural change (the solution or filter file,
+///         the solution a filter references, a project file, a restore assets file, or any of the
 ///         <see cref="FileStamping.StructuralProbeFileNames" /> at or above a project), a source file added or
 ///         deleted, or an edit to a source of a project in another language reloads the solution wholesale. An edit
 ///         to any other file already in the solution is folded into a fresh snapshot, and an unchanged tree hands
-///         back the very snapshot
-///         instance the previous call returned.
+///         back the very snapshot instance the previous call returned.
 ///     </para>
 ///     <para>
 ///         It reads and never writes: no file is touched, and no snapshot is applied back to the workspace.
@@ -90,6 +91,10 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     // Canonical path of the currently-loaded solution; drives the "path changed ⇒ full load" branch.
     private string? loadedSolutionPath;
 
+    // The loaded solution's path from the moment its snapshot exists until a load starts. IsLoaded reads it
+    // outside the gate, so it is written only through Volatile.
+    private string? readySolutionPath;
+
     // The cached immutable snapshot returned to callers.
     private WorkspaceSnapshot? snapshot;
 
@@ -155,18 +160,82 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     /// </exception>
     public async Task<WorkspaceSnapshot> GetCurrentAsync(string solutionPath, CancellationToken ct = default)
     {
+        ForcedReconcile reconciled = await GetCurrentAsync(solutionPath, [], ct).ConfigureAwait(false);
+        return reconciled.Snapshot;
+    }
+
+    /// <summary>
+    ///     Whether the session holds a loaded solution at <paramref name="solutionPath" /> whose last load
+    ///     succeeded. It never loads and never waits on a call in flight, so a load or reload under way answers
+    ///     false, and a reconcile under way answers as the load before it left things.
+    /// </summary>
+    public bool IsLoaded(string solutionPath)
+    {
+        // The disposed flag, not the field, answers for a disposed session: a load in flight when disposal starts
+        // publishes the field again when it finishes.
+        return Volatile.Read(ref disposed) == 0
+               && PathEquals(Volatile.Read(ref readySolutionPath), Path.GetFullPath(solutionPath));
+    }
+
+    /// <summary>
+    ///     Returns the solution at <paramref name="solutionPath" /> as the other overload does, except that each
+    ///     document among <paramref name="forceRead" /> is read by content even where its stat would vouch for
+    ///     it, and a structural file among them reloads the solution, since only a fresh evaluation can show what
+    ///     a stat-identical rewrite of one changed. The result says how each listed path was read.
+    /// </summary>
+    /// <exception cref="ObjectDisposedException">The session has been disposed.</exception>
+    /// <exception cref="UserErrorException">
+    ///     The <c>.slnf</c> filter at <paramref name="solutionPath" /> could not be read.
+    /// </exception>
+    public async Task<ForcedReconcile> GetCurrentAsync(
+        string solutionPath, IReadOnlyCollection<string> forceRead, CancellationToken ct = default)
+    {
         ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
         string normalizedPath = Path.GetFullPath(solutionPath);
+        HashSet<string> listed = forceRead.Select(Path.GetFullPath)
+            .ToHashSet(PathComparison.Comparer);
 
         using SemaphoreRelease held = await gate.LockAsync(ct).ConfigureAwait(false);
         ObjectDisposedException.ThrowIf(disposed != 0, this);
 
-        if (loaded is null || !PathEquals(loadedSolutionPath, normalizedPath))
-            await LoadFreshAsync(normalizedPath, ct).ConfigureAwait(false);
-        else
-            await ReconcileAsync(ct).ConfigureAwait(false);
+        // Taken before anything can reload, so a path's stat can be held to the whole of a load.
+        Dictionary<string, FileFreshness> statsAtStart = listed.ToDictionary(
+            path => path,
+            FileFreshness.Capture,
+            PathComparison.Comparer);
+        long reloadsAtStart = FullReloadCount;
+        Dictionary<string, ForcedReadOutcome> outcomes = new(PathComparison.Comparer);
 
-        return snapshot!;
+        if (loaded is null || !PathEquals(loadedSolutionPath, normalizedPath))
+        {
+            await LoadFreshAsync(normalizedPath, ct).ConfigureAwait(false);
+        }
+        else if (listed.FirstOrDefault(structuralFingerprints.ContainsKey) is { } structural)
+        {
+            diagnosticSink?.Invoke($"Structural file listed for a forced read, reloading: {structural}");
+            await LoadFreshAsync(loadedSolutionPath!, ct).ConfigureAwait(false);
+        }
+        else
+        {
+            await ReconcileAsync(listed, outcomes, ct).ConfigureAwait(false);
+        }
+
+        // Every path is held to the stat taken before anything in this call read it, never to one the load or the
+        // sweep took: a load can read a document's text before its own stats (the cross-language check compiles
+        // first), so no stat taken inside the call vouches for the text it read.
+        bool reloaded = FullReloadCount != reloadsAtStart;
+        foreach (string path in listed)
+        {
+            ForcedReadOutcome read = reloaded
+                ? ForcedReadOutcome.Reloaded
+                : outcomes.GetValueOrDefault(path, ForcedReadOutcome.Untracked);
+            bool stable = statsAtStart[path].MatchesStat(FileFreshness.Capture(path));
+            outcomes[path] = !stable && read is ForcedReadOutcome.Read or ForcedReadOutcome.Reloaded
+                ? ForcedReadOutcome.Unstable
+                : read;
+        }
+
+        return new ForcedReconcile(snapshot!, outcomes);
     }
 
     /// <summary>
@@ -175,6 +244,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     /// </summary>
     private async Task LoadFreshAsync(string solutionPath, CancellationToken ct)
     {
+        Volatile.Write(ref readySolutionPath, null);
         LoadedSolution? previous = loaded;
         loaded = null;
         current = null;
@@ -222,6 +292,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         RecordAllFingerprints(solutionPath, materialized, statsBeforeRead);
         snapshot = MintSnapshot();
         FullReloadCount++;
+        Volatile.Write(ref readySolutionPath, solutionPath);
         return;
 
         // MSBuildWorkspace can raise workspace-failure diagnostics from BuildHost callback threads while
@@ -235,11 +306,16 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         }
     }
 
-    private async Task ReconcileAsync(CancellationToken ct)
+    // forced names documents to read whatever their stat says, and outcomes receives how each one was read;
+    // neither is consulted once a reload is decided.
+    private async Task ReconcileAsync(
+        IReadOnlySet<string> forced, Dictionary<string, ForcedReadOutcome> outcomes, CancellationToken ct)
     {
         // The arms run cheapest first and short-circuit: the document sweep is the only one that reads file
         // content, so it must not run once a reload is already decided.
-        if (StructuralSweepDetectsChange() || ConeScanDetectsNewFile() || await ReconcileDocumentsAsync(ct).ConfigureAwait(false))
+        if (StructuralSweepDetectsChange()
+            || ConeScanDetectsNewFile()
+            || await ReconcileDocumentsAsync(forced, outcomes, ct).ConfigureAwait(false))
             await LoadFreshAsync(loadedSolutionPath!, ct).ConfigureAwait(false);
     }
 
@@ -279,7 +355,8 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     ///     for, and returns true when the caller must reload wholesale instead: a document has gone missing, or one
     ///     in a project of another language has new content.
     /// </summary>
-    private async Task<bool> ReconcileDocumentsAsync(CancellationToken ct)
+    private async Task<bool> ReconcileDocumentsAsync(
+        IReadOnlySet<string> forced, Dictionary<string, ForcedReadOutcome> outcomes, CancellationToken ct)
     {
         // Snapshot the key set: the loop reassigns documentFingerprints entries in place.
         List<string> paths = [.. documentFingerprints.Keys];
@@ -293,7 +370,8 @@ internal sealed class WorkspaceSession : IAsyncDisposable
             FileFreshness beforeRead = FileFreshness.Capture(path);
             if (!beforeRead.Exists) return true;
 
-            if (documentFingerprints[path].CanTrust(beforeRead)) continue;
+            bool isForced = forced.Contains(path);
+            if (!isForced && documentFingerprints[path].CanTrust(beforeRead)) continue;
 
             SourceText text;
             try
@@ -304,10 +382,12 @@ internal sealed class WorkspaceSession : IAsyncDisposable
             {
                 // Leave the entry stale-fingerprinted (retried next call) rather than poison the sweep.
                 diagnosticSink?.Invoke($"Skipping unreadable file during reconcile: {path} ({ex.Message})");
+                if (isForced) outcomes[path] = ForcedReadOutcome.Unreadable;
                 continue;
             }
 
             SweepContentReads++;
+            if (isForced) outcomes[path] = ForcedReadOutcome.Read;
 
             if (!documentIds.TryGetValue(path, out List<DocumentId>? ids) || ids.Count == 0)
             {
