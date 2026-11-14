@@ -14,8 +14,9 @@ namespace SlideRule.Tests.Cli;
 /// <summary>
 ///     The <c>status --json</c> document's optional slots (<see cref="StatusJsonRenderer" />), rendered over
 ///     reports checked in memory: the dead patterns listed under a ratcheted rule and where its unmatched entries
-///     are counted, and the orphan scan's list. Each slot is absent where it has nothing to say. The whole-document
-///     shape is pinned by the <c>violated-status.json</c> golden, which reaches none of these slots.
+///     are counted, the remaining entries with their dates and the oldest of them, and the orphan scan's list.
+///     Each slot is absent where it has nothing to say. The whole-document shape is pinned by the
+///     <c>violated-status.json</c> golden, whose entries are all undated and which reaches none of the other slots.
 /// </summary>
 public sealed class StatusJsonRendererTests
 {

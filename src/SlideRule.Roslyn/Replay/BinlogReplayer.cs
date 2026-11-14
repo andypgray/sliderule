@@ -95,8 +95,8 @@ internal static class BinlogReplayer
 
         ct.ThrowIfCancellationRequested();
 
-        // Filled by the predicate below as the reader walks the capture — the one moment the dropped
-        // projects are visible on this path.
+        // Filled by the predicate below as the reader walks the capture — the one moment the projects compiled in
+        // another language are visible on this path.
         var unsupportedProjects = new HashSet<string>(PathComparison.Comparer);
         var replayedProjects = new HashSet<string>(PathComparison.Comparer);
 

@@ -17,10 +17,11 @@ namespace SlideRule.Tests.Roslyn;
 ///     Two shapes of test live here, and the difference decides which session a case gets. A test whose
 ///     subject is a delta — one reload, a bumped edit version, the same snapshot back — takes the
 ///     class's <see cref="SharedWorkspaceSession" />: it re-baselines the counters after its own first
-///     acquisition, so a tree an earlier case edited cannot skew it, and the eight of them share one
-///     MSBuild load instead of paying eight. A test whose subject is the virgin state — zero reads
+///     acquisition, so a tree an earlier case edited cannot skew it, and all of them share one
+///     MSBuild load instead of paying one each. A test whose subject is the virgin state — zero reads
 ///     ever, exactly one load ever, first-load concurrency, recovery from a failed first load — asserts
-///     absolute counters and so must mint its own session over its own copy.
+///     absolute counters and so must mint its own session over its own copy. So must a test that acts on
+///     the session's commentary, since the shared session reports to no sink.
 /// </remarks>
 public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClassFixture<SharedWorkspaceSession>
 {

@@ -10,7 +10,8 @@ namespace SlideRule.Tests.Cli;
 ///     The stamp says what a verdict over a project that compiles twice covers: the members and hierarchy of
 ///     the types its frameworks share are one framework's, so a member, base type or interface another
 ///     framework's <c>#if</c> guards was never in the model to violate anything, while the references every
-///     framework makes are all in the model, so a ban on a reference only the losing framework makes reds.
+///     framework makes are all in the model, so a ban on a reference only the losing framework makes reds. The
+///     <c>--timings</c> cache line counts such a project once.
 /// </summary>
 /// <remarks>
 ///     The stamp is a trust statement rather than a finding, so both halves of the claim are asserted here:

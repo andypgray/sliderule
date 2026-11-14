@@ -118,9 +118,10 @@ internal static class StatusFormatter
         }
         else if (result.UntestedOperands.Count > 0)
         {
-            // A rule with a dead target or among pattern measured its other operands, so what its unmatched
-            // entries are cannot be read off this run. Captured, that is the whole sentence; uncaptured, what the
-            // reader will meet next is the capture the verb refuses, so the line says why and what clears it.
+            // A rule with a dead target or among pattern, or an exception from an allow-list, a membership or an
+            // among: part that removes nothing, measured its other operands, so what its unmatched entries are
+            // cannot be read off this run. Captured, that is the whole sentence; uncaptured, what the reader will
+            // meet next is the capture the verb refuses, so the line says why and what clears it.
             diagnosis = DeadOperandLine(
                 "not measured", result.UntestedWarnings, result.BaselineCaptured,
                 ", so this rule's unmatched entries may be untested rather than fixed.");

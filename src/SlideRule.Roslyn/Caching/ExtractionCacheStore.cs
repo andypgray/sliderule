@@ -151,8 +151,8 @@ internal sealed record ForeignProjectInputs(
     string? IntermediateAssemblyPath = null);
 
 /// <summary>
-///     A pre-extraction fingerprint of the workspace's files: the structural stamps and per-project entries, as
-///     the manifest will record them, taken before extraction started and handed back to
+///     A pre-extraction fingerprint of the workspace's files: the structural stamps, per-project entries and
+///     foreign projects, as the manifest will record them, taken before extraction started and handed back to
 ///     <see cref="ExtractionCacheStore.Write" />.
 /// </summary>
 /// <remarks>

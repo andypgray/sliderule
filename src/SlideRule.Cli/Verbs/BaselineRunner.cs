@@ -458,10 +458,11 @@ internal sealed class BaselineRunner(
         // two overlap: an empty subject reaches both, and only this sentence describes a rule whose forbidden
         // TARGET matched nothing — which produces no violations at all, so CurrentEntries hands back an empty
         // list rather than null and accept-reductions would intersect the captured section with nothing and
-        // delete every entry in it. A dead target or among pattern beside live ones is the same harm at a smaller
-        // grain: the entries only it could have matched go unmatched and would be deleted as reductions. It gates
-        // both modes for the reason the incomplete-model and narrowing gates above gate both: init would
-        // record debt nobody measured.
+        // delete every entry in it. A dead target or among pattern beside live ones, or an exception from an
+        // allow-list, a membership or an among: part that removes nothing, is the same harm at a smaller grain:
+        // entries the rule as written would have matched go unmatched and would be deleted as reductions. It gates
+        // both modes for the reason the incomplete-model and narrowing gates above gate both: init would record
+        // debt nobody measured.
         if (!result.UnmatchedEntriesTested)
         {
             string refusal = result.SelectionMatchedNothing
@@ -474,9 +475,10 @@ internal sealed class BaselineRunner(
             return false;
         }
 
-        // A dead allowed pattern or membership only adds violations, so every unmatched entry is still fixed
-        // debt and accept-reductions may retire it; only init is refused, because what it would capture
-        // includes the violations the dead pattern itself caused.
+        // A dead allowed pattern, a dead membership or an exception from a subject or a ban that removes nothing
+        // only adds violations, so every unmatched entry is still fixed debt and accept-reductions may retire it;
+        // only init is refused, because what it would capture includes the violations the dead pattern itself
+        // caused.
         if (request.Mode == BaselineMode.Init && !result.MeasuredInFull)
         {
             output.WriteLine(StricterRefusal(ruleId, result));
@@ -495,9 +497,9 @@ internal sealed class BaselineRunner(
             : AcceptReductions(output, ruleId, current, existingEntries, sections);
     }
 
-    // Why init will not capture a rule stricter than written: what the dead pattern was meant to allow, or the
-    // types a dead membership was meant to hold, are reported as violations, and a capture would record them
-    // as debt.
+    // Why init will not capture a rule stricter than written: what the dead pattern was meant to allow, the
+    // types a dead membership was meant to hold, or what a dead ban exception was meant to spare, are reported as
+    // violations, and a capture would record them as debt.
     private static string StricterRefusal(string ruleId, RuleResult result)
     {
         IReadOnlyList<CheckWarning> dead = result.StricterWarnings;

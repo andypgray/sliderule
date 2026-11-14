@@ -302,7 +302,7 @@ public sealed class QuoteSyncTests
             "dotnet build examples/Meridian/Meridian.slnx"),
 
         // The getting-started page's commands and the README quickstart, which CI's walk runs as written. The two
-        // install lines are compared with the install rather than run, because CI installs from the pack.
+        // tool install lines are compared with the install rather than run, because CI installs from the pack.
         new(DocPaths.GettingStarted, "getting-started-install", "dotnet tool install -g SlideRule.Cli", GettingStartedWalk),
         new(DocPaths.GettingStarted, "getting-started-spec-project", "sliderule init MyApp.sln", GettingStartedWalk),
         new(DocPaths.GettingStarted, "getting-started-first-check", "dotnet build MyApp.sln", GettingStartedWalk),

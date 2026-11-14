@@ -873,8 +873,8 @@ internal static class CommandFactory
     }
 
     // Every command but init, which writes the settings file, resolves its solution and spec through it the same way,
-    // and every one of those but the hook does it inside the request builder, so a malformed or misdirected settings
-    // file is refused like a bad argument: exit 2, before any load.
+    // and every one of those but the hook does it inside the command's handler and before any load, so a malformed or
+    // misdirected settings file is refused like a bad argument: exit 2.
     private static TRequest Resolved<TRequest>(
         ParseResult parseResult, Argument<string?> solution, Option<string?>? spec, IEnvironment environment,
         Func<InvocationTargets, TRequest> build)

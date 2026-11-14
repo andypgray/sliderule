@@ -1438,8 +1438,8 @@ public sealed class ExtractionCacheStoreTests
                 .ToDictionary(stamp => stamp!["Path"]!.GetValue<string>(), stamp => stamp!["Exists"]!.GetValue<bool>());
         }
 
-        // Writes a *.cs into an existing project's directory WITHOUT recording it as a document — the
-        // on-disk-but-excluded stray (a <Compile Remove> file) the cone scan sees but the compiler does not.
+        // Writes a file into an existing project's directory WITHOUT recording it as a document, so the cone scan
+        // alone decides what the cache makes of it.
         public void AddStrayFile(string project, string relativePath, string content)
         {
             temp.WriteFile([project, relativePath], content);

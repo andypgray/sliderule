@@ -8,9 +8,10 @@ namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
 ///     <see cref="MsBuildBootstrap.SelectBestInstance" /> is pure and needs no MSBuild runtime. The
-///     two <c>Initialize</c> tests exercise the override throw-paths, which run BEFORE any
-///     <c>MSBuildLocator</c> registration call — safe even though the module initializer has already
-///     registered MSBuild. Env vars are scoped to the test that sets them and the collection is serial.
+///     <c>Initialize</c> tests drive the override arm in a process the module initializer has already
+///     registered: its throw-paths refuse BEFORE any <c>MSBuildLocator</c> registration call, and the
+///     VSToolsPath tests read what the arm set before its second registration is refused. Env vars are scoped
+///     to the test that sets them and the collection is serial.
 /// </summary>
 [Collection("Serial")]
 public sealed class MsBuildBootstrapTests

@@ -11,7 +11,8 @@ namespace SlideRule.Tests.Roslyn;
 /// <summary>
 ///     Covers <see cref="ChildProcess" />'s expiry path: on both arms a real tree kill ends the child before the
 ///     caller gets its timeout, and on the async arm a refused kill still leaves the caller its timeout, or its own
-///     cancellation, rather than the kill's failure.
+///     cancellation, rather than the kill's failure. Its input path is held too: input larger than the pipes is
+///     written while the output drains, and a child that reads none of it still returns what it printed.
 /// </summary>
 /// <remarks>
 ///     The refused kill is injected because a real tree kill refuses only when a descendant cannot be ended, which no

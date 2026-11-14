@@ -67,7 +67,7 @@ internal sealed class CheckWarning
     public string? Key { get; }
 
     /// <summary>
-    ///     Which position the dead pattern held, and so which way the rule now errs, on a
+    ///     Which position the dead pattern or exception held, and so which way the rule now errs, on a
     ///     <see cref="CheckWarningKind.DeadOperand" /> warning; <see cref="DeadOperandRole.None" /> on every
     ///     other kind.
     /// </summary>

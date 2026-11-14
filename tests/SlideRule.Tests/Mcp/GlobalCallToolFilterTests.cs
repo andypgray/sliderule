@@ -13,7 +13,8 @@ namespace SlideRule.Tests.Mcp;
 /// <summary>
 ///     Drives a real MCP client against the server over in-memory pipes to lock down
 ///     <see cref="SlideRule.Cli.Mcp.Pipeline.GlobalCallToolFilter" />'s branches — silent user-error, logged
-///     unexpected-error, protocol-error pass-through, truncated success, unknown-parameter guard — end to end.
+///     unexpected-error, protocol-error pass-through, truncated success, unknown-parameter guard, the wait for the
+///     warm work slot — end to end.
 /// </summary>
 /// <remarks>
 ///     <para>

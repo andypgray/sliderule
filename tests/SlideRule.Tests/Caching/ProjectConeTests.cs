@@ -7,7 +7,10 @@ namespace SlideRule.Tests.Caching;
 
 /// <summary>
 ///     The cone walk over hand-built directories: which sources it yields where a file name's case, a directory
-///     link or an unreadable directory decides, read through <see cref="ProjectCone.Adds" />, which sorts.
+///     link, an unreadable directory or a bin or obj beside a project file decides, read through
+///     <see cref="ProjectCone.Adds" />, which sorts, and through
+///     <see cref="BuildOutputDirectories.IsUnderBuildOutput" />, the document filter's build-output test, which
+///     must agree with the walk's.
 /// </summary>
 public sealed class ProjectConeTests
 {

@@ -14,7 +14,8 @@ namespace SlideRule.Tests.Cli;
 ///     unchanged re-splice reports Unchanged with byte-identical output; a malformed block becomes a
 ///     file-naming <see cref="UserErrorException" />; and a file that is not valid UTF-8 — invalid bytes
 ///     or a UTF-16 BOM — is refused with a file-naming <see cref="UserErrorException" /> and left byte-for-byte
-///     untouched, never decoded lossily and rewritten as replacement characters.
+///     untouched, never decoded lossily and rewritten as replacement characters. The composed length is the
+///     byte length a splice writes, BOM included.
 /// </summary>
 public sealed class ManagedBlockFileTests
 {
