@@ -110,9 +110,9 @@ public static class MemberSelectionAdjectives
     }
 
     /// <summary>
-    ///     Narrows the selection to the members carrying an attribute, such as
-    ///     <c>arch.Types.Methods.AttributedWith(typeof(HttpGetAttribute))</c>. These are the members that
-    ///     carry the attribute, not the members of types that carry it — for that, apply
+    ///     Narrows the selection to the members an attribute is written on, such as
+    ///     <c>arch.Types.Methods.AttributedWith(typeof(HttpGetAttribute))</c>. These are the members the
+    ///     attribute is written on, not the members of types it is written on — for that, apply
     ///     <c>AttributedWith</c> to the type selection before projecting to members. Attributes written on
     ///     the member itself count and no others: an attribute on a property's <c>get</c> or <c>set</c>
     ///     accessor, and a <c>[return:]</c> attribute, are not seen. Pass an open generic definition to
@@ -128,7 +128,7 @@ public static class MemberSelectionAdjectives
     }
 
     /// <summary>
-    ///     Narrows the selection to the members carrying the attribute with this name — the form to use
+    ///     Narrows the selection to the members the attribute with this name is written on — the form to use
     ///     for an attribute the spec project cannot compile against, so it need not take a package
     ///     reference just to write the <c>typeof</c>. <paramref name="attributeFullName" /> is the
     ///     attribute definition's fully-qualified name with the <c>Attribute</c> suffix included
@@ -268,9 +268,9 @@ public static class MemberSelectionAdjectives
     // projection type ships its overload here, or its kind-only verbs stop compiling after the sugar.
 
     /// <summary>
-    ///     Narrows the selection to the members carrying attribute <typeparamref name="T" />, such as
-    ///     <c>arch.Types.Members.AttributedWith&lt;ObsoleteAttribute&gt;()</c>. These are the members that
-    ///     carry the attribute, not the members of types that carry it. Attributes written on the member
+    ///     Narrows the selection to the members attribute <typeparamref name="T" /> is written on, such as
+    ///     <c>arch.Types.Members.AttributedWith&lt;ObsoleteAttribute&gt;()</c>. These are the members the
+    ///     attribute is written on, not the members of types it is written on. Attributes written on the member
     ///     itself count and no others: an attribute on a property's <c>get</c> or <c>set</c> accessor, and
     ///     a <c>[return:]</c> attribute, are not seen. An open generic attribute has no type-argument
     ///     form: for <c>MarkAttribute&lt;&gt;</c> use the <see cref="System.Type" /> overload and pass
@@ -283,7 +283,7 @@ public static class MemberSelectionAdjectives
     }
 
     /// <summary>
-    ///     Narrows the selection to the methods carrying attribute <typeparamref name="T" />, such as
+    ///     Narrows the selection to the methods attribute <typeparamref name="T" /> is written on, such as
     ///     <c>arch.Types.Methods.AttributedWith&lt;ObsoleteAttribute&gt;()</c>. Attributes written on the
     ///     method itself count and no others. The result is still a <see cref="MethodSelection" />, so
     ///     <c>Returning</c> and <c>MustAcceptParameter</c> stay reachable after it. An open generic
@@ -298,7 +298,7 @@ public static class MemberSelectionAdjectives
     }
 
     /// <summary>
-    ///     Narrows the selection to the properties carrying attribute <typeparamref name="T" />, such as
+    ///     Narrows the selection to the properties attribute <typeparamref name="T" /> is written on, such as
     ///     <c>arch.Types.Properties.AttributedWith&lt;ObsoleteAttribute&gt;()</c>. Attributes written on
     ///     the property itself count and no others, so one on its <c>get</c> or <c>set</c> accessor is not
     ///     seen. The result is still a <see cref="PropertySelection" />, so <c>MustBeGetOnly</c> stays
@@ -313,7 +313,7 @@ public static class MemberSelectionAdjectives
     }
 
     /// <summary>
-    ///     Narrows the selection to the fields carrying attribute <typeparamref name="T" />, such as
+    ///     Narrows the selection to the fields attribute <typeparamref name="T" /> is written on, such as
     ///     <c>arch.Types.Fields.AttributedWith&lt;ObsoleteAttribute&gt;()</c>. Attributes written on the
     ///     field itself count and no others. The result is still a <see cref="FieldSelection" />, so
     ///     <c>MustBeReadonly</c> stays reachable after it. An open generic attribute has no type-argument

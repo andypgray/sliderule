@@ -296,8 +296,8 @@ The dependency verbs carry **no** generic twin: the pinned `(first, params more)
 generic form (a variadic type-argument list is inexpressible), and mixing a bare type into a
 selection list is served by wrapping it — `MustNotReference(web, arch.Type<SqlConnection>())`.
 The generic sugar exists only where a single type is the whole argument: `arch.Type<X>()` and
-the `Implementing` / `DerivedFrom` / `AttributedWith` hierarchy adjectives and their `Must*`
-twins (§5.2, §5.3).
+the `Implementing` / `DerivedFrom` / `AttributedWith` / `Carrying` hierarchy adjectives and their
+`Must*` twins (§5.2, §5.3).
 
 The member-access verb has **no instance-form verb twin and no cross-form mixing**: a
 `MustNotUse<T>(x => x.M)` twin would drag the type argument onto the verb, and one call cannot
@@ -535,7 +535,8 @@ other `(first, more)` lists have no sequence form yet (§11).
   remove one. Both stay silent on any narrowed run, where a pattern's types may sit in a project
   the run never loaded. The negative
   **anchor** verbs (`MustNotImplement` /
-  `MustNotDeriveFrom` / `MustNotBeAttributedWith`, type and member side) report nothing and cannot:
+  `MustNotDeriveFrom` / `MustNotBeAttributedWith` / `MustNotCarry`, type and member side) report
+  nothing and cannot:
   they resolve no target set, so "no subject matched this anchor" is what a *satisfied* ban looks
   like, and resolving the name instead does not separate a typo from a ban on something this
   codebase has never held (§4.5, §4.6).
@@ -1422,6 +1423,7 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.Implementing` | `(Type)` · `(string)` · `<T>()` | Types implementing `IHandler<T>` |
 | `.DerivedFrom` | `(Type)` · `(string)` · `<T>()` | Types derived from `ControllerBase` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | Types attributed with `[ApiController]` |
+| `.Carrying` | `(Type)` · `(string)` · `<T>()` | Types carrying `[ApiController]` |
 | `.Except` | `(Selection, …)` · `(Type, …)` | Types, except `HandlerRegistry` |
 | `.Where` | `(Func<ITypeInfo, bool>, string)` | Types that implement more than three interfaces |
 | `.Authored` | `()` | Authored types |
@@ -1463,9 +1465,11 @@ posture verbs, trailers and escape hatches of §5.4–§5.6 are written by hand.
 | `.MustImplement` | `(Type)` · `(string)` · `<T>()` | must implement `IBillingFacade` |
 | `.MustDeriveFrom` | `(Type)` · `(string)` · `<T>()` | must derive from `ControllerBase` |
 | `.MustBeAttributedWith` | `(Type)` · `(string)` · `<T>()` | must be attributed with `[ApiController]` |
+| `.MustCarry` | `(Type)` · `(string)` · `<T>()` | must carry `[ApiController]` |
 | `.MustNotImplement` | `(Type, …)` · `(string, …)` · `<T>()` | must not implement `IBillingFacade` or `IHandler<T>` |
 | `.MustNotDeriveFrom` | `(Type, …)` · `(string, …)` · `<T>()` | must not derive from `ControllerBase` |
 | `.MustNotBeAttributedWith` | `(Type, …)` · `(string, …)` · `<T>()` | must not be attributed with `[ApiController]` or `[Serializable]` |
+| `.MustNotCarry` | `(Type, …)` · `(string, …)` · `<T>()` | must not carry `[ApiController]` or `[Serializable]` |
 | `.MustBeSealed` | `()` | must be sealed |
 | `.MustBeStatic` | `()` | must be static |
 | `.MustBeAbstract` | `()` | must be abstract |
@@ -1650,6 +1654,7 @@ What the table cannot show, per adjective:
   - **One project's view.** On a subject the adjective is decidable from one project, whose own types carry their files. Read over other projects' types, as a target or in an `Except` payload, it is left to the whole solution, because a project compiled against another's assembly sees none of its source files.
 - `.Implementing(typeof(IHandler<>))` / `.Implementing("MyApp.Web.IHandler<T>")` — the string form renders byte-identically (string anchors, below)
 - `.AttributedWith(typeof(ApiControllerAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` — `Attribute` suffix stripped, bracketed; the string form renders byte-identically (string anchors, below)
+- `.Carrying(typeof(AuthorizeAttribute))` / `.Carrying("Microsoft.AspNetCore.Authorization.AuthorizeAttribute")` — " carrying `[Authorize]`": declared on the type or inherited from a base type (the inherited reading, below); rendered like `.AttributedWith`, string form included. **One project's view.** Left to the whole solution in every position, the subject's included, because an own type inherits from a base another project declares and a project compiled against another's assembly does not see every attribute its source declares
 - `.Except(selection, …)` / `.Except(typeof(X), …)` — a parenthetical canonicalized to sentence-final, after any `Where`, and closed by the composer (§6). Several operands are the union `AnyOf` mints (§5.1): `.Except(a, b)` ≡ `.Except(arch.AnyOf(a, b))`, ", except types in `A.*` or `B.*`". The `typeof` form is the dependency verbs' sugar (§3.3): `.Except(typeof(X))` ≡ `.Except(arch.Type<X>())`
 - `.Where(pred, description:)` — description verbatim — canonicalized to sentence-final (§6)
 - `.Authored()` — head premodifier: "authored types", "authored interfaces" (§6)
@@ -1669,18 +1674,25 @@ inheritance matches) and the whole base-type chain, arguments substituted. A cla
 definition name); a closed construction matches that construction exactly (on the constructed
 name); a **string** anchor is always the definition arm (string anchors, below).
 
-`AttributedWith` reads **declared attributes only**: the attributes written on the subject's own
-declaration. An attribute on a base class, declared in the solution or in a package, never counts
-for a type that derives from it, whatever the attribute's `AttributeUsage.Inherited` says. Where a
-set of types gets a cross-cutting attribute from a shared base, and the framework reads that
-attribute through the base (`Inherited = true`, the default), state the law as two rules: the set
-`MustDeriveFrom` the base, and the base `MustBeAttributedWith` the attribute. `MustDeriveFrom`
-alone checks ancestry, not the attribute. Where some types in the set declare the attribute
-themselves, leave the base's descendants out of the attribute rule's subject with
-`.Except(arch.Types.DerivedFrom(…))`. An attribute declared `Inherited = false` is not read through
-a base by the framework either, so each type must declare it. A concrete intermediate base is a
-subject like any other type, so a subject meant for the types at the bottom of a hierarchy leaves
-the bases out by name or suffix (`.Except(arch.Types.WithSuffix("ControllerBase"))`).
+Attributes have two readings. `AttributedWith` reads **declared attributes only**: the attributes
+written on the subject's own declaration. An attribute on a base class, declared in the solution or
+in a package, never counts for a type that derives from it, whatever the attribute's
+`AttributeUsage.Inherited` says. It stays the default reading. `Carrying` and the
+`MustCarry` / `MustNotCarry` verbs read **declared or inherited**, as reflection's
+`GetCustomAttributes(inherit: true)` and the frameworks that use it do: a type carries an
+attribute its own declaration has, or one any type in its base chain declares, metadata bases
+included, when the attribute class's **own** `[AttributeUsage]` leaves `Inherited` true. No usage,
+or a usage that leaves `Inherited` unset, means true; a usage on a base attribute class is not
+read, so an attribute class with no usage of its own is inherited even where its base attribute
+class sets `Inherited = false`. Interfaces never pass an attribute on, and an attribute both declared and inherited matches
+once. Where a set of types gets a cross-cutting attribute from a shared base, `MustCarry` states the
+law in one rule. The two-rule spelling remains for a law that also pins where the attribute is
+declared: the set `MustDeriveFrom` the base, and the base `MustBeAttributedWith` the attribute.
+`MustDeriveFrom` alone checks ancestry, not the attribute. An attribute declared `Inherited = false`
+is not read through a base by the framework either, and `Carrying` does not read it, so each type
+must declare it. A concrete intermediate base is a subject like any other type under either
+reading, so a subject meant for the types at the bottom of a hierarchy leaves the bases out by name
+or suffix (`.Except(arch.Types.WithSuffix("ControllerBase"))`).
 
 External (metadata)
 types carry a **shallow** hierarchy: extraction records their identity but not their own
@@ -1689,16 +1701,18 @@ documented boundary; pattern and name adjectives still work on externals). The *
 position is not bounded that way: a *declared* type's base chain and interface closure are walked
 straight through metadata, so `DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")` selects a
 declared controller — and reaches it through an intermediate external base too — even though the
-anchor is a type the spec never compiles against. The same three
-matchers back the `MustImplement` / `MustDeriveFrom` / `MustBeAttributedWith`
+anchor is a type the spec never compiles against. The inherited reading walks the same chain, so
+`Carrying` reads the attributes an external base declares for a declared subject, while an
+external subject still carries none. The same four
+matchers back the `MustImplement` / `MustDeriveFrom` / `MustBeAttributedWith` / `MustCarry`
 constraint verbs and, negated per subject over the anchor list, their `MustNot*` twins (§5.3).
 Under a negative the shallow-external boundary reads in the passing direction: an anchor
 reachable only through an external type's own bases/interfaces never matches, so the ban
 silently passes.
 
 **Generic sugar.** Each hierarchy adjective carries a thin generic twin —
-`Implementing<T>()` ≡ `Implementing(typeof(T))`, likewise `DerivedFrom<T>()` and
-`AttributedWith<T>()` (the attribute twin constrained `where T : Attribute`) — that desugars to
+`Implementing<T>()` ≡ `Implementing(typeof(T))`, likewise `DerivedFrom<T>()`,
+`AttributedWith<T>()` and `Carrying<T>()` (the attribute twins constrained `where T : Attribute`) — that desugars to
 the identical adjective, changing nothing in the model. `arch.Type<X>()` ≡ `arch.Type(typeof(X))`
 is the same idea on the noun. An **open** generic has no type-argument form, so it stays `typeof`
 (`Implementing(typeof(IHandler<>))`); the sugar is for the closed/non-generic single-type case.
@@ -1707,8 +1721,8 @@ is the same idea on the noun. An **open** generic has no type-argument form, so 
 `typeof` form: the escape hatch for a type the spec project cannot compile against, so that
 naming someone else's attribute or contract does not force a package reference on the spec just
 to write the `typeof`. Three families carry them, on identical terms — **attribute** positions
-(this adjective's `AttributedWith`, the `Must[Not]BeAttributedWith` verbs of §5.3, and their
-member-side twins in §5.7), **hierarchy** positions (the `Implementing` and `DerivedFrom`
+(this adjective's `AttributedWith` and `Carrying`, the `Must[Not]BeAttributedWith` and
+`Must[Not]Carry` verbs of §5.3, and the member-side twins in §5.7), **hierarchy** positions (the `Implementing` and `DerivedFrom`
 adjectives above, and the `Must[Not]Implement` / `Must[Not]DeriveFrom` verbs of §5.3), and the
 **member type** positions of §5.7 (`.Returning`'s anchor list and `MustAcceptParameter`'s
 anchor), whose matchers read the §4.6 return-type and parameter facts by definition FQN and
@@ -1795,10 +1809,12 @@ What the table cannot show, per verb:
 - `.MustImplement(type)` — also anchors by string (§5.2's escape hatch): `MustImplement("MyApp.Web.IHandler<T>")`
 - `.MustDeriveFrom(type)` — string form likewise
 - `.MustBeAttributedWith(type)` — also anchors by string (§5.2's escape hatch): `MustBeAttributedWith("N.XAttribute")`
+- `.MustCarry(type)` — "must carry `[Authorize]`": the inherited reading of §5.2, declared or inherited through the base chain; string form likewise. Left to the whole solution from one project's view, as `.Carrying` is
 - `.MustBeRecords()` — nullary; a record class and a record struct pass, and any other type reds. Decidable from one project: a run over one project's compilation reports only sites in that project's own files, and a type another project declares has none there, so a record struct whose flag the assembly drops is judged only by the build of the project declaring it
 - `.MustNotImplement(type, ...)` — none-of over the anchors; the negatives take `(Type first, params Type[] more)` (§10), and `(string first, params string[] more)` (§5.2), each call's list homogeneous
 - `.MustNotDeriveFrom(type, ...)` — same two arities
 - `.MustNotBeAttributedWith(type, ...)` — anchors bracketed and `Attribute`-stripped like the positive; also `(string first, params string[] more)` (§5.2), each call's list homogeneous
+- `.MustNotCarry(type, ...)` — "must not carry `[Serializable]`": none-of over the anchors under the inherited reading, the same two arities and widening as `MustNotBeAttributedWith`
 
 Naming note: the constraint carries its noun where a bare preposition would be ambiguous —
 `MustResideInNamespace`, not `MustResideIn`, because the `Project` noun exists.
@@ -1811,12 +1827,12 @@ key, message and cure. The pair exists for the tighter sentence one membership
 allows: "must reside in project `X`", where the general form says "must belong to types in
 project `X`".
 
-Generic sugar: the three type-taking hierarchy verbs carry generic twins —
-`MustImplement<T>()` ≡ `MustImplement(typeof(T))`, `MustDeriveFrom<T>()`, and
-`MustBeAttributedWith<T>()` (`where T : Attribute`) — desugaring to the identical constraint, on
-the same terms as the §5.2 adjective twins (open generics stay `typeof`).
+Generic sugar: the four type-taking hierarchy verbs carry generic twins —
+`MustImplement<T>()` ≡ `MustImplement(typeof(T))`, `MustDeriveFrom<T>()`,
+`MustBeAttributedWith<T>()` and `MustCarry<T>()` (`where T : Attribute`) — desugaring to the identical
+constraint, on the same terms as the §5.2 adjective twins (open generics stay `typeof`).
 The negatives carry the same twins — `MustNotImplement<T>()` / `MustNotDeriveFrom<T>()` /
-`MustNotBeAttributedWith<T>()` (`where T : Attribute`) — each desugaring to its verb's
+`MustNotBeAttributedWith<T>()` / `MustNotCarry<T>()` (`where T : Attribute`) — each desugaring to its verb's
 single-anchor call. Every one of these verbs additionally carries the §5.2 string form on both
 polarities — the attribute verbs on both sides too (type and member, §5.7) — so every anchor
 position in both families offers the same triple: the compile-checked `typeof`, the
@@ -2141,7 +2157,7 @@ carries its sugar overload too, or the verb silently stops compiling after the s
 - **Colliding simple names**: when two targets in one sentence share a simple name, both are
   qualified with the minimal distinguishing trailing namespace segments
   ("`Billing.Order` or `Sales.Order`"). Pinned rule. The negative hierarchy and attribute anchor
-  lists (`MustNotImplement`/`MustNotDeriveFrom`/`MustNotBeAttributedWith`) widen by the same rule —
+  lists (`MustNotImplement`/`MustNotDeriveFrom`/`MustNotBeAttributedWith`/`MustNotCarry`) widen by the same rule —
   the attribute form qualifies *inside* the brackets ("`[Billing.Audit]` or `[Sales.Audit]`") — so
   every multi-operand list disambiguates identically. Widening runs on the anchor's dot path,
   which a string attribute anchor (§5.2) supplies exactly as a `typeof` does — the dots inside
@@ -2361,8 +2377,8 @@ carries its sugar overload too, or the verb silently stops compiling after the s
     item, as for item 14.
 21. Category-invalid hierarchy anchor, both polarities (§5.2, §5.3): a `Must[Not]Implement`
     anchor must be an interface; a `Must[Not]DeriveFrom` anchor must not be an interface; a
-    `Must[Not]BeAttributedWith` anchor must derive from `System.Attribute` (`typeof(Attribute)`
-    itself is refused — declared-attribute matching could never match it). A wrong-category
+    `Must[Not]BeAttributedWith` or `Must[Not]Carry` anchor must derive from `System.Attribute`
+    (`typeof(Attribute)` itself is refused — attribute matching could never match it). A wrong-category
     anchor can never match, which makes a positive an always-red rule and a negative an
     always-pass — both silent authoring slips, so the error steers to the right verb
     ("`System.Exception` is not an interface; `MustNotImplement` requires an interface anchor —
@@ -2624,7 +2640,12 @@ this catalog.
   `AddDbContextPool`/`AddHttpClient<TClient>`, or a `ServiceDescriptor` added to the
   collection), directly or through a wrapper declared in the solution; keyed-service
   registrations, assembly scanning, factory internals, wrappers compiled into packages and
-  framework defaults are not seen."*
+  framework defaults are not seen."* The inherited attribute reading (§5.2) gates one more line on
+  the same terms, wherever the block prints it: the `MustCarry` or `MustNotCarry` verb, or a
+  `Carrying` adjective on any selection a rule reaches or a layer is defined by — *"carry =
+  declared on the type itself, or on a base type when the attribute's own `[AttributeUsage]`
+  leaves `Inherited` true (the default), which is how reflection reads attributes."* The
+  `Registered` line reads layer definitions the same way, since the block prints each one.
 - **Posture verbs**: imperative (`Enforce`, `Migrate`, `Quarantine`, `Caution`). **Options**: nouns
   (`Baseline`) or deliberate idiom (`WhileYoureThere` — it names the boy-scout rule). Its policies
   each answer the question the option asks, as imperatives (`MigrateIfSmall`, `AlwaysMigrate`,
@@ -2722,7 +2743,9 @@ project cannot reference); indexer/operator bans (the syntax-walk boundary moves
 §4.5); and the remaining subject-side member *shape* adjectives (`.Methods.ThatAreVirtual()`,
 `.ThatAreAbstract()`, …) beside `.ThatAreStatic()`, `.ThatAreOverrides()` and
 `.ThatImplementInterfaces()` — the constraint-side verbs and the
-`IMemberInfo` flags exist (§5.7, §5.6).
+`IMemberInfo` flags exist (§5.7, §5.6). The inherited attribute reading of §5.2 stops at types:
+a member reading that counts an attribute an overridden member declares, as
+`Attribute.GetCustomAttributes(member, inherit: true)` does for a method or property, is its own semantic.
 
 On the parameter facts (§4.6): the `WithParameterOfType` adjective — the adjective-position
 twin of `MustAcceptParameter`, selecting rather than constraining; the `MustNotAcceptParameter`

@@ -132,6 +132,33 @@ internal static class Sources
     ///     base chain is walked through metadata, so an external <em>anchor</em> is matchable in both anchor
     ///     forms. Its own compilation because the <see cref="Hierarchy" /> pins assert exact selected sets.
     /// </summary>
+    /// <summary>
+    ///     The inherited-attribute fixture (GRAMMAR §5.2): a base declaring an attribute of each usage shape,
+    ///     two levels below it, a type that re-declares one, a type whose only base is a framework collection,
+    ///     and an attributed interface with an implementer. <c>Pinned</c> sets <c>Inherited = false</c>;
+    ///     <c>PinnedChild</c> derives from it with no usage of its own, so the runtime reads it as inherited;
+    ///     <c>Stamp</c> has a usage that leaves <c>Inherited</c> unset and is written twice. Every type is
+    ///     re-declared reflectably in <c>CheckerTargets.cs</c> in lockstep, because the oracle theory compares
+    ///     the checker against <see cref="System.Reflection.MemberInfo.GetCustomAttributes(bool)" /> over those
+    ///     copies.
+    /// </summary>
+    public const string InheritedAttributes = """
+                                              using System;
+                                              namespace SlideRule.Tests.Checking.Targets;
+                                              public sealed class MarkAttribute : Attribute {}
+                                              [AttributeUsage(AttributeTargets.Class, Inherited = false)] public class PinnedAttribute : Attribute {}
+                                              public sealed class PinnedChildAttribute : PinnedAttribute {}
+                                              [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)] public sealed class StampAttribute : Attribute {}
+                                              public sealed class BrandAttribute<T> : Attribute {}
+                                              [Mark, Pinned, PinnedChild, Stamp, Stamp, Brand<int>] public class CarryBase {}
+                                              public class CarryDerived : CarryBase {}
+                                              public class CarryLeaf : CarryDerived {}
+                                              [Mark] public class CarryRedeclared : CarryBase {}
+                                              public class Bag : System.Collections.Generic.List<int> {}
+                                              [Mark] public interface IMarked {}
+                                              public class ViaInterface : IMarked {}
+                                              """;
+
     public const string ExternalBaseHierarchy = """
                                                 namespace SlideRule.Tests.Checking.Targets;
                                                 public class DirectDeriver : System.Exception {}

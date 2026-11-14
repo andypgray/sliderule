@@ -511,6 +511,8 @@ internal sealed class SelectionEvaluator
                 return BaseTypeMatcher(derivedFrom.Anchor);
             case AttributedWithAdjective attributedWith:
                 return AttributeMatcher(attributedWith.Anchor);
+            case CarryingAdjective carrying:
+                return CarriedAttributeMatcher(carrying.Anchor);
             case ExceptAdjective except:
                 HashSet<TypeNode> excluded = Evaluate(except.Payload, SelectionPosition.Target);
                 return t => !excluded.Contains(t);
@@ -560,6 +562,31 @@ internal sealed class SelectionEvaluator
     internal static Func<TypeNode, bool> AttributeMatcher(TypeAnchor anchor)
     {
         return ConstructionMatcher(anchor, t => t.AttributeConstructions);
+    }
+
+    // Declared or inherited: the declared matcher, or the anchor among the by-name inherited list. Both halves are
+    // built here, so an unrepresentable anchor refuses before any subject is tested.
+    internal static Func<TypeNode, bool> CarriedAttributeMatcher(TypeAnchor anchor)
+    {
+        Func<TypeNode, bool> declared = AttributeMatcher(anchor);
+        Func<IReadOnlyList<IAttributeInfo>, bool> inherited = AttributeNameMatcher(anchor);
+        return t => declared(t) || inherited(t.InheritedAttributes);
+    }
+
+    // The anchor's key among a by-name attribute list, a member's or a type's inherited one. The key is read
+    // eagerly, so an unrepresentable anchor refuses while the matcher is built.
+    internal static Func<IReadOnlyList<IAttributeInfo>, bool> AttributeNameMatcher(TypeAnchor anchor)
+    {
+        (string key, bool onDefinition) = AnchorKey(anchor);
+        Func<IAttributeInfo, string> nameOf = onDefinition ? a => a.DefinitionFullName : a => a.FullName;
+        return attributes =>
+        {
+            for (var i = 0; i < attributes.Count; i++)
+                if (nameOf(attributes[i]) == key)
+                    return true;
+
+            return false;
+        };
     }
 
     /// <summary>

@@ -39,6 +39,7 @@ internal sealed class TypeNode : ITypeInfo
         AllInterfaces = Array.Empty<TypeConstruction>();
         BaseTypeChain = Array.Empty<TypeConstruction>();
         AttributeConstructions = Array.Empty<TypeConstruction>();
+        InheritedAttributes = Array.Empty<AttributeNode>();
         Members = Array.Empty<MemberNode>();
     }
 
@@ -113,6 +114,15 @@ internal sealed class TypeNode : ITypeInfo
     ///     generic attribute is recorded like any other, keeping both its definition and its construction.
     /// </summary>
     public IReadOnlyList<TypeConstruction> AttributeConstructions { get; internal set; }
+
+    /// <summary>
+    ///     Gets the attributes the type inherits from its base types, each once, ordered ordinal by
+    ///     <see cref="AttributeNode.FullName" />: every attribute a base type declares whose class's own
+    ///     <c>[AttributeUsage]</c> leaves <c>Inherited</c> true, as reflection reads it. Empty for an interface.
+    ///     <see cref="AttributeConstructions" /> is unchanged by it, and an attribute both declared and inherited
+    ///     is in both lists.
+    /// </summary>
+    internal IReadOnlyList<AttributeNode> InheritedAttributes { get; set; }
 
     /// <summary>
     ///     Gets the type's declared methods, properties, fields and events, ordered ordinal by

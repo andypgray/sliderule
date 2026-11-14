@@ -46,6 +46,14 @@ public sealed class FragmentRoundTripTests
             .AttributeNames()
             .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
 
+        // Likewise for the attribute a base passes down.
+        direct.Type("N.SubHandler")
+            .InheritedAttributes.AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+        fromCache.Type("N.SubHandler")
+            .InheritedAttributes.AttributeNames()
+            .ShouldBe([("N.MarkAttribute", "N.MarkAttribute")]);
+
         // The same non-vacuity guard for the four mutability facts: each is a bool whose absent value is
         // false, so a dropped field round-trips equal unless something in the solution reads true. One
         // assertion per fact, on both sides.
@@ -836,6 +844,7 @@ public sealed class FragmentRoundTripTests
                              public sealed class MarkAttribute : System.Attribute {}
                              public class Msg {}
                              [Mark] public class Handler : IHandler<Msg>, IDerived<Msg> { [Mark] public void Handle(Msg m) {} }
+                             public class SubHandler : Handler {}
                              [System.CodeDom.Compiler.GeneratedCode("Tool", "1.0")] public class Emitted { public class Inner {} }
                              public class Budget
                              {

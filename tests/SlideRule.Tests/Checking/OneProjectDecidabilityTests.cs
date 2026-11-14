@@ -47,6 +47,10 @@ public sealed class OneProjectDecidabilityTests
         "Selects other types by attribute, and a project compiled against another's assembly does not see "
         + "every attribute its source declares.";
 
+    private const string Carried =
+        "Reads attributes a type inherits, and a base another project declares is read from that project's "
+        + "assembly, which does not carry every attribute its source declares.";
+
     private const string Records =
         "Selects other types by whether they are records, and a project compiled against another's assembly "
         + "does not see that a record struct is one.";
@@ -295,6 +299,27 @@ public sealed class OneProjectDecidabilityTests
         // Act + Assert
         ShouldAllClassifyAs(
             shapes, AttributedWith, "AttributedWith read over the whole solution but not classified as such");
+    }
+
+    [Fact]
+    public void Classify_AnInheritedAttributeReadAnywhere_ReportsTheCarriedReason()
+    {
+        // Arrange — unlike AttributedWith, the subject's own reading is out too: an own type inherits from a base
+        // another project declares, which this project sees only as that project's assembly.
+        (string Where, Func<Arch, Constraint> Rule)[] shapes =
+        [
+            ("on the subject", arch => arch.Types.Carrying<ObsoleteAttribute>().MustBeSealed()),
+            ("in a layer the subject names",
+                arch => arch.Layer("Marked", arch.Types.Carrying<ObsoleteAttribute>()).MustBeSealed()),
+            ("in an operand", arch => arch.Types.MustNotReference(arch.Types.Carrying<ObsoleteAttribute>())),
+            ("in an Except payload of the subject",
+                arch => arch.Types.Except(arch.Types.Carrying<ObsoleteAttribute>()).MustBeSealed()),
+            ("the verb", arch => arch.Types.MustCarry<ObsoleteAttribute>()),
+            ("the negative verb", arch => arch.Types.MustNotCarry<ObsoleteAttribute>())
+        ];
+
+        // Act + Assert
+        ShouldAllClassifyAs(shapes, Carried, "An inherited-attribute reading not classified as whole-solution");
     }
 
     [Fact]

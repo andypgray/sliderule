@@ -242,6 +242,64 @@ public sealed class OneProjectExtractionTests
         Verdict(narrowed).ShouldBe(Verdict(whole));
     }
 
+    // An own type over a sibling's attributed base inherits the attribute in both views and from both forms of
+    // the reference: the one-project view records the fact its rows leave to the whole solution.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExtractOneProject_AnOwnTypeOverASiblingsAttributedBase_InheritsTheAttributeInEitherView(bool asImage)
+    {
+        // Arrange
+        CompilationInput own = Input(
+            [CompilationFactory.CoreLibrary, CompilationFactory.Reference(DomainCompilation(), asImage)],
+            ("Web.cs", "namespace Web; public class RushOrder : Domain.Order {}"));
+
+        // Act
+        CodebaseModel oneProject = FragmentMerger.Merge(FragmentExtractor.ExtractOneProject(own, SiblingMap(), Ct));
+        CodebaseModel wholeSolution = FragmentMerger.Merge(WholeSolution(own, DomainCompilation()));
+
+        // Assert
+        oneProject.Type("Web.RushOrder")
+            .InheritedAttributes.DefinitionNames()
+            .ShouldBe(["Domain.TaggedAttribute"]);
+        wholeSolution.Type("Web.RushOrder")
+            .InheritedAttributes.DefinitionNames()
+            .ShouldBe(["Domain.TaggedAttribute"]);
+    }
+
+    // A conditional attribute class is written on the base's source and left out of its image, so a whole-solution
+    // merge reads what a base the solution declares passes down from that base's own fragment, never from how a
+    // referring compilation happened to see it.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ExtractWholeSolution_AnOwnTypeOverASiblingsBase_InheritsWhatTheBasesSourceDeclares(bool asImage)
+    {
+        // Arrange
+        const string domainSource = """
+                                    namespace Domain;
+
+                                    [System.Diagnostics.Conditional("NEVER_DEFINED")]
+                                    public sealed class TracedAttribute : System.Attribute {}
+
+                                    [Traced]
+                                    public class Entity {}
+                                    """;
+        CSharpCompilation domain = CompilationFactory.CreateCompilation(
+            SiblingAssemblyName, [CompilationFactory.CoreLibrary], ("Domain.cs", domainSource));
+        CompilationInput own = Input(
+            [CompilationFactory.CoreLibrary, CompilationFactory.Reference(domain, asImage)],
+            ("Web.cs", "namespace Web; public class Account : Domain.Entity {}"));
+
+        // Act
+        CodebaseModel wholeSolution = FragmentMerger.Merge(WholeSolution(own, domain));
+
+        // Assert
+        wholeSolution.Type("Web.Account")
+            .InheritedAttributes.DefinitionNames()
+            .ShouldBe(["Domain.TracedAttribute"]);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -368,11 +426,7 @@ public sealed class OneProjectExtractionTests
 
         // Act
         CodebaseModel oneProject = FragmentMerger.Merge(FragmentExtractor.ExtractOneProject(own, SiblingMap(), Ct));
-        CodebaseModel wholeSolution = FragmentMerger.Merge(
-        [
-            FragmentExtractor.Extract(own, Ct),
-            FragmentExtractor.Extract(new CompilationInput(GeneratedDomainCompilation(), SiblingProjectName, []), Ct)
-        ]);
+        CodebaseModel wholeSolution = FragmentMerger.Merge(WholeSolution(own, GeneratedDomainCompilation()));
 
         // Assert: the banner is a signal at all — the whole-solution merge reads it from the file — and is
         // not one from here, while the attribute both forms carry still is.
@@ -823,14 +877,20 @@ public sealed class OneProjectExtractionTests
         return FragmentExtractor.ExtractOneProject(OwnInput(asImage), SiblingMap(), Ct);
     }
 
-    // The same two projects as a whole-solution run extracts them — both compilations in hand, each its own
-    // ordinary fragment.
+    // The same two projects as a whole-solution run extracts them.
     private static IReadOnlyList<CodebaseFragment> WholeSolutionView(bool asImage)
+    {
+        return WholeSolution(OwnInput(asImage), DomainCompilation());
+    }
+
+    // The own project and a sibling as a whole-solution run extracts them: both compilations in hand, each its own
+    // ordinary fragment, the own one first.
+    private static IReadOnlyList<CodebaseFragment> WholeSolution(CompilationInput own, CSharpCompilation sibling)
     {
         return
         [
-            FragmentExtractor.Extract(OwnInput(asImage), Ct),
-            FragmentExtractor.Extract(new CompilationInput(DomainCompilation(), SiblingProjectName, []), Ct)
+            FragmentExtractor.Extract(own, Ct),
+            FragmentExtractor.Extract(new CompilationInput(sibling, SiblingProjectName, []), Ct)
         ];
     }
 

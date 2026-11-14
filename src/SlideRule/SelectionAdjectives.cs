@@ -215,12 +215,13 @@ public static class SelectionAdjectives
     }
 
     /// <summary>
-    ///     Narrows the selection to the types carrying an attribute, such as
+    ///     Narrows the selection to the types an attribute is written on, such as
     ///     <c>arch.Types.AttributedWith(typeof(ApiControllerAttribute))</c>. Attributes written on the
-    ///     type itself count and no others, so an attribute a base type carries does not. Pass an open
+    ///     type itself count and no others, so an attribute a base type declares does not; use
+    ///     <see cref="Carrying(Selection,Type)" /> to count that one too. Pass an open
     ///     generic definition to match every construction of it, or a constructed attribute type to match
     ///     that one exactly. The attribute itself may come from anywhere, but a type from a referenced
-    ///     package or the framework is never selected, because only the types the solution declares carry
+    ///     package or the framework is never selected, because only the types the solution declares have
     ///     the attribute information this reads. Nothing checks that the type is an attribute: given
     ///     anything else it selects nothing, and a rule whose subject selects nothing fails the
     ///     check.
@@ -232,7 +233,7 @@ public static class SelectionAdjectives
     }
 
     /// <summary>
-    ///     Narrows the selection to the types carrying the attribute with this name — the form to use for
+    ///     Narrows the selection to the types the attribute with this name is written on — the form to use for
     ///     an attribute the spec project cannot compile against, so it need not take a package reference
     ///     just to write the <c>typeof</c>. <paramref name="attributeFullName" /> is the attribute
     ///     definition's fully-qualified name with the <c>Attribute</c> suffix included
@@ -282,9 +283,9 @@ public static class SelectionAdjectives
     }
 
     /// <summary>
-    ///     Narrows the selection to the types carrying attribute <typeparamref name="T" />, such as
+    ///     Narrows the selection to the types attribute <typeparamref name="T" /> is written on, such as
     ///     <c>arch.Types.AttributedWith&lt;ApiControllerAttribute&gt;()</c>. Attributes written on the
-    ///     type itself count and no others, so an attribute a base type carries does not, and a type from
+    ///     type itself count and no others, so an attribute a base type declares does not, and a type from
     ///     a referenced package or the framework is never selected. An open generic attribute has no
     ///     type-argument form: for <c>MarkAttribute&lt;&gt;</c> use the <see cref="System.Type" />
     ///     overload and pass <c>typeof(MarkAttribute&lt;&gt;)</c>, which matches every construction of it.
@@ -293,6 +294,58 @@ public static class SelectionAdjectives
         where T : Attribute
     {
         return selection.AttributedWith(typeof(T));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the types carrying an attribute, written on the type itself or inherited
+    ///     from a base type, such as <c>arch.Types.WithSuffix("Controller").Carrying(typeof(AuthorizeAttribute))</c>.
+    ///     An attribute a base type declares counts when the attribute class's own <c>[AttributeUsage]</c>
+    ///     leaves <c>Inherited</c> true, which it is by default; this is how reflection's
+    ///     <c>GetCustomAttributes(true)</c> reads it. Bases from a referenced package or the framework count
+    ///     too, and interfaces never pass an attribute on. Use <see cref="AttributedWith(Selection,Type)" />
+    ///     to count only what the type itself declares. Pass an open generic definition to match every
+    ///     construction of it, or a constructed attribute type to match that one exactly. A type from a
+    ///     referenced package or the framework is never selected itself. Nothing checks that the type is an
+    ///     attribute: given anything else it selects nothing, and a rule whose subject selects nothing fails
+    ///     the check.
+    /// </summary>
+    public static Selection Carrying(this Selection selection, Type type)
+    {
+        TypeAnchor anchor = TypeAnchor.FromType(NotNull(type, nameof(type)));
+        return Append(selection, new CarryingAdjective(anchor));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the types carrying the attribute with this name, written on the type
+    ///     itself or inherited from a base type whose attribute class leaves <c>AttributeUsage.Inherited</c>
+    ///     true — the form to use for an attribute the spec project cannot compile against.
+    ///     <paramref name="attributeFullName" /> is the attribute definition's fully-qualified name with the
+    ///     <c>Attribute</c> suffix included (<c>"Microsoft.AspNetCore.Authorization.AuthorizeAttribute"</c>);
+    ///     it matches every construction of that definition, and a constructed spelling matches nothing.
+    ///     Blankness is the only thing checked, and a blank name is reported when the spec is loaded: a
+    ///     misspelt name is a legal name that selects nothing. Prefer the <see cref="System.Type" /> overload
+    ///     whenever the attribute is referenceable, because the compiler checks a <c>typeof</c> and nothing
+    ///     checks a string.
+    /// </summary>
+    public static Selection Carrying(
+        this Selection selection, [SpecSlot(nameof(SpecSlot.AttributeName))] string attributeFullName)
+    {
+        TypeAnchor anchor = TypeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
+        return Append(selection, new CarryingAdjective(anchor));
+    }
+
+    /// <summary>
+    ///     Narrows the selection to the types carrying attribute <typeparamref name="T" />, written on the
+    ///     type itself or inherited from a base type whose attribute class leaves
+    ///     <c>AttributeUsage.Inherited</c> true, such as <c>arch.Types.Carrying&lt;AuthorizeAttribute&gt;()</c>.
+    ///     Use <c>AttributedWith</c> to count only what the type itself declares. An open generic attribute
+    ///     has no type-argument form: for <c>MarkAttribute&lt;&gt;</c> use the <see cref="System.Type" />
+    ///     overload and pass <c>typeof(MarkAttribute&lt;&gt;)</c>, which matches every construction of it.
+    /// </summary>
+    public static Selection Carrying<T>(this Selection selection)
+        where T : Attribute
+    {
+        return selection.Carrying(typeof(T));
     }
 
     /// <summary>

@@ -190,6 +190,9 @@ internal static class FragmentMerger
                 PopulateMembers(roster.Node, roster.Winning);
             }
 
+            foreach (DeclarerRoster roster in _rosters.Values)
+                PopulateInheritedAttributes(roster.Node, roster.Winning);
+
             // One fragment at a time rather than one family at a time, so each family reads the supplier map and
             // the project of the fragment that observed it. Nothing here is order-sensitive: every site and
             // instance set is a SortedSet, every map keys on its endpoint pair, the external facts table was frozen
@@ -469,6 +472,35 @@ internal static class FragmentMerger
             node.BaseTypeChain = declared.BaseTypeChain.Select(c => ToConstruction(suppliers, c))
                 .ToList();
             node.AttributeConstructions = declared.AttributeConstructions.Select(c => ToConstruction(suppliers, c))
+                .ToList();
+        }
+
+        // Run once every hierarchy is resolved, so each base is its node. A base the solution declares contributes
+        // what its own winning declaration passes down, read from its own compilation, because an image can lack an
+        // attribute its source declares; any other base contributes
+        // what the referring fragment read from it. A type nothing passes anything to keeps the empty default, which
+        // is most types, so the set is made only once a base contributes.
+        private void PopulateInheritedAttributes(TypeNode node, FragmentType declared)
+        {
+            HashSet<FragmentConstruction>? inherited = null;
+            for (var i = 0; i < node.BaseTypeChain.Count; i++)
+            {
+                TypeNode baseNode = node.BaseTypeChain[i].Definition;
+                bool declaredHere = _rosters.TryGetValue(baseNode.FullName, out DeclarerRoster? baseRoster)
+                                    && ReferenceEquals(baseRoster.Node, baseNode);
+                IReadOnlyList<FragmentConstruction> passed =
+                    declaredHere ? baseRoster!.Winning.PassedDown : declared.BaseAttributes[i];
+                if (passed.Count == 0) continue;
+
+                inherited ??= new HashSet<FragmentConstruction>();
+                inherited.UnionWith(passed);
+            }
+
+            if (inherited is null) return;
+
+            node.InheritedAttributes = inherited
+                .OrderBy(c => c.ConstructedName, StringComparer.Ordinal)
+                .Select(c => c.ToAttributeNode())
                 .ToList();
         }
 

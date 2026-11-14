@@ -17,3 +17,38 @@ public class ThingBase;
 public sealed class MarkAttribute : Attribute;
 
 public class Order;
+
+// The reflectable copies of Sources.InheritedAttributes, in the same lockstep.
+[AttributeUsage(AttributeTargets.Class, Inherited = false)]
+public class PinnedAttribute : Attribute;
+
+public sealed class PinnedChildAttribute : PinnedAttribute;
+
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
+public sealed class StampAttribute : Attribute;
+
+// Brand's arity is what the generic-attribute rows bind to, so T has no use.
+// ReSharper disable once UnusedTypeParameter
+public sealed class BrandAttribute<T> : Attribute;
+
+[Mark]
+[Pinned]
+[PinnedChild]
+[Stamp]
+[Stamp]
+[Brand<int>]
+public class CarryBase;
+
+public class CarryDerived : CarryBase;
+
+public class CarryLeaf : CarryDerived;
+
+[Mark]
+public class CarryRedeclared : CarryBase;
+
+public class Bag : List<int>;
+
+[Mark]
+public interface IMarked;
+
+public class ViaInterface : IMarked;

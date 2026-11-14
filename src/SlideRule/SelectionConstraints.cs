@@ -766,9 +766,10 @@ public static class SelectionConstraints
     }
 
     /// <summary>
-    ///     States that every type in the subject carries the given attribute, such as
+    ///     States that every type in the subject is attributed with the given attribute, such as
     ///     <c>controllers.MustBeAttributedWith(typeof(ApiControllerAttribute))</c>. Declared attributes
-    ///     only: an attribute a base type carries does not count for the type deriving from it. One
+    ///     only: an attribute a base type declares does not count for the type deriving from it, and
+    ///     <see cref="MustCarry(Selection,Type)" /> is the form that counts it. One
     ///     attribute per rule. For an attribute the spec project cannot compile against, name it by string
     ///     with <see cref="MustBeAttributedWith(Selection,string)" />.
     ///     The type must derive from <c>System.Attribute</c>; anything else, <c>typeof(Attribute)</c> itself included,
@@ -781,7 +782,7 @@ public static class SelectionConstraints
     }
 
     /// <summary>
-    ///     States that every type in the subject carries the named attribute, the escape hatch for an
+    ///     States that every type in the subject is attributed with the named attribute, the escape hatch for an
     ///     attribute the spec project cannot compile against, so that naming it costs no package reference.
     ///     <paramref name="attributeFullName" /> is the attribute definition's fully-qualified name as a
     ///     report prints it, <c>Attribute</c> suffix included
@@ -828,9 +829,9 @@ public static class SelectionConstraints
     }
 
     /// <summary>
-    ///     States that every type in the subject carries the attribute <typeparamref name="T" />, such as
+    ///     States that every type in the subject is attributed with <typeparamref name="T" />, such as
     ///     <c>controllers.MustBeAttributedWith&lt;ApiControllerAttribute&gt;()</c>. Declared attributes
-    ///     only: an attribute a base type carries does not count for the type deriving from it. One
+    ///     only: an attribute a base type declares does not count for the type deriving from it. One
     ///     attribute per rule.
     ///     <typeparamref name="T" /> must be an attribute type other than <c>System.Attribute</c> itself, which is
     ///     reported when the spec is loaded.
@@ -839,6 +840,58 @@ public static class SelectionConstraints
         where T : Attribute
     {
         return subject.MustBeAttributedWith(typeof(T));
+    }
+
+    /// <summary>
+    ///     States that every type in the subject carries the given attribute, written on the type itself or
+    ///     inherited from a base type, such as <c>controllers.MustCarry(typeof(AuthorizeAttribute))</c>. An
+    ///     attribute a base type declares counts when the attribute class's own <c>[AttributeUsage]</c>
+    ///     leaves <c>Inherited</c> true, which it is by default; this is how reflection's
+    ///     <c>GetCustomAttributes(true)</c> reads it. Bases from a referenced package or the framework count
+    ///     too, and interfaces never pass an attribute on. Use <see cref="MustBeAttributedWith(Selection,Type)" />
+    ///     to require the attribute on each type's own declaration. One attribute per rule. For an attribute
+    ///     the spec project cannot compile against, name it by string with
+    ///     <see cref="MustCarry(Selection,string)" />. The type must derive from <c>System.Attribute</c>;
+    ///     anything else, <c>typeof(Attribute)</c> itself included, is reported when the spec is loaded.
+    /// </summary>
+    public static Constraint MustCarry(this Selection subject, Type type)
+    {
+        TypeAnchor anchor = TypeAnchor.FromType(NotNull(type, nameof(type)));
+        return new MustCarryConstraint(subject, anchor);
+    }
+
+    /// <summary>
+    ///     States that every type in the subject carries the named attribute, written on the type itself or
+    ///     inherited from a base type whose attribute class leaves <c>AttributeUsage.Inherited</c> true —
+    ///     the escape hatch for an attribute the spec project cannot compile against.
+    ///     <paramref name="attributeFullName" /> is the attribute definition's fully-qualified name as a
+    ///     report prints it, <c>Attribute</c> suffix included
+    ///     (<c>"Microsoft.AspNetCore.Authorization.AuthorizeAttribute"</c>), compared exactly; it matches any
+    ///     construction of that definition, and a spelling that names a construction matches nothing. One
+    ///     attribute per rule. Blankness is the only thing checked, and a blank name is reported when the
+    ///     spec is loaded; a misspelling is a legal name that never matches, so every subject type then
+    ///     fails the check. Prefer <see cref="MustCarry(Selection,Type)" /> whenever the attribute is
+    ///     referenceable, because the compiler checks a <c>typeof</c> and nothing checks a string.
+    /// </summary>
+    public static Constraint MustCarry(
+        this Selection subject, [SpecSlot(nameof(SpecSlot.AttributeName))] string attributeFullName)
+    {
+        TypeAnchor anchor = TypeAnchor.FromName(NotNull(attributeFullName, nameof(attributeFullName)));
+        return new MustCarryConstraint(subject, anchor);
+    }
+
+    /// <summary>
+    ///     States that every type in the subject carries attribute <typeparamref name="T" />, written on the
+    ///     type itself or inherited from a base type whose attribute class leaves
+    ///     <c>AttributeUsage.Inherited</c> true, such as <c>controllers.MustCarry&lt;AuthorizeAttribute&gt;()</c>.
+    ///     Use <c>MustBeAttributedWith</c> to require it on each type's own declaration. One attribute per
+    ///     rule. <typeparamref name="T" /> must be an attribute type other than <c>System.Attribute</c>
+    ///     itself, which is reported when the spec is loaded.
+    /// </summary>
+    public static Constraint MustCarry<T>(this Selection subject)
+        where T : Attribute
+    {
+        return subject.MustCarry(typeof(T));
     }
 
     /// <summary>
@@ -924,10 +977,11 @@ public static class SelectionConstraints
     }
 
     /// <summary>
-    ///     States that no type in the subject carries any of the given attributes, such as
+    ///     States that no type in the subject is attributed with any of the given attributes, such as
     ///     <c>domain.MustNotBeAttributedWith(typeof(ObsoleteAttribute), typeof(SerializableAttribute))</c>:
-    ///     a subject type carrying even one of them fails the check. Declared attributes only, so an
-    ///     attribute a base type carries does not count for the type deriving from it. At least one type is
+    ///     a subject type attributed with even one of them fails the check. Declared attributes only, so an
+    ///     attribute a base type declares does not count for the type deriving from it;
+    ///     <see cref="MustNotCarry(Selection,Type,Type[])" /> is the form that counts it. At least one type is
     ///     required, and one call is all <c>typeof</c>: to name an attribute the spec project cannot
     ///     compile against, write the whole list as strings with
     ///     <see cref="MustNotBeAttributedWith(Selection,string,string[])" />.
@@ -940,7 +994,7 @@ public static class SelectionConstraints
     }
 
     /// <summary>
-    ///     States that no type in the subject carries any of the named attributes, the escape hatch for
+    ///     States that no type in the subject is attributed with any of the named attributes, the escape hatch for
     ///     attributes the spec project cannot compile against. Each name is an attribute definition's
     ///     fully-qualified name as a report prints it, <c>Attribute</c> suffix included
     ///     (<c>"ModelContextProtocol.Server.McpServerToolAttribute"</c>), compared exactly; it matches any
@@ -992,9 +1046,9 @@ public static class SelectionConstraints
     }
 
     /// <summary>
-    ///     States that no type in the subject carries the attribute <typeparamref name="T" />, such as
+    ///     States that no type in the subject is attributed with <typeparamref name="T" />, such as
     ///     <c>publicApi.MustNotBeAttributedWith&lt;ObsoleteAttribute&gt;()</c>. Declared attributes only:
-    ///     an attribute a base type carries does not count for the type deriving from it.
+    ///     an attribute a base type declares does not count for the type deriving from it.
     ///     <typeparamref name="T" /> must be an attribute type other than <c>System.Attribute</c> itself, which is
     ///     reported when the spec is loaded.
     /// </summary>
@@ -1002,6 +1056,63 @@ public static class SelectionConstraints
         where T : Attribute
     {
         return subject.MustNotBeAttributedWith(typeof(T));
+    }
+
+    /// <summary>
+    ///     States that no type in the subject carries any of the given attributes, written on the type itself
+    ///     or inherited from a base type, such as
+    ///     <c>domain.MustNotCarry(typeof(SerializableAttribute), typeof(DataContractAttribute))</c>: a subject
+    ///     type carrying even one of them fails the check. An attribute a base type declares counts when the
+    ///     attribute class's own <c>[AttributeUsage]</c> leaves <c>Inherited</c> true, which it is by
+    ///     default; this is how reflection's <c>GetCustomAttributes(true)</c> reads it. Bases from a
+    ///     referenced package or the framework count too, and interfaces never pass an attribute on. Use
+    ///     <see cref="MustNotBeAttributedWith(Selection,Type,Type[])" /> to ban only what each type itself
+    ///     declares. At least one type is required, and one call is all <c>typeof</c>: to name an attribute
+    ///     the spec project cannot compile against, write the whole list as strings with
+    ///     <see cref="MustNotCarry(Selection,string,string[])" />. Every listed type must derive from
+    ///     <c>System.Attribute</c>; anything else, <c>typeof(Attribute)</c> itself included, is reported when
+    ///     the spec is loaded.
+    /// </summary>
+    public static Constraint MustNotCarry(this Selection subject, Type first, params Type[] more)
+    {
+        return new MustNotCarryConstraint(subject, TypeAnchor.FromTypes(first, more));
+    }
+
+    /// <summary>
+    ///     States that no type in the subject carries any of the named attributes, written on the type itself
+    ///     or inherited from a base type whose attribute class leaves <c>AttributeUsage.Inherited</c> true —
+    ///     the escape hatch for attributes the spec project cannot compile against. Each name is an attribute
+    ///     definition's fully-qualified name as a report prints it, <c>Attribute</c> suffix included
+    ///     (<c>"System.Runtime.Serialization.DataContractAttribute"</c>), compared exactly; it matches any
+    ///     construction of that definition, and a spelling that names a construction matches nothing. At
+    ///     least one name is required, and one call is all strings: write a second rule to mix these with
+    ///     <c>typeof</c> forms. Blankness is the only thing checked, and a blank name is reported when the
+    ///     spec is loaded; a misspelling is a legal name that never matches, so the ban passes and nothing
+    ///     warns. Prefer <see cref="MustNotCarry(Selection,Type,Type[])" /> whenever the attributes are
+    ///     referenceable, because the compiler checks a <c>typeof</c> and nothing checks a string.
+    /// </summary>
+    public static Constraint MustNotCarry(
+        this Selection subject,
+        [SpecSlot(nameof(SpecSlot.AttributeName))]
+        string first,
+        [SpecSlot(nameof(SpecSlot.AttributeName))]
+        params string[] more)
+    {
+        return new MustNotCarryConstraint(subject, TypeAnchor.FromNames(first, more));
+    }
+
+    /// <summary>
+    ///     States that no type in the subject carries attribute <typeparamref name="T" />, written on the type
+    ///     itself or inherited from a base type whose attribute class leaves <c>AttributeUsage.Inherited</c>
+    ///     true, such as <c>domain.MustNotCarry&lt;SerializableAttribute&gt;()</c>. Use
+    ///     <c>MustNotBeAttributedWith</c> to ban only what each type itself declares.
+    ///     <typeparamref name="T" /> must be an attribute type other than <c>System.Attribute</c> itself,
+    ///     which is reported when the spec is loaded.
+    /// </summary>
+    public static Constraint MustNotCarry<T>(this Selection subject)
+        where T : Attribute
+    {
+        return subject.MustNotCarry(typeof(T));
     }
 
     /// <summary>

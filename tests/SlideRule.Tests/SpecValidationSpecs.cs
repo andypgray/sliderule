@@ -1684,3 +1684,32 @@ internal sealed class ValidSequenceOverloadsSpec : IArchitectureSpec
         arch.Rule("area/must-not-use").Enforce(arch.Types.MustNotUse(new[] { arch.Member(typeof(DateTime), nameof(DateTime.Now)) })).Because("Reason.");
     }
 }
+
+internal sealed class NonAttributeCarriedAnchorSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/carry")
+            .Enforce(arch.Types.MustCarry(typeof(Exception)))
+            .Because("Reason.");
+        arch.Rule("area/carry-not")
+            .Enforce(arch.Types.MustNotCarry(typeof(ObsoleteAttribute), typeof(Attribute)))
+            .Because("Reason.");
+    }
+}
+
+internal sealed class BlankCarriedNameSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/carrying")
+            .Enforce(arch.Types.Carrying(" ").MustBeSealed())
+            .Because("Reason.");
+        arch.Rule("area/carry")
+            .Enforce(arch.Types.MustCarry(""))
+            .Because("Reason.");
+        arch.Rule("area/carry-not")
+            .Enforce(arch.Types.MustNotCarry("N.MarkAttribute", "  "))
+            .Because("Reason.");
+    }
+}

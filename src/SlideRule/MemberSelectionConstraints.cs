@@ -150,9 +150,9 @@ public static class MemberSelectionConstraints
     }
 
     /// <summary>
-    ///     States that every selected member must carry an attribute, such as
+    ///     States that every selected member must be attributed with an attribute, such as
     ///     <c>arch.Types.Methods.WithPrefix("Handle").MustBeAttributedWith(typeof(HttpPostAttribute))</c>.
-    ///     A member that does not carry it fails the check. Attributes written on the member itself count
+    ///     A member without it fails the check. Attributes written on the member itself count
     ///     and no others: an attribute on a property's <c>get</c> or <c>set</c> accessor, and a
     ///     <c>[return:]</c> attribute, are not seen. Pass an open generic definition to accept every
     ///     construction of it, or a constructed attribute type to require that one exactly. The type must
@@ -166,14 +166,14 @@ public static class MemberSelectionConstraints
     }
 
     /// <summary>
-    ///     States that every selected member must carry the attribute with this name — the form to use for an
+    ///     States that every selected member must be attributed with the attribute with this name — the form to use for an
     ///     attribute the spec project cannot compile against, so it need not take a package reference just
     ///     to write the <c>typeof</c>. <paramref name="attributeFullName" /> is the attribute definition's
     ///     fully-qualified name with the <c>Attribute</c> suffix included
     ///     (<c>"ModelContextProtocol.Server.McpServerToolAttribute"</c>); it accepts every construction of
     ///     that definition, and a constructed spelling matches nothing. Attributes written on the member
     ///     itself count and no others. Blankness is the only thing checked, and a blank name is reported
-    ///     when the spec is loaded: a misspelt name is a legal name that nothing carries, so every
+    ///     when the spec is loaded: a misspelt name is a legal name no member is attributed with, so every
     ///     selected member then fails the check. Prefer the <see cref="System.Type" /> overload whenever
     ///     the attribute is referenceable, because the compiler checks a <c>typeof</c> and nothing checks
     ///     a string.
@@ -186,9 +186,9 @@ public static class MemberSelectionConstraints
     }
 
     /// <summary>
-    ///     States that every selected member must carry attribute <typeparamref name="T" />, such as
-    ///     <c>arch.Types.Methods.MustBeAttributedWith&lt;HttpPostAttribute&gt;()</c>. A member that does
-    ///     not carry it fails the check. Attributes written on the member itself count and no others. An
+    ///     States that every selected member must be attributed with <typeparamref name="T" />, such as
+    ///     <c>arch.Types.Methods.MustBeAttributedWith&lt;HttpPostAttribute&gt;()</c>. A member without it
+    ///     fails the check. Attributes written on the member itself count and no others. An
     ///     open generic attribute has no type-argument form: for <c>MarkAttribute&lt;&gt;</c> use the
     ///     <see cref="System.Type" /> overload and pass <c>typeof(MarkAttribute&lt;&gt;)</c>, which
     ///     accepts every construction of it.
@@ -200,8 +200,8 @@ public static class MemberSelectionConstraints
     }
 
     /// <summary>
-    ///     States that no selected member may carry any of the listed attributes, such as
-    ///     <c>arch.Types.Members.MustNotBeAttributedWith(typeof(ObsoleteAttribute))</c>. A member carrying
+    ///     States that no selected member may be attributed with any of the listed attributes, such as
+    ///     <c>arch.Types.Members.MustNotBeAttributedWith(typeof(ObsoleteAttribute))</c>. A member attributed with
     ///     any one of them fails the check. Attributes written on the member itself count and no others.
     ///     Pass an open generic definition to ban every construction of it, or a constructed attribute
     ///     type to ban that one exactly. At least one type is required, one call takes types or names but
@@ -214,15 +214,15 @@ public static class MemberSelectionConstraints
     }
 
     /// <summary>
-    ///     States that no selected member may carry any of the attributes with these names — the form to use
+    ///     States that no selected member may be attributed with any of the attributes with these names — the form to use
     ///     for attributes the spec project cannot compile against, so the spec need not take a package
     ///     reference just to write the <c>typeof</c>. Each name is an attribute definition's
     ///     fully-qualified name with the <c>Attribute</c> suffix included
     ///     (<c>"ModelContextProtocol.Server.McpServerToolAttribute"</c>); it bans every construction of
-    ///     that definition, and a constructed spelling bans nothing. A member carrying any one of them
+    ///     that definition, and a constructed spelling bans nothing. A member attributed with any one of them
     ///     fails the check. At least one name is required, and one call takes names or types but never a
     ///     mix of the two. Blankness is the only thing checked, and a blank name is reported when the spec
-    ///     is loaded: a misspelt name is a legal name that nothing carries, so the ban passes every
+    ///     is loaded: a misspelt name is a legal name no member is attributed with, so the ban passes every
     ///     member and nothing warns. Prefer the <see cref="System.Type" /> overload whenever the attributes are
     ///     referenceable, because the compiler checks a <c>typeof</c> and nothing checks a string.
     /// </summary>
@@ -237,8 +237,8 @@ public static class MemberSelectionConstraints
     }
 
     /// <summary>
-    ///     States that no selected member may carry attribute <typeparamref name="T" />, such as
-    ///     <c>arch.Types.Members.MustNotBeAttributedWith&lt;ObsoleteAttribute&gt;()</c>. A member carrying
+    ///     States that no selected member may be attributed with <typeparamref name="T" />, such as
+    ///     <c>arch.Types.Members.MustNotBeAttributedWith&lt;ObsoleteAttribute&gt;()</c>. A member attributed with
     ///     it fails the check. Attributes written on the member itself count and no others. An open
     ///     generic attribute has no type-argument form: for <c>MarkAttribute&lt;&gt;</c> use the
     ///     <see cref="System.Type" /> overload and pass <c>typeof(MarkAttribute&lt;&gt;)</c>, which bans

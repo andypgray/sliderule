@@ -144,6 +144,15 @@ public class SentenceAssemblyTests
     }
 
     [Fact]
+    public void CarryingSubjectHead_StripsAttributeAndBrackets()
+    {
+        SentenceRenderer.Subject(Arch.Types.Carrying(typeof(ApiControllerAttribute)))
+            .ShouldBe("Types carrying `[ApiController]`");
+        SentenceRenderer.Subject(Arch.Types.Carrying("SlideRule.Tests.Stubs.ApiControllerAttribute"))
+            .ShouldBe("Types carrying `[ApiController]`");
+    }
+
+    [Fact]
     public void AttributedWithSubjectHead_StripsAttributeAndBrackets()
     {
         SentenceRenderer.Subject(Arch.Types.AttributedWith(typeof(ApiControllerAttribute)))
@@ -635,6 +644,14 @@ public class SentenceAssemblyTests
         Constraint constraint = Arch.Types.MustNotBeAttributedWith(typeof(AuditAttribute), typeof(Stubs.Sales.AuditAttribute));
         SentenceRenderer.Sentence(constraint)
             .ShouldBe("Types must not be attributed with `[Billing.Audit]` or `[Sales.Audit]`.");
+    }
+
+    [Fact]
+    public void MustNotCarry_CollidingAnchors_WidenInsideTheBrackets()
+    {
+        Constraint constraint = Arch.Types.MustNotCarry(typeof(AuditAttribute), typeof(Stubs.Sales.AuditAttribute));
+        SentenceRenderer.Sentence(constraint)
+            .ShouldBe("Types must not carry `[Billing.Audit]` or `[Sales.Audit]`.");
     }
 
     // ---- Exception edges (GRAMMAR §5.3, §3.3): the catch-ban and STRICT throw-allowlist dependency verbs ----

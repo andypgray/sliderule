@@ -29,6 +29,7 @@ namespace SlideRule.Extraction;
 /// </remarks>
 internal static class FragmentExtractor
 {
+    private const string AttributeUsageFullName = "System.AttributeUsageAttribute";
     private const string GeneratedCodeAttributeFullName = "System.CodeDom.Compiler.GeneratedCodeAttribute";
 
     private static readonly SymbolDisplayFormat FullNameFormat = new(
@@ -451,6 +452,15 @@ internal static class FragmentExtractor
         private readonly Dictionary<ISymbol, string> _memberSymbolIds = new(SymbolEqualityComparer.Default);
 #pragma warning restore RS1024
 
+        // The memos behind InheritableAttributesOf and UsageInherits: a base such as a framework controller is
+        // walked once per descendant, and an attribute class is asked once per base that wears it.
+#pragma warning disable RS1024 // false positive, as above
+        private readonly Dictionary<INamedTypeSymbol, IReadOnlyList<FragmentConstruction>> _inheritableAttributes =
+            new(SymbolEqualityComparer.Default);
+
+        private readonly Dictionary<INamedTypeSymbol, bool> _usageInherits = new(SymbolEqualityComparer.Default);
+#pragma warning restore RS1024
+
         // [System.CodeDom.Compiler.GeneratedCode] as this compilation resolves it, or null where nothing
         // references the type, so nothing can wear it. Resolved once so the generated screen is a symbol compare
         // per attribute rather than a full display walk.
@@ -633,14 +643,61 @@ internal static class FragmentExtractor
                 .ToList();
 
             var baseChain = new List<FragmentConstruction>();
+            var baseAttributes = new List<IReadOnlyList<FragmentConstruction>>();
             for (INamedTypeSymbol? current = symbol.BaseType; current is not null; current = current.BaseType)
+            {
                 baseChain.Add(Construction(current)); // nearest-first; derivation order is meaningful, so not sorted
+                baseAttributes.Add(InheritableAttributesOf(current.OriginalDefinition));
+            }
+
             builder.BaseTypeChain = baseChain;
+            builder.BaseAttributes = baseAttributes;
+            builder.PassedDown = InheritableAttributesOf(symbol.OriginalDefinition);
 
             builder.AttributeConstructions = attributeClasses
                 .Select(Construction)
                 .OrderBy(c => c.ConstructedName, StringComparer.Ordinal)
                 .ToList();
+        }
+
+        // The attributes a definition passes to its descendants, distinct, recorded by name as a member's are, so
+        // nothing is minted: System.AttributeUsageAttribute, which every attribute class inherits through
+        // System.Attribute, would otherwise be an external of every fragment that declares an attribute.
+        private IReadOnlyList<FragmentConstruction> InheritableAttributesOf(INamedTypeSymbol baseDefinition)
+        {
+            if (_inheritableAttributes.TryGetValue(baseDefinition, out IReadOnlyList<FragmentConstruction>? memo))
+                return memo;
+
+            memo = AttributeClassesOf(baseDefinition)
+                .Where(UsageInherits)
+                .Select(c => new FragmentConstruction(DefinitionName(c), ConstructedName(c)))
+                .Distinct()
+                .OrderBy(c => c.ConstructedName, StringComparer.Ordinal)
+                .ToList();
+            _inheritableAttributes[baseDefinition] = memo;
+            return memo;
+        }
+
+        // Read from the attribute class's own [AttributeUsage] alone, never its base attribute class's, and true
+        // where it has none, no Inherited argument or an unreadable one: the rule GetCustomAttributes(inherit: true)
+        // applies. Matched by name, because a well-known-type lookup is null under an ambiguous name and in a
+        // compilation without references.
+        private bool UsageInherits(INamedTypeSymbol attributeClass)
+        {
+            INamedTypeSymbol definition = attributeClass.OriginalDefinition;
+            if (_usageInherits.TryGetValue(definition, out bool memo)) return memo;
+
+            AttributeData? usage = definition.GetAttributes()
+                .FirstOrDefault(a => a.AttributeClass is { } c && DefinitionName(c) == AttributeUsageFullName);
+
+            var inherits = true;
+            if (usage is not null)
+                foreach (KeyValuePair<string, TypedConstant> named in usage.NamedArguments)
+                    if (named is { Key: "Inherited", Value: { Kind: TypedConstantKind.Primitive, Value: bool value } })
+                        inherits = value;
+
+            _usageInherits[definition] = inherits;
+            return inherits;
         }
 
         private void WalkEdges(INamedTypeSymbol symbol)
@@ -1460,6 +1517,8 @@ internal static class FragmentExtractor
         public IReadOnlyList<FragmentConstruction> AllInterfaces { get; set; } = [];
         public IReadOnlyList<FragmentConstruction> BaseTypeChain { get; set; } = [];
         public IReadOnlyList<FragmentConstruction> AttributeConstructions { get; set; } = [];
+        public IReadOnlyList<FragmentConstruction> PassedDown { get; set; } = [];
+        public IReadOnlyList<IReadOnlyList<FragmentConstruction>> BaseAttributes { get; set; } = [];
 
         public FragmentType ToFragmentType()
         {
@@ -1472,6 +1531,8 @@ internal static class FragmentExtractor
                 AllInterfaces,
                 BaseTypeChain,
                 AttributeConstructions,
+                PassedDown,
+                BaseAttributes,
                 Members.Select(m => m.Member).ToList());
         }
     }

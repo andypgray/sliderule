@@ -304,6 +304,8 @@ public sealed class ManifestJsonTests
             AllInterfaces: [construction],
             BaseTypeChain: [construction],
             AttributeConstructions: [construction],
+            PassedDown: [construction],
+            BaseAttributes: [[construction]],
             DeclaredMembers: [member]);
 
         TypeFacts externalFacts = typeFacts with

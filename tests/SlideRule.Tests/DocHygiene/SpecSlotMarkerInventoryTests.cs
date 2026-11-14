@@ -42,7 +42,7 @@ public sealed class SpecSlotMarkerInventoryTests
 {
     // The number of string literals a spec can write, counted once so that adding a verb is a deliberate
     // edit here rather than a table that grew while nobody was counting.
-    private const int SlotCount = 88;
+    private const int SlotCount = 92;
 
     private const string RootNamespace = "SlideRule";
 
@@ -113,6 +113,7 @@ public sealed class SpecSlotMarkerInventoryTests
             ["SelectionAdjectives.Implementing(Selection, string)/interfaceFullName"] = nameof(SpecSlot.InterfaceName),
             ["SelectionAdjectives.DerivedFrom(Selection, string)/baseTypeFullName"] = nameof(SpecSlot.BaseTypeName),
             ["SelectionAdjectives.AttributedWith(Selection, string)/attributeFullName"] = nameof(SpecSlot.AttributeName),
+            ["SelectionAdjectives.Carrying(Selection, string)/attributeFullName"] = nameof(SpecSlot.AttributeName),
             ["SelectionAdjectives.Where(Selection, Func<ITypeInfo, bool>, string)/description"] = nameof(SpecSlot.Description),
 
             ["SelectionConstraints.MustHaveExactlyOneCounterpart(Selection, Selection, string)/named"] = nameof(SpecSlot.CounterpartTemplate),
@@ -124,12 +125,15 @@ public sealed class SpecSlotMarkerInventoryTests
             ["SelectionConstraints.MustImplement(Selection, string)/interfaceFullName"] = nameof(SpecSlot.InterfaceName),
             ["SelectionConstraints.MustDeriveFrom(Selection, string)/baseTypeFullName"] = nameof(SpecSlot.BaseTypeName),
             ["SelectionConstraints.MustBeAttributedWith(Selection, string)/attributeFullName"] = nameof(SpecSlot.AttributeName),
+            ["SelectionConstraints.MustCarry(Selection, string)/attributeFullName"] = nameof(SpecSlot.AttributeName),
             ["SelectionConstraints.MustNotImplement(Selection, string, string[])/first"] = nameof(SpecSlot.InterfaceName),
             ["SelectionConstraints.MustNotImplement(Selection, string, string[])/more"] = nameof(SpecSlot.InterfaceName),
             ["SelectionConstraints.MustNotDeriveFrom(Selection, string, string[])/first"] = nameof(SpecSlot.BaseTypeName),
             ["SelectionConstraints.MustNotDeriveFrom(Selection, string, string[])/more"] = nameof(SpecSlot.BaseTypeName),
             ["SelectionConstraints.MustNotBeAttributedWith(Selection, string, string[])/first"] = nameof(SpecSlot.AttributeName),
             ["SelectionConstraints.MustNotBeAttributedWith(Selection, string, string[])/more"] = nameof(SpecSlot.AttributeName),
+            ["SelectionConstraints.MustNotCarry(Selection, string, string[])/first"] = nameof(SpecSlot.AttributeName),
+            ["SelectionConstraints.MustNotCarry(Selection, string, string[])/more"] = nameof(SpecSlot.AttributeName),
             ["SelectionConstraints.Must(Selection, Func<ITypeInfo, bool>, string)/description"] = nameof(SpecSlot.Description),
 
             ["MemberSelectionAdjectives.WithSuffix(TSelf, string)/suffix"] = nameof(SpecSlot.MemberSuffix),

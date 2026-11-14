@@ -3,6 +3,7 @@ using SlideRule.Checking;
 using SlideRule.Cli.Rendering;
 using SlideRule.Codebase;
 using SlideRule.Hosting;
+using SlideRule.Tests.Checking.Targets;
 using SlideRule.Tests.Extraction;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -457,6 +458,8 @@ public sealed class ClaimTracerTests
     [InlineData("derived", "Shop.Domain.IRepository", false, "it does not derive from `Object`")]
     [InlineData("attributed", "Shop.Domain.Order", true, "it is attributed with `[Serializable]`")]
     [InlineData("attributed", "Shop.Domain.OrderRepository", false, "it is not attributed with `[Serializable]`")]
+    [InlineData("carrying", "Shop.Domain.Order", true, "it is attributed with `[Serializable]`")]
+    [InlineData("carrying", "Shop.Domain.OrderRepository", false, "it does not carry `[Serializable]`, declared or inherited")]
     [InlineData("authored", "Shop.Domain.Order", true, "it is authored, not generated")]
     [InlineData("public", "Shop.Domain.Order", true, "it is declared public")]
     [InlineData("public", "Shop.Domain.LegacyOrderRepository", false, "it is declared internal, not public")]
@@ -484,6 +487,7 @@ public sealed class ClaimTracerTests
             "implementing" => arch.Types.Implementing("Shop.Domain.IRepository"),
             "derived" => arch.Types.DerivedFrom("System.Object"),
             "attributed" => arch.Types.AttributedWith("System.SerializableAttribute"),
+            "carrying" => arch.Types.Carrying("System.SerializableAttribute"),
             "authored" => arch.Types.Authored(),
             "public" => arch.Types.ThatArePublic(),
             "sealed" => arch.Types.ThatAreSealed(),
@@ -498,6 +502,23 @@ public sealed class ClaimTracerTests
         ClaimTrace trace = new ClaimTracer(ShopModel).Trace(selection, type);
 
         trace.Verdict.ShouldBe(kept ? ClaimVerdict.Claimed : ClaimVerdict.Narrowed);
+        trace.Steps.Select(candidate => candidate.Text).ShouldBe([step]);
+    }
+
+    // A carried attribute is named for where it was found: the type's own declaration wins over a base that also
+    // declares it, and only an attribute the type does not declare is said to be inherited.
+    [Theory]
+    [InlineData("CarryDerived", "it inherits `[Mark]` from a base type")]
+    [InlineData("CarryRedeclared", "it is attributed with `[Mark]`")]
+    public void ACarryingAdjective_SaysWhetherTheTypeDeclaresOrInheritsTheAttribute(string typeName, string step)
+    {
+        CodebaseModel model = CompilationFactory.Extract(Sources.InheritedAttributes);
+        var arch = new Arch();
+
+        ClaimTrace trace = new ClaimTracer(model).Trace(
+            arch.Types.Carrying(typeof(MarkAttribute)), model.Type($"SlideRule.Tests.Checking.Targets.{typeName}"));
+
+        trace.Verdict.ShouldBe(ClaimVerdict.Claimed);
         trace.Steps.Select(candidate => candidate.Text).ShouldBe([step]);
     }
 

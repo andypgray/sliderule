@@ -646,6 +646,12 @@ internal static class SpecValidator
             case MustNotBeAttributedWithConstraint or MemberMustNotBeAttributedWithConstraint:
                 CheckAttributeAnchors(anchors, "MustNotBeAttributedWith", target, errors);
                 break;
+            case MustCarryConstraint:
+                CheckAttributeAnchors(anchors, "MustCarry", target, errors);
+                break;
+            case MustNotCarryConstraint:
+                CheckAttributeAnchors(anchors, "MustNotCarry", target, errors);
+                break;
         }
     }
 
@@ -712,6 +718,8 @@ internal static class SpecValidator
             MemberMustBeAttributedWithConstraint c => ([c.Anchor], SpecSlot.AttributeName),
             MustNotBeAttributedWithConstraint c => (c.Anchors, SpecSlot.AttributeName),
             MemberMustNotBeAttributedWithConstraint c => (c.Anchors, SpecSlot.AttributeName),
+            MustCarryConstraint c => ([c.Anchor], SpecSlot.AttributeName),
+            MustNotCarryConstraint c => (c.Anchors, SpecSlot.AttributeName),
             MemberMustAcceptParameterConstraint c => ([c.Anchor], SpecSlot.ParameterTypeName),
             _ => null
         };
@@ -1102,6 +1110,9 @@ internal static class SpecValidator
                 case AttributedWithAdjective { Anchor.DefinitionFullName: { } attributeName }:
                     // The adjective's string anchor, on the same terms as the two verbs' (item 15).
                     yield return (attributeName, SpecSlot.AttributeName);
+                    break;
+                case CarryingAdjective { Anchor.DefinitionFullName: { } carriedName }:
+                    yield return (carriedName, SpecSlot.AttributeName);
                     break;
                 case ImplementingAdjective { Anchor.DefinitionFullName: { } interfaceName }:
                     // The hierarchy adjectives' string anchors, likewise: blankness is checked on an adjective,

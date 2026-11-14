@@ -146,6 +146,7 @@ internal static class NodeReaders
         Field(map, AdjectiveWhere, "anchor", Anchor, anchor => new ImplementingAdjective(anchor));
         Field(map, AdjectiveWhere, "anchor", Anchor, anchor => new DerivedFromAdjective(anchor));
         Field(map, AdjectiveWhere, "anchor", Anchor, anchor => new AttributedWithAdjective(anchor));
+        Field(map, AdjectiveWhere, "anchor", Anchor, anchor => new CarryingAdjective(anchor));
         Field(map, AdjectiveWhere, "payload", SelectionAt, payload => new ExceptAdjective(payload));
 
         Bare<SelectionAdjective, AuthoredAdjective>(map, AdjectiveWhere);
@@ -254,9 +255,11 @@ internal static class NodeReaders
         SubjectField(map, "anchor", Anchor, (s, a) => new MustImplementConstraint(s, a));
         SubjectField(map, "anchor", Anchor, (s, a) => new MustDeriveFromConstraint(s, a));
         SubjectField(map, "anchor", Anchor, (s, a) => new MustBeAttributedWithConstraint(s, a));
+        SubjectField(map, "anchor", Anchor, (s, a) => new MustCarryConstraint(s, a));
         SubjectField(map, "anchors", Anchors, (s, a) => new MustNotImplementConstraint(s, a));
         SubjectField(map, "anchors", Anchors, (s, a) => new MustNotDeriveFromConstraint(s, a));
         SubjectField(map, "anchors", Anchors, (s, a) => new MustNotBeAttributedWithConstraint(s, a));
+        SubjectField(map, "anchors", Anchors, (s, a) => new MustNotCarryConstraint(s, a));
 
         SubjectField(map, "glob", NamespaceGlob, (s, glob) => new MustResideInNamespaceConstraint(s, glob));
         SubjectField(map, "projectName", Text, (s, name) => new MustResideInProjectConstraint(s, name));

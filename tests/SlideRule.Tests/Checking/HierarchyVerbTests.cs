@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using Shouldly;
 using SlideRule.Checking;
 using SlideRule.Codebase;
@@ -20,6 +22,24 @@ public sealed class HierarchyVerbTests
     private static readonly CodebaseModel TransitiveModel = CompilationFactory.Extract(Sources.HierarchyTransitive);
     private static readonly CodebaseModel GenericAttributeModel = CompilationFactory.Extract(Sources.GenericAttributes);
     private static readonly CodebaseModel ExternalBaseModel = CompilationFactory.Extract(Sources.ExternalBaseHierarchy);
+    private static readonly CodebaseModel InheritedModel = CompilationFactory.Extract(Sources.InheritedAttributes);
+
+    // Each subject of the inherited fixture against each attribute it could carry, the framework ones included:
+    // DebuggerDisplay passes down from List<T>, TypeForwardedFrom (Inherited = false) does not.
+    private static readonly Type[] CarrySubjects =
+    [
+        typeof(CarryBase), typeof(CarryDerived), typeof(CarryLeaf), typeof(CarryRedeclared), typeof(Bag),
+        typeof(IMarked), typeof(ViaInterface)
+    ];
+
+    private static readonly Type[] CarriedAttributes =
+    [
+        typeof(MarkAttribute), typeof(PinnedAttribute), typeof(PinnedChildAttribute), typeof(StampAttribute),
+        typeof(BrandAttribute<int>), typeof(DebuggerDisplayAttribute), typeof(TypeForwardedFromAttribute)
+    ];
+
+    public static TheoryData<Type, Type> CarryPairs { get; } = new(
+        CarrySubjects.SelectMany(subject => CarriedAttributes.Select(attribute => (subject, attribute))));
 
     [Fact]
     public void Implementing_OpenGeneric_SelectsEveryConstruction()
@@ -74,6 +94,10 @@ public sealed class HierarchyVerbTests
     [InlineData("MustBeAttributedWith", T + "MarkAttribute", "Tagged", "Plain")]
     [InlineData("MustNotBeAttributedWith", typeof(MarkAttribute), "Plain", "Tagged")]
     [InlineData("MustNotBeAttributedWith", T + "MarkAttribute", "Plain", "Tagged")]
+    [InlineData("MustCarry", typeof(MarkAttribute), "Tagged", "Plain")]
+    [InlineData("MustCarry", T + "MarkAttribute", "Tagged", "Plain")]
+    [InlineData("MustNotCarry", typeof(MarkAttribute), "Plain", "Tagged")]
+    [InlineData("MustNotCarry", T + "MarkAttribute", "Plain", "Tagged")]
     public void HierarchyVerb_PassesTheGreenPrefix_FlagsTheRedPrefix(
         string verb, object anchor, string green, string red)
     {
@@ -158,6 +182,66 @@ public sealed class HierarchyVerbTests
         Checker.Verdict(TransitiveModel, arch => arch.Types.WithPrefix("Attr")
                 .MustBeAttributedWith(typeof(MarkAttribute)))
             .ShouldHaveFailedWithSubjects([$"{T}AttrDerived", $"{T}AttrLeaf"]);
+    }
+
+    // The inherited reading of the same chain: the declaring base and both levels below it.
+    [Fact]
+    public void Carrying_BaseAttribute_SelectsTheBaseTheIntermediateBaseAndTheLeaf()
+    {
+        Checker.Selects(TransitiveModel, arch => arch.Types.WithPrefix("Attr").Carrying(typeof(MarkAttribute)))
+            .ShouldBe([$"{T}AttrBase", $"{T}AttrDerived", $"{T}AttrLeaf"]);
+    }
+
+    [Fact]
+    public void MustCarry_BaseAttribute_PassesEveryLevelOfTheChain()
+    {
+        Checker.Verdict(TransitiveModel, arch => arch.Types.WithPrefix("Attr").MustCarry(typeof(MarkAttribute)))
+            .ShouldHavePassed();
+    }
+
+    // An inherited generic attribute matches on its definition for an open typeof and a string, as a declared one
+    // does: CarryLeaf inherits Brand<int> from two levels up.
+    [Theory]
+    [InlineData("open")]
+    [InlineData("string")]
+    public void Carrying_DefinitionAnchor_MatchesAnInheritedConstruction(string anchor)
+    {
+        Checker.Selects(InheritedModel, arch => (anchor == "open"
+                    ? arch.Types.Carrying(typeof(BrandAttribute<>))
+                    : arch.Types.Carrying($"{T}BrandAttribute<T>"))
+                .Named("CarryLeaf"))
+            .ShouldBe([$"{T}CarryLeaf"]);
+    }
+
+    // None-of over the list: CarryLeaf inherits Stamp but not Pinned, so the second anchor alone reds it, and a list
+    // of two it carries neither of passes.
+    [Fact]
+    public void MustNotCarry_AnchorList_RedsOnAnyInheritedAnchor()
+    {
+        Checker.Verdict(InheritedModel, arch => arch.Types.Named("CarryLeaf")
+                .MustNotCarry(typeof(PinnedAttribute), typeof(StampAttribute)))
+            .ShouldHaveFailedWithSubjects([$"{T}CarryLeaf"]);
+
+        Checker.Verdict(InheritedModel, arch => arch.Types.Named("CarryLeaf")
+                .MustNotCarry($"{T}PinnedAttribute", "System.SerializableAttribute"))
+            .ShouldHavePassed();
+    }
+
+    // The oracle: the checker's inherited reading is reflection's, pair by pair, over the reflectable copies of the
+    // fixture. The exact attribute type is compared, so a derived attribute class never stands in for its base.
+    [Theory]
+    [MemberData(nameof(CarryPairs))]
+    public void Carrying_SelectsExactlyWhatReflectionReportsWithInheritance(Type subject, Type attribute)
+    {
+        bool reflected = subject.GetCustomAttributes(inherit: true)
+            .Any(a => a.GetType() == attribute);
+
+        bool selected = Checker.Selects(InheritedModel, arch => arch.Types.Carrying(attribute))
+            .Contains(subject.FullName!);
+
+        selected.ShouldBe(reflected,
+            $"Carrying({attribute.Name}) {(selected ? "selects" : "does not select")} {subject.Name}, where "
+            + $"GetCustomAttributes(true) {(reflected ? "reports" : "does not report")} it");
     }
 
     // The spelling GRAMMAR §5.2 gives for an attribute a shared base carries: name the base, which reaches every level
@@ -344,6 +428,10 @@ public sealed class HierarchyVerbTests
             ("MustBeAttributedWith", string name) => subject.MustBeAttributedWith(name),
             ("MustNotBeAttributedWith", Type type) => subject.MustNotBeAttributedWith(type),
             ("MustNotBeAttributedWith", string name) => subject.MustNotBeAttributedWith(name),
+            ("MustCarry", Type type) => subject.MustCarry(type),
+            ("MustCarry", string name) => subject.MustCarry(name),
+            ("MustNotCarry", Type type) => subject.MustNotCarry(type),
+            ("MustNotCarry", string name) => subject.MustNotCarry(name),
             _ => throw new ArgumentOutOfRangeException(nameof(verb), verb, "No hierarchy verb takes this anchor.")
         };
     }

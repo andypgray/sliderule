@@ -127,9 +127,9 @@ internal enum SpecValidationErrorCode
     ///     A hierarchy verb given a type of the wrong category, which never matches, so the positive verb always
     ///     fails and the negative always passes: <c>MustImplement</c> and <c>MustNotImplement</c> take an
     ///     interface, <c>MustDeriveFrom</c> and <c>MustNotDeriveFrom</c> a non-interface, and
-    ///     <c>MustBeAttributedWith</c> and <c>MustNotBeAttributedWith</c> a type deriving from
-    ///     <see cref="System.Attribute" />, bare <c>typeof(Attribute)</c> excluded. Reported for <c>typeof</c>
-    ///     only: a name given as a string carries no type to categorize.
+    ///     <c>MustBeAttributedWith</c>, <c>MustNotBeAttributedWith</c>, <c>MustCarry</c> and <c>MustNotCarry</c> a
+    ///     type deriving from <see cref="System.Attribute" />, bare <c>typeof(Attribute)</c> excluded. Reported for
+    ///     <c>typeof</c> only: a name given as a string carries no type to categorize.
     /// </summary>
     HierarchyAnchorWrongCategory,
 

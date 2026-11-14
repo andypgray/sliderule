@@ -142,9 +142,9 @@ Errors you may see, verbatim, and what they mean:
 
 Turn every step-1 hypothesis and every stated-intent line the language can express into a rule, and write the rule's ID onto the line it came from. Do not pre-judge postures — the checker assigns the evidence in step 4; postures come in step 5. **Author the already-true directions too**: every layer pair the survey's edge matrix shows clean becomes an Enforce candidate — the cheapest law you will ever get. Where a project reference already runs the other way, MSBuild forbids the pair as a cycle, so state the direction as `core.MustOnlyReference(shared)` or `core.MustOnlyReferenceItself()` instead: that also binds the next project added.
 
-Define each layer by whatever honestly says where it is. A namespace cone where the namespaces are disciplined; `arch.Project("MyApp.Web")` where the unit of architecture is the assembly, or where the survey's `multiplyDeclaredTypes[]` or a shared `RootNamespace` says the namespaces do not separate the projects; a refinement — `core.InNamespace("MyApp.Core.Model.*")` — where one cone nests inside another and a glob would swallow it. A layer names exactly what its definition names and checks identically to it, so the choice costs nothing at the checker and buys the row, the card and the collective voice.
+Define each layer by whatever honestly says where it is. A namespace cone where the namespaces are disciplined; `arch.Project("MyApp.Web")` where the unit of architecture is the assembly, or where the survey's `multiplyDeclaredTypes[]` or a shared `RootNamespace` says the namespaces do not separate the projects; a refinement — `core.InNamespace("MyApp.Core.Model.*")` — where one cone nests inside another and a glob would swallow it.
 
-Give each layer a `.Purpose(prose)`: one sentence on what the layer is for, lifted from the stated-intent line that already says it. It renders into the layer's module-map row and its card, so the sentence that rotted in a document now sits beside the definition it describes and re-renders with it.
+Give each layer a `.Purpose(prose)`: one sentence on what the layer is for, lifted from the stated-intent line that already says it. It renders into the layer's module-map row and its card.
 
 ```csharp
 Layer domain = arch.Layer("Domain", "MyApp.Domain.*").Purpose("Domain holds the order and customer model.");
@@ -174,7 +174,7 @@ Then draft one candidate for each question the codebase answers yes to, and answ
 - **`async`: Are async methods named `*Async`?** `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")`, where the codebase names them so. **On an MVC estate, take the controllers out first** — `web.Except(arch.Types.DerivedFrom("Microsoft.AspNetCore.Mvc.ControllerBase")).Methods.Returning(typeof(Task), typeof(Task<>)).MustHaveSuffix("Async")`, or `System.Web.Mvc.Controller` on .NET Framework — because action methods are named for their routes and can be nearly every violation the rule reports.
 - **`cancellation`: Do `Task`-returning methods take a `CancellationToken`?** `web.Methods.Returning(typeof(Task), typeof(Task<>)).MustAcceptParameter(typeof(CancellationToken))`, where most already do. Matching is declaration-level and exact (a `CancellationToken?` parameter does not count), and whether a body *flows* the token is not this rule's question.
 - **`members`: Which members are banned?** `domain.MustNotUse(() => DateTime.Now, () => DateTime.UtcNow)` where timestamps persist or compare and a clock seam exists; likewise blocking waits on async paths (`arch.Member(typeof(Task), "Wait")`) and ambient configuration (`Environment.GetEnvironmentVariable`) where a settings type exists. Not for a member the code has no alternative to.
-- **`attributes`: Must a set of types or actions carry an attribute?** `web.WithSuffix("Controller").MustBeAttributedWith("MyApp.Web.AuthorizeAdminAttribute")`, where a guide prescribes one (authorization, area, antiforgery) or nearly every member of the set carries it; on actions, `web.Methods.AttributedWith("Microsoft.AspNetCore.Mvc.HttpPostAttribute").MustBeAttributedWith(…)`. Not for what a framework convention applies unwritten. Only attributes declared on the type itself count. For one a shared base declares, rule that the set `MustDeriveFrom` the base and the base `MustBeAttributedWith` it. Concrete intermediate bases are subjects too.
+- **`attributes`: Must a set of types or actions carry an attribute?** `web.WithSuffix("Controller").MustBeAttributedWith("MyApp.Web.AuthorizeAdminAttribute")`, where a guide prescribes one (authorization, area, antiforgery) or nearly every member of the set carries it; on actions, `web.Methods.AttributedWith("Microsoft.AspNetCore.Mvc.HttpPostAttribute").MustBeAttributedWith(…)`. Not for what a framework convention applies unwritten. These read declared attributes; `MustCarry`, `MustNotCarry` and `.Carrying` also count one a base declares whose `AttributeUsage` lets it inherit.
 - **`construction`: Must a set of types arrive through one root?** `arch.Types.Except(arch.Type<HandlerRegistry>()).MustNotConstruct(arch.Types.Implementing(typeof(IHandler<>)))`: handlers or services resolved through a container may be *referenced* but never *constructed* outside the root the `.Except` names. Not for plain values the code is meant to `new`.
 - **`captive`: Does a singleton capture a shorter-lived service?** `arch.Registered(Lifetime.Singleton).MustNotInject(arch.Registered(Lifetime.Scoped))`. Add `arch.Registered(Lifetime.Transient)` only where the transients are disposable or hold state: a stateless transient held by a singleton is harmless. **Registrations are read from every solution project, test projects included**, and membership is per type, so a test host that registers a product service as a singleton makes it one for this rule. Before calling a hit captive, find where its singleton registration is: `arch_explain` with `type` lists each registration's file and line, an instance whose type argument is inferred included; where only a test project makes it one, `.Except` that type (or the test project's own types) and say so in the `Because`. A test registration can put a type on the operand end too, which `arch_explain` lists the same way: check both ends of a hit. Not where registration goes through calls the checker cannot see (Semantics, below): an empty-subject failure here means exactly that, so drop the rule rather than guessing.
 - **`family`: Is there a family of like units — plugins, modules, bounded contexts, one project or one layer each?** The law that every unit keeps to itself is one rule over the family, not one per unit. `arch.Each(arch.Projects.Matching("MyApp.Plugin.*")).MustNotReferenceEachOther()` says no plugin reaches another; `arch.Each(dispatch, tracking, invoicing).Except(<each module's Contracts cone>).MustOnlyBeReferencedByItself()` says each module's internals are reached only from its own module; `arch.Each(a, b, c).MustNotHaveCircularReferences()` says the units may reference each other but never in a circle — the law for peers whose order nobody has stated, and the first law to write on an estate before its order is known (layers only: MSBuild already forbids a circle among projects). On a family, "itself" and "their own" mean the cell — the whole layer or project the type sits in, as declared — so the `MustOnly*` verbs read the same way per cell, and the survey's edge matrix over the family's projects is the evidence. One rule, one ID, one baseline; write one rule per cell only where each cell needs its own `Because` or `Fix`. To excuse some types, `.Except` them from the family rather than dropping their cell: a dropped cell is guarded by nothing.
@@ -307,7 +307,7 @@ candidate: naming -> none: 9 of 31 handler types end in Handler
 candidate: async -> naming/async-suffix
 candidate: cancellation -> none: 3 of 212 Task-returning methods take a CancellationToken
 candidate: members -> time/no-wall-clock
-candidate: attributes -> none: no guide prescribes one; 12 of 40 controllers carry [Authorize]
+candidate: attributes -> none: no guide prescribes one; 12 of 40 controllers declare [Authorize]
 candidate: construction -> none: no container; services are constructed where used
 candidate: captive -> none: no registration call in source
 candidate: family -> none: no set of like units
@@ -384,6 +384,7 @@ line.
 | `.Implementing` | `(Type)` · `(string)` · `<T>()` | Types implementing `IHandler<T>` |
 | `.DerivedFrom` | `(Type)` · `(string)` · `<T>()` | Types derived from `ControllerBase` |
 | `.AttributedWith` | `(Type)` · `(string)` · `<T>()` | Types attributed with `[ApiController]` |
+| `.Carrying` | `(Type)` · `(string)` · `<T>()` | Types carrying `[ApiController]` |
 | `.Except` | `(Selection, …)` · `(Type, …)` | Types, except `HandlerRegistry` |
 | `.Where` | `(Func<ITypeInfo, bool>, string)` | Types that implement more than three interfaces |
 | `.Authored` | `()` | Authored types |
@@ -425,9 +426,11 @@ line.
 | `.MustImplement` | `(Type)` · `(string)` · `<T>()` | must implement `IBillingFacade` |
 | `.MustDeriveFrom` | `(Type)` · `(string)` · `<T>()` | must derive from `ControllerBase` |
 | `.MustBeAttributedWith` | `(Type)` · `(string)` · `<T>()` | must be attributed with `[ApiController]` |
+| `.MustCarry` | `(Type)` · `(string)` · `<T>()` | must carry `[ApiController]` |
 | `.MustNotImplement` | `(Type, …)` · `(string, …)` · `<T>()` | must not implement `IBillingFacade` or `IHandler<T>` |
 | `.MustNotDeriveFrom` | `(Type, …)` · `(string, …)` · `<T>()` | must not derive from `ControllerBase` |
 | `.MustNotBeAttributedWith` | `(Type, …)` · `(string, …)` · `<T>()` | must not be attributed with `[ApiController]` or `[Serializable]` |
+| `.MustNotCarry` | `(Type, …)` · `(string, …)` · `<T>()` | must not carry `[ApiController]` or `[Serializable]` |
 | `.MustBeSealed` | `()` | must be sealed |
 | `.MustBeStatic` | `()` | must be static |
 | `.MustBeAbstract` | `()` | must be abstract |
@@ -551,8 +554,8 @@ and several are both red. Write `among:` and `named:` as named arguments at ever
 candidate homes with `arch.AnyOf`. `MustBeRegistered()` is the completeness half beside
 `MustNotInject`'s shape half; membership is `arch.Registered()`'s exactly, so a registration the
 checker cannot see reds a correctly registered type. `MustImplement`, `MustDeriveFrom` and
-`MustBeAttributedWith` take one anchor; `MustNotImplement`, `MustNotDeriveFrom` and
-`MustNotBeAttributedWith` take one or more and red a subject matching any of them.
+`MustBeAttributedWith` and `MustCarry` take one anchor; `MustNotImplement`, `MustNotDeriveFrom`,
+`MustNotBeAttributedWith` and `MustNotCarry` take one or more and red a subject matching any of them.
 `MustHaveNameMatching(glob)` is the glob form beside the suffix and prefix verbs. The shape verbs
 `MustBeStatic`, `MustBeAbstract`, `MustBeRecords`, `MustBePublic` and `MustBeInternal` carry C# declaration semantics:
 a static class is neither sealed nor abstract, and an interface is abstract.
@@ -584,8 +587,8 @@ fact is evaluated rather than parsed, so a violation points at the declaration t
 `arch.Projects.Matching("MyApp.*").Except(arch.Projects.Named("MyApp.Cli")).MustNotBePackable()` —
 *"Projects matching `MyApp.*`, except project `MyApp.Cli`, must not be packable."*
 
-The **string overload** on every hierarchy, attribute and member type anchor position — the three
-adjectives, the `Must[Not]Implement` / `Must[Not]DeriveFrom` / `Must[Not]BeAttributedWith`
+The **string overload** on every hierarchy, attribute and member type anchor position — the four
+adjectives, the `Must[Not]Implement` / `Must[Not]DeriveFrom` / `Must[Not]BeAttributedWith` / `Must[Not]Carry`
 verbs, and `.Returning` / `MustAcceptParameter` on a member subject — is the escape hatch
 for a type the spec project cannot compile against, and it renders
 byte-identically to the `typeof()` form. Reach for it whenever a reference on the spec project
@@ -668,6 +671,6 @@ same (source, caught) edge, so a baseline entry means the same thing under any o
 `Implementing`/`DerivedFrom`
 are transitive with type-argument substitution; an open generic (`typeof(IHandler<>)`)
 matches any construction. The `MustNot*`
-hierarchy verbs share these and `AttributedWith`'s matcher, negated per subject over the anchor list (a
+hierarchy verbs share these and `AttributedWith`'s or `.Carrying`'s matcher, negated per subject over the anchor list (a
 subject reds iff it matches ANY anchor). Closed generics are
 refused in reference positions — ban the open definition and/or the argument type.

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using Shouldly;
 using SlideRule.Checking;
@@ -357,20 +358,25 @@ public sealed class CheckerSemanticsTests
                 + "meant to spare is reported as a violation.");
     }
 
-    [Fact]
-    public void TargetException_ByAHierarchyAdjectiveOverAPackageType_WarnsAsStricterThanWritten()
+    // A package's type carries no base list and no attributes here, so neither adjective ever matches it, whatever
+    // the noun.
+    [Theory]
+    [InlineData("derived", "types in `System.Text` derived from `Object`")]
+    [InlineData("carrying", "types in `System.Text` carrying `[DebuggerDisplay]`")]
+    public void TargetException_ByAHierarchyAdjectiveOverAPackageType_WarnsAsStricterThanWritten(
+        string adjective, string exception)
     {
-        // A package's type carries no base list here, so DerivedFrom never matches it, whatever the noun.
         RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
                 arch.Rule("text/no-builders")
                     .Enforce(arch.Namespace("App.Domain.*")
                         .MustNotReference(arch.Namespace("System.Text")
-                            .Except(arch.Namespace("System.Text").DerivedFrom(typeof(object)))))
+                            .Except(adjective == "derived"
+                                ? arch.Namespace("System.Text").DerivedFrom(typeof(object))
+                                : arch.Namespace("System.Text").Carrying(typeof(DebuggerDisplayAttribute)))))
                     .Because("b"))
             .Single();
 
-        result.ShouldHaveWarnedStricterException(
-                "types in `System.Text`", "types in `System.Text` derived from `Object`")
+        result.ShouldHaveWarnedStricterException("types in `System.Text`", exception)
             .Hint!.ShouldStartWith("`arch.Types` holds only the types this solution declares");
     }
 

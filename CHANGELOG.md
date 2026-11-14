@@ -55,6 +55,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loading, extraction and the cache write to the check and the report, then the total and the time the process
   took to start. Its last line gives the cache verdict and how many of the solution's projects the run extracted.
   Stdout, the `--json` document and every report file are the same with or without it.
+- `.Carrying(...)`, `MustCarry(...)` and `MustNotCarry(...)` read an attribute declared on a type or inherited
+  from a base type, as reflection's `GetCustomAttributes(inherit: true)` and ASP.NET Core read it. An attribute
+  on a base counts when the attribute class's own `[AttributeUsage]` leaves `Inherited` true, the default, and
+  bases from packages and the framework count too. "Management controllers carry `[Authorize]`" is one rule
+  where it took two: `MustDeriveFrom` the base and the base `MustBeAttributedWith` the attribute.
+  `AttributedWith` and `Must[Not]BeAttributedWith` still read the type's own declaration only. Each form takes
+  a `typeof`, a string and a generic argument. The build analyzer leaves the three to `check`, because a base
+  another project declares reaches a build as that project's assembly, which does not carry every attribute
+  its source declares. The root `AGENTS.md` block adds a `carry =` line to its glossary when a rule uses them.
+  A 0.3.0 build analyzer refuses a `sliderule.model.json` that holds one.
 
 ### Changed
 
@@ -78,6 +88,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `<ImportDirectoryBuildTargets>false</ImportDirectoryBuildTargets>` there. An `IDE` code-style error on a
   spec file, not only IDE0073, gets the fix its message names, such as an expression-bodied `Define` for
   IDE0022.
+- The `derive_spec` recipe's `attributes` question names `MustCarry`, `MustNotCarry` and `.Carrying` for an
+  attribute a base passes down, in place of the two-rule spelling it taught.
+- The root `AGENTS.md` block's `registered =` glossary line now also appears when the `Registered` noun stands
+  only in a layer's definition, which the block prints.
 
 ### Fixed
 

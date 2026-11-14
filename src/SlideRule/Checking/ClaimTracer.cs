@@ -209,6 +209,9 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
                 new ClaimStep($"it derives from {derivedFrom.Anchor.BacktickedName()}"),
             AttributedWithAdjective attributedWith =>
                 new ClaimStep($"it is attributed with {attributedWith.Anchor.BacktickedAttributeName()}"),
+            CarryingAdjective carrying => SelectionEvaluator.AttributeMatcher(carrying.Anchor)(type)
+                ? new ClaimStep($"it is attributed with {carrying.Anchor.BacktickedAttributeName()}")
+                : new ClaimStep($"it inherits {carrying.Anchor.BacktickedAttributeName()} from a base type"),
             ExceptAdjective except => new ClaimStep($"outside the except: {except.Payload.ReferenceProse()}"),
             WhereAdjective where => new ClaimStep($"it passes the predicate \"{where.Description}\""),
             AuthoredAdjective => new ClaimStep("it is authored, not generated"),
@@ -266,6 +269,8 @@ internal sealed class ClaimTracer(CodebaseModel model, SolutionRoot? root = null
             AttributedWithAdjective attributedWith =>
                 new ClaimStep(
                     $"it is not attributed with {attributedWith.Anchor.BacktickedAttributeName()}"),
+            CarryingAdjective carrying =>
+                new ClaimStep($"it does not carry {carrying.Anchor.BacktickedAttributeName()}, declared or inherited"),
             // The removal is the surprise this trace exists to explain, so the payload's own trace says why
             // the type is in it — read in target position, where an Except payload is always resolved.
             ExceptAdjective except => new ClaimStep(

@@ -46,6 +46,30 @@ public class GenericSugarTests
     }
 
     [Fact]
+    public void Carrying_Generic_ReifiesIdenticallyToTypeof()
+    {
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.Carrying<SugarAttribute>().MustBeSealed(),
+            arch => arch.Types.Carrying(typeof(SugarAttribute)).MustBeSealed());
+    }
+
+    [Fact]
+    public void MustCarry_Generic_ReifiesIdenticallyToTypeof()
+    {
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.MustCarry<SugarAttribute>(),
+            arch => arch.Types.MustCarry(typeof(SugarAttribute)));
+    }
+
+    [Fact]
+    public void MustNotCarry_Generic_ReifiesIdenticallyToTypeof()
+    {
+        Checker.ShouldReifyAlike(
+            arch => arch.Types.MustNotCarry<SugarAttribute>(),
+            arch => arch.Types.MustNotCarry(typeof(SugarAttribute)));
+    }
+
+    [Fact]
     public void MustImplement_Generic_ReifiesIdenticallyToTypeof()
     {
         Checker.ShouldReifyAlike(

@@ -115,7 +115,7 @@ internal sealed class DeadExceptions
     {
         return piece.Noun is TypesNoun
                || piece.Adjectives.Any(adjective => adjective is ImplementingAdjective or DerivedFromAdjective
-                   or AttributedWithAdjective or UnderAdjective);
+                   or AttributedWithAdjective or CarryingAdjective or UnderAdjective);
     }
 
     // A pointer that removes nothing names something gone or misplaced.

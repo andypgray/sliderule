@@ -335,6 +335,9 @@ internal static class ModelDump
         builder.Append("  attrConstructions=[")
             .Append(string.Join(", ", type.AttributeConstructions.Select(RenderConstruction)))
             .AppendLine("]");
+        builder.Append("  inheritedAttributes=[")
+            .Append(RenderAttributes(type.InheritedAttributes))
+            .AppendLine("]");
     }
 
     private static string RenderSites(IReadOnlyList<SourceLocation> sites)

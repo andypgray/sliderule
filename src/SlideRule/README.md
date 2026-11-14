@@ -136,8 +136,8 @@ type, it offers what the projects your spec references declare, one dotted segme
 the opening quote of `arch.Namespace("")` and the top-level namespaces appear, each with a `.*` form
 for the whole subtree. Type a dot and the next segment follows.
 
-`Named` offers simple type names. The filters `Implementing`, `DerivedFrom`, `AttributedWith` and
-`Returning`, the `Must*` verbs of the first three, and `MustAcceptParameter` take a type's full name. They
+`Named` offers simple type names. The filters `Implementing`, `DerivedFrom`, `AttributedWith`, `Carrying`
+and `Returning`, the `Must*` verbs of the first four, and `MustAcceptParameter` take a type's full name. They
 offer the types each one can match, spelled as a report prints them, generic parameters included.
 Names from the projects your spec references sort above everything else the compilation can see.
 

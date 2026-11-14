@@ -57,6 +57,16 @@ internal static class OneProjectDecidability
         "Selects other types by attribute, and a project compiled against another's assembly does not see "
         + "every attribute its source declares.";
 
+    /// <summary>
+    ///     An attribute read through the base chain, on either side: an own subject inherits from a base another
+    ///     project declares, and that base is read from its image here and from its source in the whole-solution
+    ///     check, the gap <see cref="AttributedWithReason" /> measured. The extractor still records the fact in
+    ///     this view, so a row moved to decidable is judged against a populated list.
+    /// </summary>
+    private const string CarriedAttributeReason =
+        "Reads attributes a type inherits, and a base another project declares is read from that project's "
+        + "assembly, which does not carry every attribute its source declares.";
+
     private const string RecordReason =
         "Selects other types by whether they are records, and a project compiled against another's assembly "
         + "does not see that a record struct is one.";
@@ -401,6 +411,8 @@ internal static class OneProjectDecidability
         OutOnTargetSide(rows, AttributedWithReason, typeof(AttributedWithAdjective));
         OutOnTargetSide(rows, RecordReason, typeof(ThatAreRecordsAdjective));
 
+        Out(rows, CarriedAttributeReason, typeof(CarryingAdjective));
+
         // A side-keyed row of its own. The own project's types carry the paths of the files that declare them, so a
         // glob over them is decidable; another project's carry none here, so a glob can only exclude them. A ban
         // would survive that, but an allow-list and an Except payload, which stand on the same side, would not, and
@@ -470,6 +482,7 @@ internal static class OneProjectDecidability
             typeof(MustNotUseConstraint));
 
         Out(rows, RegisteredReason, typeof(MustBeRegisteredConstraint));
+        Out(rows, CarriedAttributeReason, typeof(MustCarryConstraint), typeof(MustNotCarryConstraint));
         Out(rows, AmongReason, typeof(MustNotReferenceEachOtherConstraint));
         Out(rows, CircleReason, typeof(MustNotHaveCircularReferencesConstraint));
         Out(rows, CounterpartReason, typeof(MustHaveExactlyOneCounterpartConstraint));

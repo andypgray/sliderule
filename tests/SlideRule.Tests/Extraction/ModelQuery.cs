@@ -204,13 +204,33 @@ internal static class ModelQuery
             .ToList();
     }
 
-    /// <summary>
-    ///     The member's declared attributes as (definition, constructed) name pairs, in recorded order — so a
-    ///     generic attribute's divergence is assertable as one value.
-    /// </summary>
+    /// <summary>The member's declared attributes, as <see cref="AttributeNames(IEnumerable{IAttributeInfo})" /> reads them.</summary>
     public static IReadOnlyList<(string Definition, string Constructed)> AttributeNames(this MemberNode member)
     {
-        return member.Attributes.Select(a => (a.DefinitionFullName, a.FullName))
+        return member.Attributes.AttributeNames();
+    }
+
+    /// <summary>
+    ///     The attributes as (definition, constructed) name pairs, in recorded order — so a generic attribute's
+    ///     divergence is assertable as one value.
+    /// </summary>
+    public static IReadOnlyList<(string Definition, string Constructed)> AttributeNames(this IEnumerable<IAttributeInfo> attributes)
+    {
+        return attributes.Select(a => (a.DefinitionFullName, a.FullName))
+            .ToList();
+    }
+
+    /// <summary>The constructed full names of <paramref name="attributes" />, in recorded order.</summary>
+    public static IReadOnlyList<string> ConstructedNames(this IEnumerable<IAttributeInfo> attributes)
+    {
+        return attributes.Select(a => a.FullName)
+            .ToList();
+    }
+
+    /// <summary>The definition full names of <paramref name="attributes" />, in recorded order.</summary>
+    public static IReadOnlyList<string> DefinitionNames(this IEnumerable<IAttributeInfo> attributes)
+    {
+        return attributes.Select(a => a.DefinitionFullName)
             .ToList();
     }
 

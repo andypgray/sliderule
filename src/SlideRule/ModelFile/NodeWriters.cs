@@ -135,6 +135,7 @@ internal static class NodeWriters
         Add<ImplementingAdjective>(arms, (w, a) => w.ConstructionAnchor("anchor", a.Anchor));
         Add<DerivedFromAdjective>(arms, (w, a) => w.ConstructionAnchor("anchor", a.Anchor));
         Add<AttributedWithAdjective>(arms, (w, a) => w.ConstructionAnchor("anchor", a.Anchor));
+        Add<CarryingAdjective>(arms, (w, a) => w.ConstructionAnchor("anchor", a.Anchor));
         Add<ExceptAdjective>(arms, (w, a) =>
         {
             w.Key("payload");
@@ -206,9 +207,11 @@ internal static class NodeWriters
         Subject<MustImplementConstraint>(arms, (w, c) => w.ConstructionAnchor("anchor", c.Anchor));
         Subject<MustDeriveFromConstraint>(arms, (w, c) => w.ConstructionAnchor("anchor", c.Anchor));
         Subject<MustBeAttributedWithConstraint>(arms, (w, c) => w.ConstructionAnchor("anchor", c.Anchor));
+        Subject<MustCarryConstraint>(arms, (w, c) => w.ConstructionAnchor("anchor", c.Anchor));
         Subject<MustNotImplementConstraint>(arms, (w, c) => w.ConstructionAnchors("anchors", c.Anchors));
         Subject<MustNotDeriveFromConstraint>(arms, (w, c) => w.ConstructionAnchors("anchors", c.Anchors));
         Subject<MustNotBeAttributedWithConstraint>(arms, (w, c) => w.ConstructionAnchors("anchors", c.Anchors));
+        Subject<MustNotCarryConstraint>(arms, (w, c) => w.ConstructionAnchors("anchors", c.Anchors));
 
         Subject<MustResideInNamespaceConstraint>(arms, (w, c) => w.Field("glob", c.Glob));
         Subject<MustResideInProjectConstraint>(arms, (w, c) => w.Field("projectName", c.ProjectName));

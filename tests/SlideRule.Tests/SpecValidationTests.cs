@@ -1089,6 +1089,23 @@ public class SpecValidationTests
                       "requires an attribute anchor (used by 'area/rule').");
     }
 
+    // The inherited verbs take the declared verbs' category rule, each named in its own steer; the negative's
+    // refused anchor is the second of its list.
+    [Fact]
+    public void HierarchyAnchorWrongCategory_NonAttributeOnEitherCarryVerb_IsReported()
+    {
+        SpecValidationException ex = ShouldFailToBuild(new NonAttributeCarriedAnchorSpec());
+
+        ex.ShouldHaveError(Code.HierarchyAnchorWrongCategory, "area/carry")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1692: 'System.Exception' does not derive from System.Attribute; MustCarry " +
+                      "requires an attribute anchor (used by 'area/carry').");
+        ex.ShouldHaveError(Code.HierarchyAnchorWrongCategory, "area/carry-not")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1695: 'System.Attribute' does not derive from System.Attribute; MustNotCarry " +
+                      "requires an attribute anchor (used by 'area/carry-not').");
+    }
+
     [Fact]
     public void HierarchyAnchorWrongCategory_InvalidAnchorInNegativeList_BesideMissingBecause_AreReportedInOnePass()
     {
@@ -1143,6 +1160,22 @@ public class SpecValidationTests
         ex.ShouldHaveError(Code.BlankPattern, "area/rule")
             .Message
             .ShouldBe("SpecValidationSpecs.cs:769: Blank attribute name on 'area/rule'.");
+    }
+
+    [Fact]
+    public void BlankPattern_BlankAttributeNameOnTheCarryAdjectiveAndVerbs_IsReported()
+    {
+        SpecValidationException ex = ShouldFailToBuild(new BlankCarriedNameSpec());
+
+        ex.ShouldHaveError(Code.BlankPattern, "area/carrying")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1705: Blank attribute name on 'area/carrying'.");
+        ex.ShouldHaveError(Code.BlankPattern, "area/carry")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1708: Blank attribute name on 'area/carry'.");
+        ex.ShouldHaveError(Code.BlankPattern, "area/carry-not")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1711: Blank attribute name on 'area/carry-not'.");
     }
 
     [Fact]

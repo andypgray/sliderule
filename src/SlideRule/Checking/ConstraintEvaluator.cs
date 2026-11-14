@@ -271,6 +271,10 @@ internal sealed class ConstraintEvaluator
                 return Shape(subjects, NoneOf(c.Anchors, SelectionEvaluator.BaseTypeMatcher));
             case MustNotBeAttributedWithConstraint c:
                 return Shape(subjects, NoneOf(c.Anchors, SelectionEvaluator.AttributeMatcher));
+            case MustCarryConstraint c:
+                return Shape(subjects, SelectionEvaluator.CarriedAttributeMatcher(c.Anchor));
+            case MustNotCarryConstraint c:
+                return Shape(subjects, NoneOf(c.Anchors, SelectionEvaluator.CarriedAttributeMatcher));
             case MustBeSealedConstraint:
                 return Shape(subjects, t => t.IsSealed);
             case MustBeStaticConstraint:

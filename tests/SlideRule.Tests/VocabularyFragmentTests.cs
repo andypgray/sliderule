@@ -235,6 +235,29 @@ public class VocabularyFragmentTests
     }
 
     [Fact]
+    public void MustCarry_StripsAttributeSuffixAndBrackets()
+    {
+        SentenceRenderer.Sentence(Arch.Types.MustCarry(typeof(ApiControllerAttribute)))
+            .ShouldBe("Types must carry `[ApiController]`.");
+    }
+
+    [Fact]
+    public void MustNotCarry_OrList_StripsAttributeSuffixBracketsAndJoins()
+    {
+        SentenceRenderer.Sentence(Arch.Types.MustNotCarry(typeof(ApiControllerAttribute), typeof(SerializableAttribute)))
+            .ShouldBe("Types must not carry `[ApiController]` or `[Serializable]`.");
+    }
+
+    [Fact]
+    public void CarryVerbs_StringAnchors_RenderTheTypeofSentences()
+    {
+        SentenceRenderer.Sentence(Arch.Types.MustCarry("SlideRule.Tests.Stubs.ApiControllerAttribute"))
+            .ShouldBe("Types must carry `[ApiController]`.");
+        SentenceRenderer.Sentence(Arch.Types.MustNotCarry("SlideRule.Tests.Stubs.ApiControllerAttribute", "System.SerializableAttribute"))
+            .ShouldBe("Types must not carry `[ApiController]` or `[Serializable]`.");
+    }
+
+    [Fact]
     public void MustNotBeAttributedWith_OrList_StripsAttributeSuffixBracketsAndJoins()
     {
         // Each anchor is Attribute-stripped and bracketed like the positive verb, joined as an or-list (§5.3, §6).

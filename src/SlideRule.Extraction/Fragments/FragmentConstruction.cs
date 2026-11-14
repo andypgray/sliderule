@@ -1,3 +1,5 @@
+using SlideRule.Codebase;
+
 namespace SlideRule.Extraction.Fragments;
 
 /// <summary>
@@ -5,4 +7,10 @@ namespace SlideRule.Extraction.Fragments;
 ///     (<c>N.IHandler&lt;T&gt;</c>) and the name as constructed (<c>N.IHandler&lt;N.Order&gt;</c>), which
 ///     coincide for a non-generic type.
 /// </summary>
-internal sealed record FragmentConstruction(string DefinitionFullName, string ConstructedName);
+internal sealed record FragmentConstruction(string DefinitionFullName, string ConstructedName)
+{
+    internal AttributeNode ToAttributeNode()
+    {
+        return new AttributeNode(DefinitionFullName, ConstructedName);
+    }
+}

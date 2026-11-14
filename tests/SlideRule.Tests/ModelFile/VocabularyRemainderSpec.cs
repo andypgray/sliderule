@@ -105,6 +105,19 @@ internal static class VocabularyRemainderSpec
             .Enforce(arch.Types.InNamespace("Remainder.Values.*")
                 .MustNotDeriveFrom(typeof(ControllerBase)))
             .Because("A value carried into the host is a value; one that is also a controller is bound to a request it knows nothing about.");
+
+        arch.Rule("remainder/controllers-carry-the-attribute")
+            .Enforce(arch.Types.InNamespace("Remainder.Api.*").MustCarry(typeof(ApiControllerAttribute)))
+            .Because("The framework reads the attribute through the base chain, so a base may carry it for its controllers.");
+
+        arch.Rule("remainder/internal-types-carry-no-serialization")
+            .Enforce(arch.Types.InNamespace("Remainder.Internal.*")
+                .MustNotCarry(typeof(SerializableAttribute), typeof(ApiControllerAttribute)))
+            .Because("An Internal type is free to change shape, which a serialized form would freeze.");
+
+        arch.Rule("remainder/carried-controllers-are-sealed")
+            .Enforce(arch.Types.Carrying(typeof(ApiControllerAttribute)).MustBeSealed())
+            .Because("A controller is the end of its chain; a base passes the attribute down, never a controller.");
     }
 
     private static void DefineNames(Arch arch)

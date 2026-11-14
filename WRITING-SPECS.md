@@ -81,6 +81,7 @@ A rule's subject is a selection of types, built from a starting set and narrowed
 | `arch.AnyOf(a, b)` | the union of selections |
 | `.DerivedFrom(...)`, `.Implementing(...)` | types by base type or interface |
 | `.AttributedWith(...)`, `.OfKind(...)` | types by attribute or by kind |
+| `.Carrying(...)` | types by attribute, declared or inherited from a base type |
 | `.Authored()` | the types a person wrote, without generated code |
 
 Namespace patterns are case-sensitive and match whole dot-separated segments. A trailing `.*` covers the namespace and every namespace below it, so `MyApp.Domain.*` includes `MyApp.Domain` itself. An interior `*` segment matches exactly one segment, a `*` inside a segment (`Legacy*`) matches within that segment, and a lone `*` matches everything. A pattern with a `*` before its trailing `.*`, such as `MyApp.*.Controllers.*`, can never match, so loading the spec reports it as an error. The contract package's analyzer flags it as `SR1017` while you type.

@@ -65,6 +65,12 @@ internal static class AgentContextRenderer
         "keyed-service registrations, assembly scanning, factory internals, wrappers compiled into packages and " +
         "framework defaults are not seen.";
 
+    // A paragraph of its own, as the Registered line is, because "carry" is no edge axis. The backticked names
+    // are literal output.
+    private const string GlossaryCarryLine =
+        "carry = declared on the type itself, or on a base type when the attribute's own `[AttributeUsage]` leaves " +
+        "`Inherited` true (the default), which is how reflection reads attributes.";
+
     private const string GlossaryTail = "Expand any rule ID with `sliderule explain <rule-id>` for its reason and fix.";
 
     // The axis clauses in emission order, each beside the fact that earns it.
@@ -111,7 +117,7 @@ internal static class AgentContextRenderer
     {
         Guard.NotNull(model, nameof(model));
 
-        bool needsRegisteredGlossary = model.Rules.Any(rule => rule.Constraint is { } constraint && NeedsRegisteredGlossary(constraint));
+        List<Selection> rendered = RenderedSelections(model).ToList();
         var sections = new List<string>
         {
             ProvenanceLine(specName),
@@ -122,7 +128,9 @@ internal static class AgentContextRenderer
 
         // The Registered glossary line gates independently of the axis clauses (a Registered noun can ride a
         // non-inject verb, and MustNotInject can ban a plain type), so it is its own paragraph (GRAMMAR §10).
-        if (needsRegisteredGlossary) sections.Add(GlossaryRegisteredLine);
+        if (NeedsRegisteredGlossary(model, rendered)) sections.Add(GlossaryRegisteredLine);
+
+        if (NeedsCarryGlossary(model, rendered)) sections.Add(GlossaryCarryLine);
 
         if (model.Layers.Count > 0) sections.Add(LayersSection(model.Layers));
 
@@ -150,17 +158,39 @@ internal static class AgentContextRenderer
         return string.Join("; ", clauses) + ". " + GlossaryTail;
     }
 
-    // True when a rule renders the word "registered" (GRAMMAR §10) — out of the VERB, which spells it with no
-    // noun to carry it, or out of a Registered noun in the subject or any operand. The noun half descends
-    // through Except payloads and the internal Quarantine union, since a Registered noun in any of those still
-    // renders the word in the block's prose and so must gate the glossary line. The descent is the shared
-    // SelectionWalk, so the block glosses exactly the nouns validation sees.
-    private static bool NeedsRegisteredGlossary(Constraint constraint)
+    // Every selection whose prose the block prints: each rule's subject and operands through the shared
+    // SelectionWalk (Except payloads and the internal Quarantine union included), so the block glosses exactly the
+    // nouns validation sees, and each layer's definition, which the layers section prints and no rule's walk
+    // reaches, because the walk stops at a layer noun.
+    private static IEnumerable<Selection> RenderedSelections(ArchitectureModel model)
     {
-        if (constraint is MustBeRegisteredConstraint) return true;
+        IEnumerable<Selection> ruleSelections = model.Rules
+            .Select(rule => rule.Constraint)
+            .OfType<Constraint>()
+            .SelectMany(constraint => constraint.Selections());
 
-        IEnumerable<Selection> selections = constraint.Selections();
-        return selections.Any(selection => selection.Noun is RegisteredNoun);
+        IEnumerable<Selection> layerSelections = model.Layers
+            .Select(layer => layer.Definition)
+            .OfType<Selection>()
+            .SelectMany(SelectionWalk.ExpandSelection);
+
+        return ruleSelections.Concat(layerSelections);
+    }
+
+    // True when the block prints the word "registered" (GRAMMAR §10): out of the verb, which spells it with no
+    // noun to carry it, or out of a Registered noun anywhere the block renders a selection.
+    private static bool NeedsRegisteredGlossary(ArchitectureModel model, IReadOnlyList<Selection> rendered)
+    {
+        return model.Rules.Any(rule => rule.Constraint is MustBeRegisteredConstraint)
+               || rendered.Any(selection => selection.Noun is RegisteredNoun);
+    }
+
+    // True when the block prints "carry" or "carrying": out of either verb, or out of the adjective anywhere the
+    // block renders a selection.
+    private static bool NeedsCarryGlossary(ArchitectureModel model, IReadOnlyList<Selection> rendered)
+    {
+        return model.Rules.Any(rule => rule.Constraint is MustCarryConstraint or MustNotCarryConstraint)
+               || rendered.Any(selection => selection.Adjectives.Any(adjective => adjective is CarryingAdjective));
     }
 
     /// <summary>Composes a quarantined scope's card for its own directory's <c>AGENTS.md</c>.</summary>

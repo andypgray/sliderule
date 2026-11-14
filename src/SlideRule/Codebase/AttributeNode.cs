@@ -1,8 +1,8 @@
 namespace SlideRule.Codebase;
 
 /// <summary>
-///     One attribute declared on a member in the extracted model (GRAMMAR §4.6): an entry of
-///     <see cref="MemberNode.Attributes" />.
+///     One attribute in the extracted model, recorded by name: an entry of <see cref="MemberNode.Attributes" />
+///     (GRAMMAR §4.6) or of <see cref="TypeNode.InheritedAttributes" />.
 /// </summary>
 internal sealed class AttributeNode : IAttributeInfo
 {

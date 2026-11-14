@@ -67,6 +67,19 @@ public sealed class UnresolvedSymbolExtractionTests
         external.IsExternal.ShouldBeTrue();
     }
 
+    // An unresolved attribute class has no readable usage, so a base wearing one passes it down under the default,
+    // as the declared fact keeps it rather than dropping it.
+    [Fact]
+    public void Extract_BaseCarryingUnresolvedAttribute_PassesItDownByName()
+    {
+        CodebaseModel model = CompilationFactory.Extract(
+            "namespace App;\n[Ghost.Marker]\npublic class Tagged { }\npublic class Child : Tagged { }\n");
+
+        model.Type("App.Child")
+            .InheritedAttributes.ShouldHaveSingle(
+                a => a.DefinitionFullName.StartsWith("Ghost.Marker", StringComparison.Ordinal), a => a.FullName);
+    }
+
     [Fact]
     public void Extract_UnresolvedExternal_KeepsAStableBaselineKeyAndTheClassFallback()
     {

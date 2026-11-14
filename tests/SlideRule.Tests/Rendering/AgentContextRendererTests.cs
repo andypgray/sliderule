@@ -615,6 +615,61 @@ public class AgentContextRendererTests
         block.ShouldNotContain("inject = a source-level constructor-parameter dependency");
     }
 
+    // The layers section prints a layer's definition, which no rule's selection walk reaches, so a Registered noun
+    // standing only there still gates the line.
+    [Fact]
+    public void RootBlock_WithRegisteredNounOnlyInALayerDefinition_EmitsTheRegisteredGlossaryLine()
+    {
+        ArchitectureModel model = Checker.Model(arch => arch.Rule("services/sealed")
+            .Enforce(arch.Layer("Services", arch.Registered()).MustBeSealed())
+            .Because("A registered service is composed, never extended."));
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+
+        block.ShouldContain("registered = named in a source-level container registration");
+    }
+
+    // Every place the block prints "carry" or "carrying" gates the line: either verb, the adjective on a subject,
+    // in an Except payload, or in a layer definition the rules name only by the layer.
+    [Theory]
+    [InlineData("verb")]
+    [InlineData("negative verb")]
+    [InlineData("subject")]
+    [InlineData("Except payload")]
+    [InlineData("layer definition")]
+    public void RootBlock_WithAnInheritedAttributeReading_EmitsTheCarryGlossaryLine(string where)
+    {
+        ArchitectureModel model = Checker.Model(arch => arch.Rule("marks/rule")
+            .Enforce(where switch
+            {
+                "verb" => arch.Types.MustCarry(typeof(ObsoleteAttribute)),
+                "negative verb" => arch.Types.MustNotCarry(typeof(ObsoleteAttribute)),
+                "subject" => arch.Types.Carrying(typeof(ObsoleteAttribute)).MustBeSealed(),
+                "Except payload" => arch.Types.Except(arch.Types.Carrying(typeof(ObsoleteAttribute))).MustBeSealed(),
+                _ => arch.Layer("Marked", arch.Types.Carrying<ObsoleteAttribute>()).MustBeSealed()
+            })
+            .Because("Reason."));
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+
+        block.ShouldContain(
+            "carry = declared on the type itself, or on a base type when the attribute's own `[AttributeUsage]` " +
+            "leaves `Inherited` true (the default), which is how reflection reads attributes.");
+    }
+
+    [Fact]
+    public void RootBlock_WithADeclaredAttributeReadingOnly_OmitsTheCarryGlossaryLine()
+    {
+        ArchitectureModel model = Checker.Model(arch => arch.Rule("marks/rule")
+            .Enforce(arch.Types.AttributedWith(typeof(ObsoleteAttribute))
+                .MustBeAttributedWith(typeof(SerializableAttribute)))
+            .Because("Reason."));
+
+        string block = AgentContextRenderer.RootBlock(model, "Spec");
+
+        block.ShouldNotContain("carry = ");
+    }
+
     [Fact]
     public void RootBlock_WithCaptiveDependencyRule_ComposesInjectClauseRegisteredLineAndTrueSubject()
     {
@@ -741,5 +796,6 @@ public class AgentContextRendererTests
         block.ShouldNotContain("catch = a source-level `catch`");
         block.ShouldNotContain("throw = a source-level `throw`");
         block.ShouldNotContain("expose = a public signature position");
+        block.ShouldNotContain("carry = ");
     }
 }

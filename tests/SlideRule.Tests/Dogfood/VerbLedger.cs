@@ -24,6 +24,10 @@ internal static class VerbLedger
         "The seams here are consumed by injection rather than inheritance, and the one true hierarchy " +
         "statement, that every *Constraint derives from Constraint, is already model/constraint-nodes.";
 
+    private const string AttributesAreDeclared =
+        "Every attribute law here is about a declaration, [McpServerToolType] on each tool type, and the " +
+        "released build analyzer this repository runs refuses a model file naming the inherited verbs.";
+
     /// <summary>The unused verbs, each keyed to the sentence saying why the self-spec does not use it.</summary>
     public static IReadOnlyDictionary<string, string> Unused { get; } =
         new Dictionary<string, string>(StringComparer.Ordinal)
@@ -51,6 +55,8 @@ internal static class VerbLedger
             [nameof(SelectionConstraints.MustNotBeAttributedWith)] =
                 "No attribute is forbidden here, and inventing a ban to exercise a verb is the contrivance " +
                 "this ledger refuses.",
+            [nameof(SelectionConstraints.MustCarry)] = AttributesAreDeclared,
+            [nameof(SelectionConstraints.MustNotCarry)] = AttributesAreDeclared,
             [nameof(SelectionConstraints.MustHaveNameMatching)] =
                 "The two naming laws here are a prefix and a suffix, which say it more exactly than a pattern.",
             [nameof(SelectionConstraints.MustOnlyBeReferencedByItself)] =

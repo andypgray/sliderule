@@ -45,7 +45,7 @@ public interface ITypeInfo
     /// <summary>
     ///     The attributes written on the type itself, each as the attribute type's own facts — so a
     ///     predicate reads <c>attribute.Name</c> (<c>ApiControllerAttribute</c>, suffix intact) or its
-    ///     namespace. Attributes a base type carries are not included, and the list is empty for a type
+    ///     namespace. Attributes a base type declares are not included, and the list is empty for a type
     ///     from a referenced package or the framework.
     /// </summary>
     IReadOnlyList<ITypeInfo> Attributes { get; }
@@ -104,7 +104,7 @@ public interface ITypeInfo
     ///     a person wrote is therefore authored, so a violation reported against it is one somebody can act
     ///     on. An external type (a package's, the framework's, or one from a project the check leaves out)
     ///     is judged by the attribute alone. Nothing is inferred from a file path, an <c>obj</c> directory
-    ///     or a naming convention, and a hand-written type carrying the attribute is reported generated.
+    ///     or a naming convention, and a hand-written type declaring the attribute is reported generated.
     /// </summary>
     bool IsGenerated { get; }
 
