@@ -1854,6 +1854,22 @@ jobs:
               exit 1
             }
           done
+      # explain opens no workspace for a spec passed as its built DLL, so it learns which project builds the DLL
+      # only from the record a check leaves in the cache. A line appended to the spec source after that check
+      # makes the cache read partial, and the sentence must still reach the answer.
+      - name: Explain through this solution's built spec DLL reports a stale spec once a check has recorded it
+        run: |
+          spec=arch/SlideRule.Architecture/bin/Debug/net10.0/SlideRule.Architecture.dll
+          source=arch/SlideRule.Architecture/SlideRuleArchitectureSpec.cs
+          dotnet run --no-build --project src/SlideRule.Cli -- check --spec "$spec" > /dev/null
+          printf '\n// appended after the build\n' >> "$source"
+          answer="$(dotnet run --no-build --project src/SlideRule.Cli -- explain layering/model-independent --spec "$spec")"
+          git checkout -- "$source"
+          printf '%s\n' "$answer"
+          grep -Fq "the spec project 'SlideRule.Architecture' differs from its last build" <<< "$answer" || {
+            echo "::error::explain --spec <the built spec DLL> printed no stale-spec sentence after the spec source changed, so the check's recorded resolution was not replayed"
+            exit 1
+          }
 
   # The action as an adopter on Windows runs it: installed at a released version through its install step,
   # against a solution below the repository root. self-check covers neither, since it is ubuntu, runs the CLI

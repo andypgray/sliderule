@@ -8,8 +8,8 @@ namespace SlideRule.Tests.Cli;
 /// <summary>
 ///     <c>explain</c> against the persisted extraction cache, over the one fixture that declares a spec
 ///     project (<see cref="LayoutAppFixture" />) and therefore the only bed where explain resolves by
-///     convention against a real workspace — a prebuilt DLL <c>--spec</c> answers on the fast path and
-///     never reaches a cache at all.
+///     convention against a real workspace. A spec passed as its built DLL reads the cache only for the record
+///     naming the project that builds it, which <see cref="StaleSpecE2ETests" /> covers.
 /// </summary>
 /// <remarks>
 ///     <para>

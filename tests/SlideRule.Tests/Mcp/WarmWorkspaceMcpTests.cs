@@ -628,6 +628,27 @@ public sealed class WarmWorkspaceMcpTests
     }
 
     [Fact]
+    public async Task ArchExplain_SpecBoundByItsBuiltDll_PutsTheSentenceAboveTheAnswerOnceTheWorkspaceIsLoaded()
+    {
+        // The server bypasses the persisted cache, so before a call loads the workspace the rule form answers from
+        // the DLL alone and nothing says which project builds it; once one has, the session's resolution says.
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
+        using ScopedFile edit = LayoutAppFixture.EditSpecAfterBuild(workspace);
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(workspace.SolutionPath, LayoutAppFixture.BuiltSpecDll(workspace)), Ct);
+        var session = harness.Services.GetRequiredService<WorkspaceSession>();
+        var arguments = new Dictionary<string, object?> { ["ruleId"] = LayoutAppFixture.RuleId };
+
+        string unloaded = await ShouldAnswerAsync(harness, "arch_explain", arguments);
+        session.IsLoaded(workspace.SolutionPath).ShouldBeFalse();
+
+        await ShouldAnswerArchCheckAsync(harness);
+        string loaded = await ShouldAnswerAsync(harness, "arch_explain", arguments);
+
+        loaded.ShouldBe(LayoutAppFixture.StaleSpecSentence + Environment.NewLine + Environment.NewLine + unloaded);
+    }
+
+    [Fact]
     public async Task ArchCheck_CommentLinesInsertedOnDisk_RemapsSitesAndMatchesColdCli()
     {
         // Arrange — a warm server bound to the violated spec, whose rules red several sites inside

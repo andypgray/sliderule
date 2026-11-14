@@ -646,7 +646,7 @@ Under `--json`, the stderr line omits `warning:`. Check and status documents inc
 
 Checksum comparison needs a portable PDB embedded in the DLL or stored next to it with a matching ID. At least one source listed in the PDB must exist locally. SlideRule compares the recorded SHA-1 or SHA-256 checksums, reporting changed or missing sources. A checkout, a touch or an edit reverted to the original bytes does not count. A `.cs` file under the project directory that the build did not compile counts as added only when written after the DLL.
 
-Without a usable portable PDB, or when none of its sources exists locally, comparison uses file times. A source written after the DLL then counts as newer. Generated sources under the project's `bin` and `obj` build-output directories, nested projects' sources, the project file and its imports are excluded. A DLL that no declared project builds names no project and is never compared. `explain <rule-id>` loads a DLL spec without the solution, so it never compares one.
+Without a usable portable PDB, or when none of its sources exists locally, comparison uses file times. A source written after the DLL then counts as newer. Generated sources under the project's `bin` and `obj` build-output directories, nested projects' sources, the project file and its imports are excluded. A DLL that no declared project builds names no project and is never compared. `explain <rule-id>` and `baseline rename` load a DLL spec without opening the solution. They compare it when an earlier run's cache records the project that builds it, and in the MCP server once its workspace is loaded. Before then they do not compare it, and neither does `explain --no-cache`.
 
 ### The settings file
 

@@ -54,6 +54,11 @@ internal sealed class CountingSolutionSource(ISolutionSource inner) : ISolutionS
         return Recorded(await inner.AcquireClosureAsync(solutionPath, projectFiles, ct));
     }
 
+    public bool HoldsLoaded(string solutionPath)
+    {
+        return inner.HoldsLoaded(solutionPath);
+    }
+
     private SolutionHandle Recorded(SolutionHandle handle)
     {
         Loads.Add((handle.IsClosure, handle.Solution.Projects.Select(project => project.Name).ToHashSet(StringComparer.Ordinal)));

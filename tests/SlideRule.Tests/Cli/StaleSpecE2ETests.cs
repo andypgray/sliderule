@@ -11,7 +11,8 @@ namespace SlideRule.Tests.Cli;
 ///     A spec source edited after its project's last build, run through the real CLI over the LayoutApp fixture,
 ///     whose solution declares a spec project: the warning on stderr and in a clean hook run's output, the sentence
 ///     above <c>explain</c>'s answer, the <c>staleSpec</c> stamp in the documents, on a cold run and on a cache hit,
-///     and the silence of a spec passed as its DLL.
+///     the same for a spec passed as its built DLL, and the silence of the DLL form where no run has recorded which
+///     project builds it.
 /// </summary>
 /// <remarks>
 ///     The edit adds a member to the spec class and changes no rule, so the verdict stays green and the warning is
@@ -108,6 +109,71 @@ public sealed class StaleSpecE2ETests
 
         result.Exit.ShouldNotBe(0, customMessage: result.Err);
         result.Out.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(true)] // the recording check sees the edit, so the explain's cache read is a hit
+    [InlineData(false)] // the edit lands after the recording check, so the explain's read is partial
+    public async Task Explain_SpecPassedAsItsBuiltDll_PutsTheSentenceAboveTheAnswerOnceACheckHasRecordedIt(
+        bool editBeforeTheRecordingCheck)
+    {
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
+        using var cache = new TempCacheRoot("stale-spec");
+        string dll = LayoutAppFixture.BuiltSpecDll(workspace);
+        string[] explain = ["explain", LayoutAppFixture.RuleId, workspace.SolutionPath, "--spec", dll];
+        CliResult fresh = await RunColdAsync(cache.Root, explain);
+        fresh.ShouldSucceed();
+
+        using ScopedFile? earlyEdit = editBeforeTheRecordingCheck ? LayoutAppFixture.EditSpecAfterBuild(workspace) : null;
+        await ShouldRecordTheDllWithACheckAsync(cache.Root, workspace, dll);
+        using ScopedFile? lateEdit = editBeforeTheRecordingCheck ? null : LayoutAppFixture.EditSpecAfterBuild(workspace);
+        CliResult stale = await RunColdAsync(cache.Root, explain);
+
+        stale.Out.ShouldBe(LayoutAppFixture.StaleSpecSentence + Environment.NewLine + Environment.NewLine + fresh.Out);
+        stale.Err.ShouldBe(Warning + Environment.NewLine);
+        stale.Loads.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData(false)] // no run has recorded which project builds the DLL
+    [InlineData(true)] // one has, and --no-cache leaves the record unread
+    public async Task Explain_SpecPassedAsItsBuiltDll_WithNoRecordRead_AnswersWithoutTheSentenceAndLoadsNothing(
+        bool recordedAndBypassed)
+    {
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
+        using var cache = new TempCacheRoot("stale-spec");
+        using ScopedFile edit = LayoutAppFixture.EditSpecAfterBuild(workspace);
+        string dll = LayoutAppFixture.BuiltSpecDll(workspace);
+        if (recordedAndBypassed) await ShouldRecordTheDllWithACheckAsync(cache.Root, workspace, dll);
+
+        string[] noCache = recordedAndBypassed ? ["--no-cache"] : [];
+        CliResult result = await RunColdAsync(
+            cache.Root, ["explain", LayoutAppFixture.RuleId, workspace.SolutionPath, "--spec", dll, .. noCache]);
+
+        result.ShouldSucceed();
+        result.Out.ShouldNotContain(LayoutAppFixture.StaleSpecSentence);
+        result.Err.ShouldBeEmpty();
+        result.Loads.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task BaselineRename_SpecPassedAsItsBuiltDll_WarnsOnStderrOnceACheckHasRecordedIt()
+    {
+        // The rename refuses on its own file work, after the spec has loaded, so the warning is all it writes first.
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
+        using var cache = new TempCacheRoot("stale-spec");
+        using ScopedFile edit = LayoutAppFixture.EditSpecAfterBuild(workspace);
+        string dll = LayoutAppFixture.BuiltSpecDll(workspace);
+        await ShouldRecordTheDllWithACheckAsync(cache.Root, workspace, dll);
+
+        CliResult result = await RunColdAsync(
+            cache.Root, "baseline", "rename", workspace.SolutionPath, "--spec", dll,
+            "--from", "layout/old-name", "--to", LayoutAppFixture.RuleId);
+
+        result.ShouldRefuseWithExactly(
+            Warning + Environment.NewLine
+                    + $"rule '{LayoutAppFixture.RuleId}' is not ratcheted — only Migrate and Quarantine containment rules carry baselines.");
+        result.Loads.ShouldBe(0);
     }
 
     [Fact]

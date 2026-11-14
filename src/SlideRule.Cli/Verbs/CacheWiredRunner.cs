@@ -109,19 +109,20 @@ internal abstract class CacheWiredRunner(
 
     /// <summary>
     ///     The spec's model alone, for a verb that reads the spec and never the code, with the solution directory
-    ///     when <paramref name="needsSolutionDirectory" /> asks for it (null otherwise on the built-DLL path), and
-    ///     the spec's <see cref="CodebaseSource.StaleSpec" /> verdict, null on the built-DLL path; a verdict that is
+    ///     (null only on the built-DLL path when no solution is found and <paramref name="needsSolutionDirectory" />
+    ///     did not require one), and the spec's <see cref="CodebaseSource.StaleSpec" /> verdict; a verdict that is
     ///     not null comes with a solution directory that is not null either.
     /// </summary>
     /// <remarks>
-    ///     A built-DLL spec resolves without ever opening the solution, so this path never asks whether the DLL
-    ///     is a member's built output and reports no stale verdict for it. The model still comes through the source,
-    ///     so a warm host serves its cached one rather than reloading the DLL per call. When the directory is
-    ///     wanted the solution is discovered first, so a missing solution is the error reported before a bad DLL.
     ///     A convention or csproj spec is resolved through the shared acquisition seam, which replays a cached
     ///     resolution or loads the workspace for resolution alone and never extracts, so the model is the model
     ///     every other verb would have loaded; its diagnostics are composed like every other verb's, so the
-    ///     MSBuild-selection note accompanies the load failures.
+    ///     MSBuild-selection note accompanies the load failures. A built-DLL spec never makes this path load a
+    ///     workspace: whether the DLL is a member's built output, and so whether its sources are compared, is
+    ///     answered by what is already on hand, a warm source holding the solution loaded (which takes the shared
+    ///     seam) or the resolution a validated cache recorded for the DLL, and otherwise left unasked with no
+    ///     verdict. A missing DLL is refused first; when the directory is required the solution is discovered
+    ///     next, so a missing solution is reported before a DLL that fails to load.
     /// </remarks>
     protected async Task<(ArchitectureModel Model, string? SolutionDirectory, StaleSpec? StaleSpec)> LoadSpecModelAsync(
         string? solution, string? spec, string workingDirectory, bool noCache, bool needsSolutionDirectory,
@@ -130,15 +131,11 @@ internal abstract class CacheWiredRunner(
         SpecResolution? withoutSolution = SpecResolver.TryResolveWithoutSolution(spec);
         if (withoutSolution is not null)
         {
-            string? anchor = null;
-            if (needsSolutionDirectory)
-            {
-                string solutionPath = ModelPipeline.DiscoverSolution(solution, workingDirectory, Environment);
-                anchor = SolutionProjectFileParser.AnchorDirectory(solutionPath);
-            }
-
-            ArchitectureModel model = SolutionSource.LoadSpecModel(withoutSolution.DllPath);
-            return (model, anchor, null);
+            string? solutionPath = needsSolutionDirectory
+                ? ModelPipeline.DiscoverSolution(solution, workingDirectory, Environment)
+                : TryDiscoverSolution(solution, workingDirectory);
+            if (solutionPath is null || !SolutionSource.HoldsLoaded(solutionPath))
+                return LoadDllSpecModel(solutionPath, spec!, withoutSolution, noCache, error, ct);
         }
 
         using var source = await CodebaseSource.CreateWithSpecAsync(
@@ -147,5 +144,36 @@ internal abstract class CacheWiredRunner(
         RecordCacheOutcome(source);
 
         return (source.Model, source.SolutionDirectory, source.StaleSpec);
+    }
+
+    // The built-DLL path with no workspace: the cache's record for the DLL, when there is one, names the project
+    // whose sources are compared; without one the DLL is loaded as given and nothing is compared.
+    private (ArchitectureModel Model, string? SolutionDirectory, StaleSpec? StaleSpec) LoadDllSpecModel(
+        string? solutionPath, string spec, SpecResolution withoutSolution, bool noCache, TextWriter error,
+        CancellationToken ct)
+    {
+        if (solutionPath is null) return (SolutionSource.LoadSpecModel(withoutSolution.DllPath), null, null);
+
+        string anchor = SolutionProjectFileParser.AnchorDirectory(solutionPath);
+        SpecResolution? recorded = noCache ? null : CodebaseSource.TryReplayRecordedSpec(Environment, solutionPath, spec, ct);
+        SpecResolution resolution = recorded ?? withoutSolution;
+
+        ArchitectureModel model = SolutionSource.LoadSpecModel(resolution.DllPath);
+        StaleSpec? stale = SpecSourceComparison.Compare(resolution);
+        StaleSpecNotice.Render(error, stale, anchor);
+        return (model, anchor, stale);
+    }
+
+    // Discovery for a verb that answers without a solution when none is found.
+    private string? TryDiscoverSolution(string? solution, string workingDirectory)
+    {
+        try
+        {
+            return ModelPipeline.DiscoverSolution(solution, workingDirectory, Environment);
+        }
+        catch (UserErrorException)
+        {
+            return null;
+        }
     }
 }

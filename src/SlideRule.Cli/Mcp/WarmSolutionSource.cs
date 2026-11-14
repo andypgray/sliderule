@@ -57,6 +57,12 @@ internal sealed class WarmSolutionSource(
         return specs.Load(specDllPath);
     }
 
+    /// <inheritdoc />
+    public bool HoldsLoaded(string solutionPath)
+    {
+        return session.IsLoaded(solutionPath);
+    }
+
     /// <summary>
     ///     The solution's declared membership, read once per <paramref name="generation" />. The generation is the
     ///     whole key: the session stats the solution file and every project file, so a change to any of them, and a

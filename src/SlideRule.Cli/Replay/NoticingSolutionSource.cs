@@ -39,6 +39,12 @@ internal sealed class NoticingSolutionSource(string notice, TextWriter error, IS
         return inner.LoadSpecModel(specDllPath);
     }
 
+    /// <inheritdoc />
+    public bool HoldsLoaded(string solutionPath)
+    {
+        return inner.HoldsLoaded(solutionPath);
+    }
+
     private void Notice()
     {
         if (_noticed) return;

@@ -101,6 +101,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its rules and never reported a stale spec. A DLL counts as a project's when it has the project's assembly name
   and sits under the project's `bin` or `artifacts` output root, or under its project directory when its output
   has neither. A DLL that two declared projects build is refused with both projects named.
+- `explain <rule-id>` and `baseline rename` given the DLL a declared project builds now report a stale spec,
+  still without opening the solution. They report it once an earlier run's cache records which project builds
+  the DLL, and `arch_explain` reports it once the server has loaded its workspace. They used to report none for a
+  DLL spec.
 - Every command and MCP tool that loads the solution now refuses when a `global.json` pins an SDK the .NET
   host cannot resolve. The refusal names the pinned version and the file, quotes the host, and gives the
   ways out: the repository's own instruction when the pin supplies one, installing that SDK or

@@ -567,6 +567,27 @@ internal sealed class CodebaseSource : IDisposable
             record.IntermediateAssemblyPath, record.ProjectFilePath);
     }
 
+    /// <summary>
+    ///     The resolution a validated cache recorded for the DLL <paramref name="spec" />, replayed with no workspace,
+    ///     or null when there is no cache, it does not validate, or it holds no record for that argument.
+    /// </summary>
+    /// <remarks>
+    ///     A partial serves as well as a hit, because a record holds only structural facts and a partial is never a
+    ///     structural change. It has to: an edit to the spec project's own sources, the stale spec a caller is
+    ///     asking about, is what makes the read partial.
+    /// </remarks>
+    internal static SpecResolution? TryReplayRecordedSpec(
+        IEnvironment environment, string solutionPath, string spec, CancellationToken ct)
+    {
+        ExtractionCacheStore? store = TryCreateStore(solutionPath, environment);
+        if (store is null) return null;
+
+        CacheReadResult read = ReadTimed(store, ct);
+        return read.Outcome is CacheOutcome.Hit or CacheOutcome.Partial
+            ? ResolveSpecOnHitTimed(spec, read.SpecResolutions)
+            : null;
+    }
+
     private static CacheReadResult ReadTimed(ExtractionCacheStore store, CancellationToken ct)
     {
         using (PhaseTimings.Measure(TimedPhase.CacheRead))

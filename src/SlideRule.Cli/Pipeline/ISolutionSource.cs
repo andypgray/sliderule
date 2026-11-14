@@ -40,4 +40,15 @@ internal interface ISolutionSource
     {
         return ModelPipeline.LoadModel(specDllPath);
     }
+
+    /// <summary>
+    ///     Whether this source already holds the solution at <paramref name="solutionPath" /> loaded, so acquiring
+    ///     it reconciles that workspace rather than loading one from nothing; a structural change since the last
+    ///     acquisition still reloads. It never loads and never waits. The default, for a source that loads per run,
+    ///     is false.
+    /// </summary>
+    bool HoldsLoaded(string solutionPath)
+    {
+        return false;
+    }
 }

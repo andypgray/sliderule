@@ -31,12 +31,35 @@ public sealed class NoticingSolutionSourceTests
         whole.IsClosure.ShouldBeFalse();
     }
 
+    [Fact]
+    public void HoldsLoaded_AnswersAsTheWrappedSourceDoes_WithoutANotice()
+    {
+        // A wrapped warm source that holds the solution must still read as holding it, or a built-DLL explain
+        // over it loses the stale-spec verdict the warm session can give; asking acquires nothing.
+        using var inner = new RecordingSource { Loaded = "App.sln" };
+        var error = new StringWriter();
+        ISolutionSource source = new NoticingSolutionSource("the capture is stale", error, inner);
+
+        source.HoldsLoaded("App.sln").ShouldBeTrue();
+        source.HoldsLoaded("Other.sln").ShouldBeFalse();
+        error.ToString().ShouldBeEmpty();
+        inner.Calls.ShouldBeEmpty();
+    }
+
     // Hands back an empty solution and records which kind of acquisition it was asked for.
     private sealed class RecordingSource : ISolutionSource, IDisposable
     {
         private readonly AdhocWorkspace workspace = new();
 
         public List<string> Calls { get; } = [];
+
+        /// <summary>The one solution path this source reports holding loaded, or null for none.</summary>
+        public string? Loaded { get; init; }
+
+        public bool HoldsLoaded(string solutionPath)
+        {
+            return solutionPath == Loaded;
+        }
 
         public void Dispose()
         {

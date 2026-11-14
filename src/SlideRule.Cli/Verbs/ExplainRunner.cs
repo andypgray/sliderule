@@ -28,10 +28,10 @@ namespace SlideRule.Cli.Verbs;
 ///     <para>
 ///         <b>Never a gate.</b> A workspace opened for resolution can fail partially; the rule form renders the
 ///         composed diagnostics to stderr and still answers, because the model it dumps comes from the spec,
-///         not the codebase — a load failure cannot make the answer wrong. The DLL fast path never opens a
-///         workspace, so it stays silent by construction. The type and path forms answer from the codebase, which
-///         a load failure can leave short, so they also announce an incomplete or narrowed model at the top of
-///         the answer, which is <c>arch_explain</c>'s only channel.
+///         not the codebase — a load failure cannot make the answer wrong. A built-DLL spec reaches a workspace
+///         only where a warm one is already loaded, so elsewhere it renders no load diagnostics. The type and path
+///         forms answer from the codebase, which a load failure can leave short, so they also announce an
+///         incomplete or narrowed model at the top of the answer, which is <c>arch_explain</c>'s only channel.
 ///     </para>
 ///     <para>
 ///         <b>It fronts the persisted extraction cache</b> (<c>--no-cache</c> opts out), and the rule form is
@@ -55,7 +55,7 @@ internal sealed class ExplainRunner(
     {
         if (request.RuleId is not { } ruleId) return await ExplainClaimsAsync(request, ct);
 
-        // A built-DLL --spec answers with no solution in reach, so none is discovered.
+        // A built-DLL --spec answers with no solution in reach as well as with one.
         (ArchitectureModel model, string? solutionDirectory, StaleSpec? stale) = await LoadSpecModelAsync(
             request.Solution, request.Spec, request.WorkingDirectory, request.NoCache, needsSolutionDirectory: false,
             error, ct);

@@ -1,3 +1,7 @@
+using Shouldly;
+using SlideRule.Cli;
+using SlideRule.Cli.Verbs;
+using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -161,6 +165,24 @@ public sealed class ExplainCommandTests
 
         result.ShouldRefuseWith(NoConstructorSpec.Refusal);
         result.Err.ShouldNotContain("   at ", result.Transcript());
+    }
+
+    [Fact]
+    public async Task Explain_BuiltDllWithNoSolutionInReach_AnswersFromTheDllAlone()
+    {
+        // The DLL form looks for a solution only to learn which project builds the DLL, so finding none is no error.
+        using TempDirectory noSolution = TestTempRoot.Fresh("explain-no-solution");
+        var request = new ExplainRequest(
+            "layering/domain-independent", null, CliRunner.ViolatedSpecDll, noSolution.Path, false);
+        var source = new CountingSolutionSource();
+
+        CliResult result = await CliResult.CapturedAsync((output, error) =>
+            CommandEntryPoint.RunAsync(
+                () => new ExplainRunner(output, error, source, new FakeEnvironment()).RunAsync(request, Ct), error, Ct));
+
+        result.ShouldSucceed("layering/domain-independent (enforce)");
+        result.Err.ShouldBeEmpty();
+        source.AcquireCount.ShouldBe(0);
     }
 
     [Fact]
