@@ -63,8 +63,8 @@ public interface IQuarantinedScope
 
     /// <summary>
     ///     States why the scope exists, in one line of prose. Required: a scope without it is reported
-    ///     when the spec is loaded. Rendered into the generated agent context and echoed with every
-    ///     containment violation.
+    ///     when the spec is loaded. Rendered into the generated context for the scope's directory and echoed
+    ///     with every containment violation; the root managed block lists the scope without it.
     /// </summary>
     IQuarantinedScope Because([SpecSlot(nameof(SpecSlot.Because))] string because);
 }

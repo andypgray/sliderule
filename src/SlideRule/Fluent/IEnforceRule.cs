@@ -12,7 +12,9 @@ public interface IEnforceRule
 {
     /// <summary>
     ///     States why the rule exists, in one line of prose. Required: a rule without it is reported when
-    ///     the spec is loaded. Rendered into the generated agent context and echoed with every violation.
+    ///     the spec is loaded. Printed by <c>explain</c> and with every violation, and rendered in the rule's
+    ///     bullet wherever a directory's generated context lists the rule; the root managed block lists the rule
+    ///     without it.
     /// </summary>
     IEnforceRule Because([SpecSlot(nameof(SpecSlot.Because))] string because);
 
@@ -25,7 +27,8 @@ public interface IEnforceRule
 
     /// <summary>
     ///     Names the page the rule's reasoning rests on, as an absolute <c>http</c> or <c>https</c> URL.
-    ///     Optional. Rendered as "See &lt;url&gt;." after the reason in the generated agent context,
+    ///     Optional. Rendered as "See &lt;url&gt;." in the rule's bullet in the generated agent context,
+    ///     after the rule sentence in the root managed block and after the reason in a directory's generated context,
     ///     printed as a <c>citation:</c> line by <c>explain</c> and beneath a failed rule by <c>check</c>,
     ///     and published as the rule's help URI in SARIF output. A value that is not an absolute http(s)
     ///     URL is reported when the spec is loaded.

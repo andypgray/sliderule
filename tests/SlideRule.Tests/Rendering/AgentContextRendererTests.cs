@@ -46,34 +46,28 @@ public class AgentContextRendererTests
             RenderedLawText.InstallNote +
             "## Architecture (SlideRule)\n\n" +
             "reference = a source-level type reference; construct = a source-level object creation " +
-            "(`new`, including target-typed `new()`). Expand any rule ID with `sliderule explain <rule-id>`.\n\n" +
+            "(`new`, including target-typed `new()`). " +
+            RenderedLawText.GlossaryTail + "\n\n" +
             "### Layers\n" +
             "- **Domain** — `MyApp.Domain.*`. Domain holds the order and customer model.\n" +
             "- **Web** — `MyApp.Web.*`\n\n" +
             "### Rules\n" +
-            "- `layering/domain-independent` — The Domain layer must not reference the Web layer. " +
-            "Domain is UI-agnostic; transaction boundaries live in services.\n" +
-            "- `naming/interfaces` — Interfaces in `MyApp.*` must be named `I*`. " +
-            "House naming convention; agents grep by I-prefix.\n" +
-            "- `naming/handlers` — Types implementing `IHandler<T>` must be named `*Handler`. " +
-            "Handler discovery is convention-based (see HandlerRegistry).\n" +
+            "- `layering/domain-independent` — The Domain layer must not reference the Web layer.\n" +
+            "- `naming/interfaces` — Interfaces in `MyApp.*` must be named `I*`.\n" +
+            "- `naming/handlers` — Types implementing `IHandler<T>` must be named `*Handler`.\n" +
             "- `di/handlers-via-registry` — Types, except `HandlerRegistry`, must not construct " +
-            "types implementing `IHandler<T>`. " +
-            "Handlers are resolved through HandlerRegistry; direct construction bypasses discovery.\n" +
-            "- `style/type-name-length` — Types in `MyApp.*` must keep type names at or under 40 characters. " +
-            "Long type names break the generated architecture tables.\n\n" +
+            "types implementing `IHandler<T>`.\n" +
+            "- `style/type-name-length` — Types in `MyApp.*` must keep type names at or under 40 characters.\n\n" +
             "### Migrations\n" +
             "- `data-access/no-inline-sql` — Some existing code here still follows the OLD pattern: " +
             "Controllers open SqlConnection directly (legacy Active Record style). " +
             "That is grandfathered debt, not house style. New code must follow: " +
             "Types in the Web layer named `*Controller` must not reference `SqlConnection`. " +
-            "Repository pattern for testability — ADR-012. " +
             "If you are already editing a grandfathered site and the migration is small, migrate it; " +
             "otherwise do not grow the debt.\n\n" +
             "### Quarantined scopes\n" +
             "- `legacy/billing` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade`, " +
             "must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`. " +
-            "Replacement scheduled (BillingV2, ADR-019); not worth stabilizing. " +
             "Sanctioned surface: `IBillingFacade`, `BillingFacade`.";
 
         AgentContextRenderer.RootBlock(Checker.Canonical, "CanonicalSampleSpec")
@@ -88,12 +82,11 @@ public class AgentContextRendererTests
             "do not edit between the markers; edit the spec and re-render.*\n\n" +
             RenderedLawText.InstallNote +
             "## Architecture (SlideRule)\n\n" +
-            "reference = a source-level type reference. Expand any rule ID with `sliderule explain <rule-id>`.\n\n" +
+            "reference = a source-level type reference. " +
+            RenderedLawText.GlossaryTail + "\n\n" +
             "### Rules\n" +
             "- `layering/core-no-roslyn` — Types in project `SlideRule` must not reference " +
-            "types in project `SlideRule.Roslyn`. " +
-            "Core is the netstandard2.0 reified model both render targets consume; " +
-            "Roslyn extraction is host machinery.";
+            "types in project `SlideRule.Roslyn`.";
 
         AgentContextRenderer.RootBlock(DogfoodShapeModel, "SlideRule.Architecture")
             .ShouldBe(expected);
@@ -371,7 +364,7 @@ public class AgentContextRendererTests
     }
 
     [Fact]
-    public void LayerCard_MigrateRule_RendersSameCounterPriorBulletAsRoot()
+    public void LayerCard_MigrateRule_RendersTheRootCounterPriorBulletWithTheReason()
     {
         // A layer carrying one Migrate rule (subject refined onto the layer) — the counter-prior bullet source.
         ArchitectureModel model = Checker.Model(arch =>
@@ -386,29 +379,31 @@ public class AgentContextRendererTests
         List<ArchRule> migrateRules = model.Rules.Where(rule => rule.Posture == Posture.Migrate)
             .ToList();
 
-        // The exact counter-prior bullet the root ### Migrations section renders for this rule.
-        const string counterPriorBullet =
+        const string frame =
             "- `data-access/no-inline-sql` — Some existing code here still follows the OLD pattern: " +
             "Controllers build DataTables inline (legacy Active Record style). " +
             "That is grandfathered debt, not house style. New code must follow: " +
-            "Types in the Web layer named `*Controller` must not reference types in `System.Data.*`. " +
-            "Repository pattern for testability. " +
+            "Types in the Web layer named `*Controller` must not reference types in `System.Data.*`. ";
+        const string policy =
             "If you are already editing a grandfathered site and the migration is small, migrate it; " +
             "otherwise do not grow the debt.";
 
+        // The root block's bullet carries the whole counter-prior frame and the policy, without the reason.
         AgentContextRenderer.RootBlock(model, "Spec")
-            .ShouldContain(counterPriorBullet);
-        // The shared composer renders the Migrate rule byte-identically in the layer card (no Fix, no count).
+            .ShouldEndWith("### Migrations\n" + frame + policy);
+        // The layer card's bullet is the same bullet with the reason between the target law and the policy
+        // (no Fix, no count).
         AgentContextRenderer.LayerCard("Web", null, migrateRules)
-            .ShouldContain(counterPriorBullet);
+            .ShouldContain("\n" + frame + "Repository pattern for testability. " + policy + "\n");
     }
 
     [Fact]
     public void RuleBullet_EnforceRuleWithCitation_EndsWithTheAutolinkedPage()
     {
-        // The citation is its own sentence after the reason, in angle brackets so the terminating period
-        // stays out of the link. It rides in the always-on block rather than behind `explain` because the
-        // provenance of a quoted guidance rule is part of the claim the bullet makes.
+        // The citation is its own sentence, in angle brackets so the terminating period stays out of the link:
+        // after the statement in the root block, after the reason on a card. It rides in the always-on block
+        // rather than behind `explain` because the provenance of a quoted guidance rule is part of the claim
+        // the bullet makes.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("http/reuse-httpclient")
                 .Enforce(arch.Namespace("MyApp.*").MustHaveSuffix("Client"))
@@ -416,18 +411,22 @@ public class AgentContextRendererTests
                 .Citation("https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines"));
 
         AgentContextRenderer.RootBlock(model, "Spec")
-            .ShouldContain(
-                "- `http/reuse-httpclient` — Types in `MyApp.*` must be named `*Client`. "
-                + "A new client per call exhausts sockets. "
+            .ShouldEndWith(
+                "\n- `http/reuse-httpclient` — Types in `MyApp.*` must be named `*Client`. "
                 + "See <https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines>.");
+        AgentContextRenderer.LayerCard("MyApp", null, model.Rules)
+            .ShouldContain(
+                "\n- `http/reuse-httpclient` — Types in `MyApp.*` must be named `*Client`. "
+                + "A new client per call exhausts sockets. "
+                + "See <https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines>.\n");
     }
 
     [Fact]
-    public void RuleBullet_MigrateRuleWithCitation_PutsThePageBetweenTheReasonAndThePolicy()
+    public void RuleBullet_MigrateRuleWithCitation_PutsThePageBetweenTheTargetLawAndThePolicy()
     {
-        // The Migrate bullet continues past the reason into the boy-scout policy, so the citation goes
-        // between them: appended after the policy it would separate the reason from the page it cites, and
-        // the reason's own terminator is what the sentence before a URL needs.
+        // The Migrate bullet continues past the target law into the boy-scout policy, so the citation goes
+        // between them: appended after the policy it would separate the law from the page it cites, and the
+        // law's own terminator is what the sentence before a URL needs.
         ArchitectureModel model = Checker.Model(arch =>
             arch.Rule("async/no-blocking-waits")
                 .Migrate("Handlers block on the task.", arch.Types.MustHaveSuffix("Handler"))
@@ -436,7 +435,7 @@ public class AgentContextRendererTests
 
         AgentContextRenderer.RootBlock(model, "Spec")
             .ShouldContain(
-                "Blocking a pooled thread on an incomplete task deadlocks under load. "
+                "New code must follow: Types must be named `*Handler`. "
                 + "See <https://learn.microsoft.com/dotnet/csharp/asynchronous-programming/async-scenarios>. "
                 + "If you are already editing a grandfathered site and the migration is small, migrate it; "
                 + "otherwise do not grow the debt.");
@@ -536,7 +535,7 @@ public class AgentContextRendererTests
         // The member-axis "use" entry appears beside "reference" only when a member-target rule exists.
         block.ShouldContain(
             "reference = a source-level type reference; use = a source-level member access. " +
-            "Expand any rule ID with `sliderule explain <rule-id>`.");
+            RenderedLawText.GlossaryTail);
         // It is a swap, not an addition — the member-free glossary line is gone (GRAMMAR §4.5).
         block.ShouldNotContain("reference = a source-level type reference. Expand");
     }
@@ -553,7 +552,7 @@ public class AgentContextRendererTests
         // The construct clause appears beside "reference" only when a MustNotConstruct rule exists (no use here).
         block.ShouldContain(
             "reference = a source-level type reference; construct = a source-level object creation " +
-            "(`new`, including target-typed `new()`). Expand any rule ID with `sliderule explain <rule-id>`.");
+            "(`new`, including target-typed `new()`). " + RenderedLawText.GlossaryTail);
         block.ShouldNotContain("use = a source-level member access");
     }
 
@@ -576,7 +575,7 @@ public class AgentContextRendererTests
         block.ShouldContain(
             "reference = a source-level type reference; use = a source-level member access; " +
             "construct = a source-level object creation (`new`, including target-typed `new()`). " +
-            "Expand any rule ID with `sliderule explain <rule-id>`.");
+            RenderedLawText.GlossaryTail);
     }
 
     [Fact]
@@ -591,7 +590,7 @@ public class AgentContextRendererTests
         // The inject clause appears beside "reference" when a MustNotInject rule exists (no Registered noun here).
         block.ShouldContain(
             "reference = a source-level type reference; inject = a source-level constructor-parameter dependency " +
-            "(primary constructors included). Expand any rule ID with `sliderule explain <rule-id>`.");
+            "(primary constructors included). " + RenderedLawText.GlossaryTail);
         // No Registered noun in this spec → no separate registered glossary line.
         block.ShouldNotContain("registered = named in a source-level container registration");
     }
@@ -629,7 +628,7 @@ public class AgentContextRendererTests
         // The inject clause composes into the axis-glossary line...
         block.ShouldContain(
             "reference = a source-level type reference; inject = a source-level constructor-parameter dependency " +
-            "(primary constructors included). Expand any rule ID with `sliderule explain <rule-id>`.");
+            "(primary constructors included). " + RenderedLawText.GlossaryTail);
         // ...and the Registered noun gates the separate registered line.
         block.ShouldContain(
             "registered = named in a source-level container registration " +
@@ -654,7 +653,7 @@ public class AgentContextRendererTests
         // The catch clause appears beside "reference" only when a MustNotCatch rule exists (no other axis here).
         block.ShouldContain(
             "reference = a source-level type reference; catch = a source-level `catch` clause " +
-            "(a bare `catch` counts as `System.Exception`). Expand any rule ID with `sliderule explain <rule-id>`.");
+            "(a bare `catch` counts as `System.Exception`). " + RenderedLawText.GlossaryTail);
         block.ShouldNotContain("throw = a source-level `throw`");
     }
 
@@ -672,7 +671,7 @@ public class AgentContextRendererTests
         block.ShouldContain(
             "reference = a source-level type reference; throw = a source-level `throw` of the thrown " +
             "expression's type (bare rethrows `throw;` are not recorded). " +
-            "Expand any rule ID with `sliderule explain <rule-id>`.");
+            RenderedLawText.GlossaryTail);
         block.ShouldNotContain("catch = a source-level `catch`");
     }
 
@@ -690,7 +689,7 @@ public class AgentContextRendererTests
         // clause MustNotCatch renders — the fact being glossed is the same fact.
         block.ShouldContain(
             "reference = a source-level type reference; catch = a source-level `catch` clause " +
-            "(a bare `catch` counts as `System.Exception`). Expand any rule ID with `sliderule explain <rule-id>`.");
+            "(a bare `catch` counts as `System.Exception`). " + RenderedLawText.GlossaryTail);
         block.ShouldNotContain("throw = a source-level `throw`");
     }
 
@@ -708,7 +707,7 @@ public class AgentContextRendererTests
         block.ShouldContain(
             "reference = a source-level type reference; throw = a source-level `throw` of the thrown " +
             "expression's type (bare rethrows `throw;` are not recorded). " +
-            "Expand any rule ID with `sliderule explain <rule-id>`.");
+            RenderedLawText.GlossaryTail);
         block.ShouldNotContain("catch = a source-level `catch`");
     }
 
@@ -726,7 +725,7 @@ public class AgentContextRendererTests
         block.ShouldContain(
             "reference = a source-level type reference; expose = a public signature position " +
             "(return, parameter, or property/field/event type) on a public member of an externally visible type. " +
-            "Expand any rule ID with `sliderule explain <rule-id>`.");
+            RenderedLawText.GlossaryTail);
         block.ShouldNotContain("catch = a source-level `catch`");
     }
 

@@ -99,13 +99,14 @@ public sealed class QuoteSyncTests
             SelfSpec,
             Extent.WholeStatements),
         new(
-            // The rendered bullet carries the derived rule sentence and the rule's Because on one line,
-            // which the FAIL stanza below splits across two; that join is what makes this marker pick out
-            // the AGENTS.md fence rather than the hook report.
+            // The page quotes the Host layer's card, whose bullet carries the derived rule sentence and the
+            // rule's Because on one line, which the FAIL stanza below splits across two; that join is what
+            // makes this marker pick out the card's fence rather than the hook report. The root block's
+            // bullet carries no Because, so it cannot be the source.
             DocPaths.SelfCheck,
             "agents-block",
             "`Console.WriteLine()`. Stdout is a protocol channel",
-            "AGENTS.md"),
+            "src/SlideRule.Cli/AGENTS.md"),
         new(
             // The page calls this class the whole of the adapter dogfood, so it is held whole from its declaration
             // to the end of the file, and a member added to the class reds here.

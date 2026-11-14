@@ -28,7 +28,7 @@ A rule is one statement. It starts with `arch.Rule(id)` and has a posture with i
 |---|---|---|
 | the ID | yes | names the rule in reports, in `explain` and in its baseline |
 | the posture | yes | `Enforce(...)` or `Migrate(from:, to:)` |
-| `Because` | yes | one line of reason, rendered for agents and printed in every report |
+| `Because` | yes | one line of reason, rendered on the cards, printed by `explain` and in every report |
 | `Fix` | no | what to do instead, printed under a failed rule and in each build warning |
 | `Citation` | no | an absolute `http` or `https` URL the reason rests on |
 | `Exemplar` | no | a type to copy, printed with its `file:line` under a failed rule |
@@ -42,7 +42,7 @@ arch.Rule("naming/interfaces")
     .Citation("https://learn.microsoft.com/dotnet/standard/design-guidelines/names-of-classes-structs-and-interfaces");
 ```
 
-An ID must match `^[a-z0-9-]+(/[a-z0-9-]+)*$`, and the convention is `area/rule-name`. The ID also keys the rule's baseline, so when a ratcheted rule's ID changes, `sliderule baseline rename` moves its baseline to the new one. A citation becomes the rule's help link in SARIF and a `citation:` line in reports. In the `AGENTS.md` block and the cards, it follows the reason as `See <url>.`, and the fix and exemplar do not appear. An exemplar never affects the verdict, and `check` warns when it matches no type.
+An ID must match `^[a-z0-9-]+(/[a-z0-9-]+)*$`, and the convention is `area/rule-name`. The ID also keys the rule's baseline, so when a ratcheted rule's ID changes, `sliderule baseline rename` moves its baseline to the new one. A citation becomes the rule's help link in SARIF and a `citation:` line in reports. In the root `AGENTS.md` block it follows the rule sentence as `See <url>.`, and on the cards it follows the reason. The fix and exemplar appear in neither. An exemplar never affects the verdict, and `check` warns when it matches no type.
 
 ## Enforce and Migrate
 

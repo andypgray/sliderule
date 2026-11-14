@@ -1,6 +1,6 @@
 # Microsoft guidance, enforced and cited: Meridian.Interchange
 
-Meridian.Interchange is Meridian's outbound interchange worker, governed by 12 rules, each citing the learn.microsoft.com page it enforces. Every rule pairs a one-sentence reason with a `Citation` naming the Microsoft page behind it. The rendered agent context therefore quotes the guidance with its provenance, and a reviewer can follow the link to the source.
+Meridian.Interchange is Meridian's outbound interchange worker, governed by 12 rules, each citing the learn.microsoft.com page it enforces. Every rule pairs a one-sentence reason with a `Citation` naming the Microsoft page behind it. The rendered agent context therefore prints each rule with its link, and a reviewer can follow it to the source.
 
 The other examples state house rules. This one states Microsoft's rules and shows its work. An agent dropped into the worker reads the rules before it writes, and each rule cites the canonical page. "Reuse HttpClient" arrives as the documented .NET guideline, with the page behind it. The rule the agent reads is the rule the build enforces, and both include the citation. This page is a cookbook. Each recipe gives the guidance sentence, the spec line that encodes it, and the captured `check` output when the code breaks it. That output is cut to the rules that went red.
 
@@ -62,8 +62,8 @@ They reify to the same kind of rule, so the rendered context, the violation mess
 `sliderule render` writes those into the managed block in [AGENTS.md](AGENTS.md), citation and all. CI runs `render --check` over this example and fails on a stale block, so the context an agent reads is the spec the build enforces:
 
 ```markdown
-- `http/reuse-httpclient` — Types, except types in `Meridian.Interchange.Host.*`, must not construct `HttpClient`. A new HttpClient per call exhausts sockets under load; IHttpClientFactory pools handlers. See <https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines>.
-- `di/hosted-services-scope-their-work` — Types derived from `BackgroundService` must not reference `IOptionsSnapshot<TOptions>` or `IOutboxStore`. A BackgroundService is a singleton; a captured scoped IOptionsSnapshot or scoped store outlives its scope; resolve per work item from an IServiceScopeFactory scope. See <https://learn.microsoft.com/dotnet/core/extensions/scoped-service>.
+- `http/reuse-httpclient` — Types, except types in `Meridian.Interchange.Host.*`, must not construct `HttpClient`. See <https://learn.microsoft.com/dotnet/fundamentals/networking/http/httpclient-guidelines>.
+- `di/hosted-services-scope-their-work` — Types derived from `BackgroundService` must not reference `IOptionsSnapshot<TOptions>` or `IOutboxStore`. See <https://learn.microsoft.com/dotnet/core/extensions/scoped-service>.
 ```
 
 ## The burndown

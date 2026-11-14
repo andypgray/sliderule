@@ -65,7 +65,7 @@ internal static class AgentContextRenderer
         "keyed-service registrations, assembly scanning, factory internals, wrappers compiled into packages and " +
         "framework defaults are not seen.";
 
-    private const string GlossaryTail = "Expand any rule ID with `sliderule explain <rule-id>`.";
+    private const string GlossaryTail = "Expand any rule ID with `sliderule explain <rule-id>` for its reason and fix.";
 
     // The axis clauses in emission order, each beside the fact that earns it.
     // The two exception axes gate on the axis, not on one verb: any catch verb renders the catch clause and
@@ -240,7 +240,7 @@ internal static class AgentContextRenderer
         Guard.NotNullOrWhiteSpace(layerName, nameof(layerName));
         Guard.NotNull(rules, nameof(rules));
 
-        List<string> bullets = rules.Select(rule => RuleBullet(rule)).ToList();
+        List<string> bullets = rules.Select(rule => RuleBullet(rule, withReason: true)).ToList();
         bullets.Add($"- Expand any rule above with {ProseFormat.Backtick("sliderule explain <rule-id>")}.");
 
         var lede = $"This directory contains the {ProseFormat.Backtick(layerName)} layer.";
@@ -272,7 +272,7 @@ internal static class AgentContextRenderer
 
     private static string RulesSection(IReadOnlyList<ArchRule> rules)
     {
-        IEnumerable<string> bullets = rules.Select(rule => RuleBullet(rule));
+        IEnumerable<string> bullets = rules.Select(rule => RuleBullet(rule, withReason: false));
         return Section("Rules", bullets);
     }
 
@@ -281,43 +281,49 @@ internal static class AgentContextRenderer
     // its task does not infer it is house style.
     private static string MigrationsSection(IReadOnlyList<ArchRule> rules, Func<ArchRule, int?>? counts)
     {
-        IEnumerable<string> bullets = rules.Select(rule => RuleBullet(rule, counts));
+        IEnumerable<string> bullets = rules.Select(rule => RuleBullet(rule, withReason: false, counts));
         return Section("Migrations", bullets);
     }
 
-    // One rule's context bullet, shared by the root sections and the layer cards, so a rule renders
-    // byte-identically wherever it appears. No Fix line ever: progressive disclosure routes fixes to `explain`.
-    private static string RuleBullet(ArchRule rule, Func<ArchRule, int?>? counts = null)
+    // One rule's context bullet, the one composer behind the root sections and the layer cards. The root
+    // carries the rule's ID, statement and citation; a card adds the reason between the statement and the
+    // citation, because the root loads into every agent session and the reason is served by `explain` and by
+    // a failed check. Neither carries a Fix: progressive disclosure routes fixes to `explain`.
+    private static string RuleBullet(ArchRule rule, bool withReason, Func<ArchRule, int?>? counts = null)
     {
+        string reason = withReason ? " " + rule.Because : string.Empty;
+
         return rule.Posture == Posture.Migrate
-            ? MigrationBullet(rule, counts)
-            : $"- {ProseFormat.Backtick(rule.Id)} — {rule.Sentence} {rule.Because}{CitationClause(rule)}";
+            ? MigrationBullet(rule, reason, counts)
+            : $"- {ProseFormat.Backtick(rule.Id)} — {rule.Sentence}{reason}{CitationClause(rule)}";
     }
 
-    private static string MigrationBullet(ArchRule rule, Func<ArchRule, int?>? counts)
+    private static string MigrationBullet(ArchRule rule, string reason, Func<ArchRule, int?>? counts)
     {
         MigrateData migrate = rule.Migrate!;
         string bullet = $"- {ProseFormat.Backtick(rule.Id)} — Some existing code here still follows the OLD pattern: " +
                         $"{migrate.From} That is grandfathered debt, not house style. New code must follow: " +
-                        $"{migrate.ToSentence} {rule.Because}{CitationClause(rule)} {PolicySentence(migrate.Policy)}";
+                        $"{migrate.ToSentence}{reason}{CitationClause(rule)} {PolicySentence(migrate.Policy)}";
 
         if (counts?.Invoke(rule) is { } remaining) bullet += $" Grandfathered sites remaining: {remaining}.";
 
         return bullet;
     }
 
-    // The rule's citation, as a sentence of its own after the reason: a CommonMark angle-bracket autolink,
-    // which is what keeps the following period out of the link target. It sits inside the bullet rather
-    // than behind `explain` because the provenance of a quoted guidance rule is the claim the bullet makes,
-    // and it is written leading-space-first so a rule with no citation adds nothing to the bullet at all.
+    // The rule's citation, as a sentence of its own after the statement (after the reason on a card): a
+    // CommonMark angle-bracket autolink, which is what keeps the following period out of the link target. It
+    // sits inside the bullet rather than behind `explain` because the provenance of a quoted guidance rule is
+    // the claim the bullet makes, and it is written leading-space-first so a rule with no citation adds
+    // nothing to the bullet at all.
     private static string CitationClause(ArchRule rule)
     {
         return rule.Citation is { } citation ? $" See <{citation}>." : string.Empty;
     }
 
     // The Quarantine containment section (GRAMMAR §7), in the always-on root block because containment binds
-    // code OUTSIDE the quarantined directory, and those agents never see the per-directory scope card. Dragons
-    // prose stays scoped-only (progressive disclosure) and prints in the scope card and explain.
+    // code OUTSIDE the quarantined directory, and those agents never see the per-directory scope card. What
+    // they act on is the boundary and its sanctioned surface; the reason and the Dragons prose stay
+    // scoped-only (progressive disclosure) and print in the scope card and explain.
     private static string QuarantinedScopesSection(IReadOnlyList<ArchRule> containmentRules)
     {
         IEnumerable<string> bullets = containmentRules.Select(QuarantinedScopeBullet);
@@ -327,7 +333,7 @@ internal static class AgentContextRenderer
     private static string QuarantinedScopeBullet(ArchRule rule)
     {
         ScopeData quarantine = rule.Scope!;
-        var bullet = $"- {ProseFormat.Backtick(quarantine.ScopeId)} — {rule.Sentence} {rule.Because}";
+        var bullet = $"- {ProseFormat.Backtick(quarantine.ScopeId)} — {rule.Sentence}";
         if (SurfaceSentence(quarantine) is { } surface) bullet += " " + surface;
         return bullet;
     }

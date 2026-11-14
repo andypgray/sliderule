@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that file in place of `AGENTS.md` in its directory, even when it is empty, so its sessions never see the
   managed block or the card there.
 
+### Changed
+
+- The root `AGENTS.md` block lists each rule as its ID, its sentence and its citation. A rule's `Because`
+  prints on the layer and scope cards, in `explain`, in the MCP server's `arch_explain` and in a failed
+  rule's `check` output. The root block loads into every agent session, and the reasons were most of its
+  size. This repository's root file falls from 37,999 bytes to 20,104, below the 32 KiB Codex reads by
+  default.
+  A Migrate rule keeps its whole counter-prior paragraph and a quarantined scope keeps its sanctioned
+  surface. The cards are unchanged.
+
 ### Fixed
 
 - On Linux and macOS, the MSBuild note printed next to a load failure now reads

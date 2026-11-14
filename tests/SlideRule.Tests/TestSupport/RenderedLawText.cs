@@ -3,9 +3,10 @@ namespace SlideRule.Tests.TestSupport;
 /// <summary>
 ///     Rendered agent-context text that more than one suite is pinned against — a family rule's bullet,
 ///     which appears on both of its cells' cards; the whole cards the MCP surface returns and the render
-///     verb splices into a file; and the recovery paragraph every root block carries. Spelled once because
-///     two copies of a string would let one drift: the CLI-versus-MCP parity rows and the end-to-end render
-///     goldens only mean the same thing while the text they compare is literally the same text.
+///     verb splices into a file; the recovery paragraph every root block carries; and the sentence that ends
+///     its glossary line. Spelled once because two copies of a string would let one drift: the CLI-versus-MCP
+///     parity rows and the end-to-end render goldens only mean the same thing while the text they compare is
+///     literally the same text.
 /// </summary>
 /// <remarks>
 ///     The cards here carry no provenance line — that is a render file-splice concern rather than part of
@@ -24,6 +25,10 @@ internal static class RenderedLawText
         "install the tool with `dotnet tool install -g SlideRule.Cli`, or run any command " +
         "without installing: `dotnet dnx SlideRule.Cli --yes -- check <solution>`. " +
         SdkPinSentence + "*\n\n";
+
+    /// <summary>The sentence that ends every rendered root block's glossary line.</summary>
+    internal const string GlossaryTail =
+        "Expand any rule ID with `sliderule explain <rule-id>` for its reason and fix.";
 
     internal const string LeavesBullet =
         "- `layering/leaves-independent` — Each of the Reporting and Billing layers must not reference " +

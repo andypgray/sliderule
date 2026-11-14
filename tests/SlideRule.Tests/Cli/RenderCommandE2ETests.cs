@@ -88,27 +88,25 @@ public sealed class RenderCommandE2ETests : IDisposable
         RenderSpecProvenance +
         RenderedLawText.InstallNote +
         "## Architecture (SlideRule)\n\n" +
-        "reference = a source-level type reference. Expand any rule ID with `sliderule explain <rule-id>`.\n\n" +
+        "reference = a source-level type reference. " +
+        RenderedLawText.GlossaryTail + "\n\n" +
         "### Layers\n" +
         "- **Domain** — `MyApp.Domain.*`\n" +
         "- **Web** — `MyApp.Web.*`. The HTTP surface: controllers and the views they serve.\n\n" +
         "### Rules\n" +
         "- `layering/billing-independent` — Types in `MyApp.Legacy.Billing.*` must not reference " +
-        "types in `MyApp.Web.*`. Billing must not reach up into the web layer.\n" +
-        "- `naming/interfaces` — Interfaces in `MyApp.*` must be named `I*`. " +
-        "House naming convention; agents grep by I-prefix.\n\n" +
+        "types in `MyApp.Web.*`.\n" +
+        "- `naming/interfaces` — Interfaces in `MyApp.*` must be named `I*`.\n\n" +
         "### Migrations\n" +
         "- `data-access/no-inline-sql` — Some existing code here still follows the OLD pattern: " +
         "Controllers build DataTables inline (legacy Active Record style). " +
         "That is grandfathered debt, not house style. New code must follow: " +
         "Types in `MyApp.Web.*` named `*Controller` must not reference types in `System.Data.*`. " +
-        "Repository pattern for testability. " +
         "If you are already editing a grandfathered site and the migration is small, migrate it; " +
         "otherwise do not grow the debt.\n\n" +
         "### Quarantined scopes\n" +
         "- `legacy/billing` — Types in `MyApp.Legacy.Billing.*`, except `IBillingFacade` or `BillingFacade`, " +
         "must be referenced only by types in `MyApp.Legacy.Billing.*`, `IBillingFacade` or `BillingFacade`. " +
-        "Replacement scheduled (BillingV2, ADR-019); not worth stabilizing. " +
         "Sanctioned surface: `IBillingFacade`, `BillingFacade`.";
 
     private const string ScopeBody = RenderSpecProvenance + RenderedLawText.BillingScopeCard;
@@ -127,25 +125,24 @@ public sealed class RenderCommandE2ETests : IDisposable
         LayerSpecProvenance +
         RenderedLawText.InstallNote +
         "## Architecture (SlideRule)\n\n" +
-        "reference = a source-level type reference. Expand any rule ID with `sliderule explain <rule-id>`.\n\n" +
+        "reference = a source-level type reference. " +
+        RenderedLawText.GlossaryTail + "\n\n" +
         "### Layers\n" +
         "- **Web** — project `MyApp.Web`. The HTTP surface: controllers and the views they serve.\n" +
         "- **Billing** — `MyApp.Legacy.Billing.*`\n" +
         "- **Reporting** — types in the Web layer named `Report*`\n\n" +
         "### Rules\n" +
-        "- `layering/web-not-billing` — The Web layer must not reference types in `MyApp.Legacy.Billing.*`. " +
-        "The web layer must reach billing only through the sanctioned facade.\n" +
-        "- `layering/billing-not-web` — The Billing layer must not reference types in `MyApp.Web.*`. " +
-        "Billing must not reach up into the web layer.\n" +
+        "- `layering/web-not-billing` — The Web layer must not reference types in `MyApp.Legacy.Billing.*`.\n" +
+        "- `layering/billing-not-web` — The Billing layer must not reference types in `MyApp.Web.*`.\n" +
         "- `layering/reporting-not-billing` — The Reporting layer must not reference types in " +
-        "`MyApp.Legacy.Billing.*`. The reporting slice takes its numbers from the domain, never from the " +
-        "legacy biller.\n" +
-        RenderedLawText.LeavesBullet +
-        RenderedLawText.LeavesNotCircularBullet +
-        "\n### Quarantined scopes\n" +
+        "`MyApp.Legacy.Billing.*`.\n" +
+        "- `layering/leaves-independent` — Each of the Reporting and Billing layers must not reference " +
+        "the others.\n" +
+        "- `layering/leaves-not-circular` — Each of the Reporting and Billing layers must not have " +
+        "circular references with the others.\n\n" +
+        "### Quarantined scopes\n" +
         "- `legacy/billing` — Types in the Billing layer, except `IBillingFacade` or `BillingFacade`, " +
         "must be referenced only by the Billing layer, `IBillingFacade` or `BillingFacade`. " +
-        "Replacement scheduled (BillingV2, ADR-019); not worth stabilizing. " +
         "Sanctioned surface: `IBillingFacade`, `BillingFacade`.";
 
     // Two layer cards in one directory, merged into one managed block in declaration order: Web's and the
