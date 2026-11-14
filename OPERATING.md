@@ -117,7 +117,7 @@ The tool, the contract, the build analyzer and the xUnit adapter ship one versio
 dotnet tool update -g SlideRule.Cli --version <version>
 ```
 
-Then set the same version on the spec project's `SlideRule` reference, and on `SlideRule.Analyzers` and `SlideRule.Xunit` wherever you use them. Before 1.0, a minor version can change the spec API with no shim, so read the release's Breaking entries in the [changelog](https://github.com/andypgray/sliderule/blob/main/CHANGELOG.md) first. Build the spec, run `sliderule render` so the model file comes from the new tool, and run `check`.
+Then set the same version on the spec project's `SlideRule` reference, and on `SlideRule.Analyzers` and `SlideRule.Xunit` wherever you use them. Before 1.0, a minor version can change the spec API with no shim, so read the release's entries in the [changelog](https://github.com/andypgray/sliderule/blob/main/CHANGELOG.md) first. Build the spec, run `sliderule render` so the model file comes from the new tool, and run `check`.
 
 A half-finished upgrade shows in the build: a model file in a newer schema than the analyzer reads stops it with `SR2091`, and packages at two versions report `SR1093` or `SR2093`. A model file in an older schema is reported as `SR2091` too, until `render --model` rewrites it. The extraction cache starts over by itself after an upgrade, because a run never reuses a cache another SlideRule version wrote, and a baseline file in the previous format is read as before and upgraded on its next write.
 

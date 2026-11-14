@@ -22,7 +22,7 @@ A rule about a layer reads in the layer's name ("The Domain layer must not refer
 
 ## The parts of a rule
 
-A rule is one statement. It starts with `arch.Rule(id)` and has a posture with its constraint, a reason, and up to three optional trailers:
+A rule is one statement. It starts with `arch.Rule(id)` and has a posture with its constraint, a reason, and optional trailers. Every rule can take the parts below, and a `Migrate` rule also takes the trailers its posture describes:
 
 | Part | Required | What it does |
 |---|---|---|

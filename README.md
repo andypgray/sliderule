@@ -6,12 +6,12 @@
 
 SlideRule is a .NET architecture checker that enforces one C# spec and renders the same rules for coding agents.
 
-A long-lived codebase has layers, boundaries and rules. They live in a few heads, no build step checks them, and the diagrams drift. A change can cross a boundary and the build still passes. A coding agent makes that change quickly and plausibly, and it cannot see which walls are structural. SlideRule's answer is architecture-as-code. The rules become one C# spec, and the spec produces every surface this page names.
+A build can succeed after a change crosses a boundary your team intended to preserve. Diagrams and instructions then depend on someone noticing and updating them. SlideRule compiles your architecture decisions into one model for enforcement and generated agent context.
 
-1. **Enforcement.** One checker passes or fails the rules at the command line, in CI, in the build and as named xUnit tests. A Claude Code hook runs the same check when an agent's turn ends.
-2. **Agent context.** The rules render to a managed `AGENTS.md` block and per-directory rule cards, and MCP query tools serve the same rules to coding agents.
+1. **Enforcement.** One checker evaluates rules at the command line, in CI, inside the C# compiler and as individually named xUnit tests. A Claude Code hook checks when an agent's turn ends.
+2. **Agent context.** `sliderule render` writes a managed `AGENTS.md` block and per-directory rule cards. `sliderule mcp` serves the rules through query tools.
 
-SlideRule is pre-alpha. Minor versions can still change the spec API before 1.0. [Status](#status) describes what exists today and the versioning rules.
+SlideRule is pre-alpha. Minor versions can still change the spec API before 1.0. [Status](#status) describes the available features and versioning rules.
 
 Install the tool, build your solution, and check it:
 
@@ -21,7 +21,7 @@ dotnet build MyApp.sln
 sliderule check MyApp.sln
 ```
 
-`check` reads the rules from a spec project, a C# class library in your solution. On a solution with no spec project yet, `check` stops and reports that it found none. The [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md) page makes one with the `SlideRule` package, and `sliderule graph` surveys a solution before it has any rules.
+`check` needs a spec project in the solution that references the `SlideRule` package (`SlideRule.dll`). Without one, it reports `No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.` and exits 2. Use `sliderule init` to create the csproj and empty spec class; [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md) walks the setup. The class implements `IArchitectureSpec`; its `Define(Arch arch)` declares layers, rules and scopes. `sliderule graph` surveys the solution without a spec.
 
 A rule is one statement:
 
@@ -32,11 +32,11 @@ arch.Rule("layering/domain-independent")
     .Fix("Move the dependency out of Domain: define an interface here and implement it in the outer layer that needs it.");
 ```
 
-That is the whole rule. It has an ID, a posture, a constraint, a reason and a fix. Here the posture is `Enforce`, and `domain` and the three layers it must not reference are declared earlier in the spec by namespace pattern. The rule is committed in the [clean-architecture example](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Quoting), and CI keeps `check` green against the codebase it governs. A rule can also cite the page its reason rests on and name a type to copy, as [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md) shows.
+That is the whole rule. Its ID is `layering/domain-independent`; `Enforce` is the posture and `domain.MustNotReference(application, infrastructure, api)` is the constraint. `Because` explains the reason; `Fix` describes the remedy. The four layers were declared earlier by namespace pattern, including `arch.Layer("Domain", "Meridian.Quoting.Domain.*")`. The [clean-architecture example](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Quoting) includes this rule; CI builds and checks that solution with both the repository CLI and the packed tool. [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md) covers optional `Fix`, `Citation(uri)` and `Exemplar(selection)`, which names a type to copy.
 
 ## When an agent breaks a rule
 
-Rules like the one above govern this repository too. One of them keeps the CLI off stdout, because the MCP server speaks JSON-RPC over that channel. Suppose an agent adds a progress printer to the CLI and reaches for `Console.WriteLine`. When it tries to end its turn, the Claude Code `Stop` hook in [`hooks/`](https://github.com/andypgray/sliderule/tree/main/hooks) runs `check` over the working tree. The rule goes red, and the hook blocks the stop with this report on the agent's stderr:
+This repository's `cli/no-stdout` rule forbids direct `Console.Out`, `Console.Write()` and `Console.WriteLine()` use in the Host layer, the CLI project. The MCP server uses stdout for JSON-RPC. Suppose an agent adds `Rendering/ProgressPrinter.cs` with writes on lines 10 and 15. That imagined change breaks only this rule. The Claude Code `Stop` hook runs `check` over the working tree; `SubagentStop` covers workers too. The configuration is in [`hooks/`](https://github.com/andypgray/sliderule/tree/main/hooks). On the first failed stop, the hook exits 2 and blocks the stop with this report on the agent's stderr:
 
 ```text
 FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write()` or `Console.WriteLine()`.
@@ -48,9 +48,9 @@ FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write
   src/SlideRule.Cli/Rendering/ProgressPrinter.cs:15 — SlideRule.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
 ```
 
-The report gives the rule, its reason, its citation, the fix and each offending line. The `subject:` line appears only when a rule's subject includes generated code, here 1 of its 228 types. The agent routes the output through the command's console instead, and the next stop is clean.
+Claude Code returns stderr to the agent so it can continue. The report starts with the rule ID and sentence, then the reason, optional citation, fix and exemplar, followed by the subject and offending lines. The `subject:` line appears only when the subject includes generated types. The agent writes through the command's `InvocationConfiguration` console, and the next stop passes.
 
-The [SlideRule on itself](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md) page shows this repository's own spec on the other surfaces too, from the prose it renders to code scanning and the graph. It also explains how every excerpt on both pages is held to its source.
+The printer exists only in the demonstration. [SlideRule on itself](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md) shows the same report and explains how excerpts are checked against their sources. It also shows the generated prose, code scanning and graph. The hook permits three consecutive continuations per prompt by default, configurable with `--max-rounds`; after that it reports the failure without blocking.
 
 ## The four postures
 
@@ -63,19 +63,21 @@ Every rule has one of the first two, and every scope one of the last two.
 | `Quarantine` | containment for a scope | a new reference into the scope |
 | `Caution` | dragons for code new callers may use | never fails; a change touching it warns |
 
-`Migrate` is for a rule the code does not keep yet. `sliderule baseline init` records the rule's current violations, and any new violation fails from then on. As sites are fixed, `sliderule baseline accept-reductions` shrinks the baseline, and once it is empty, `status` suggests promoting the rule to `Enforce`.
+Use `arch.Rule(id).Enforce(...)` for a rule that must pass now, or `.Migrate(from, to)` to introduce a target alongside existing violations. `sliderule baseline init` records the current violations of each ratcheted rule. New violations fail; baselined sites pass. As sites are fixed, `sliderule baseline accept-reductions` shrinks the counted baseline. When it is empty, `sliderule status` reports `promotable to Enforce (baseline is empty)`.
 
-A scope marks code that needs care. Its dragons are notes on why the code is fragile and how to call into it. `render` puts them on a card in the scope's directory. `Quarantine` also records the references into the scope on a baseline, and fails any new one except through the surface `BoundaryOnlyVia` names. Both kinds of scope warn when a change touches them, given `check --diff-base <ref>`. The [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md) page shows each posture in code, and [Operating SlideRule](https://github.com/andypgray/sliderule/blob/main/OPERATING.md) follows a ratchet from capture to promotion.
+Declare a scope with `arch.Scope(id).Quarantine(selection)` or `.Caution(selection)`. `Dragons(prose)` or `DragonsDoc(path)` explains the fragile code and how to call it; `render` writes that guidance into its directory's card. Quarantine baselines references into the scope and fails new ones that bypass the surface named by `BoundaryOnlyVia`. Both scopes also warn when a changed file declares a type in the scope. Use `check --diff-base <ref>` for those tripwires; without diff context they are skipped. Tripwires never fail, and `Caution` has no failing containment rule.
 
-The three postures after `Enforce` each answer a way a coding agent goes wrong on an established codebase. `Enforce` is the law the code already keeps, and a change that crosses it fails wherever the check runs. The [Meridian example](https://github.com/andypgray/sliderule/blob/main/examples/Meridian/README.md#three-ways-an-agent-goes-wrong-here) walks three of those ways on real output.
+[Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md) shows all four postures in code. [Operating SlideRule](https://github.com/andypgray/sliderule/blob/main/OPERATING.md) follows a ratchet from capture to promotion. The [Meridian example](https://github.com/andypgray/sliderule/blob/main/examples/Meridian/README.md#three-ways-an-agent-goes-wrong-here) demonstrates three changes with check output:
 
-- An agent copies the majority pattern, the statistical prior. Six of Meridian's eight controllers open a `SqlConnection`, so inline SQL reads as house style and an agent writes its next controller the same way. `Migrate` answers it. The rendered context calls that pattern debt, in words the agent reads before it writes.
-- An agent tidies away a gateway, the helpful refactor. A public type inside a module invites a direct call that skips the gateway in front of it. A `Quarantine` scope makes the gateway the only sanctioned way in.
-- An agent corrects structural weirdness. A check-digit table that skips values looks like a bug, and making it contiguous breaks real container numbers. The dragons on a `Quarantine` or `Caution` scope answer it. The card on that scope's directory explains what the code does, which part is structural, and how to call in.
+- Copying the majority pattern. Six of Meridian's eight controllers open a `SqlConnection` and run inline SQL; Bookings and Quotes do not. `Migrate` identifies the old pattern in generated context: `That is grandfathered debt, not house style. New code must follow: ...` An existing pattern can therefore remain in the code while new instances fail.
+
+- Bypassing a gateway. Meridian quarantines `Meridian.Clearance.*` behind `IClearanceGateway` and `ClearanceGateway`. A new direct reference to its public `ContainerNumberValidator` fails `clearance/engine/containment`, with the fix to use `IClearanceGateway`.
+
+- Changing code that looks wrong. The clearance engine's ISO 6346 letter-value table skips every multiple of 11. Making it contiguous breaks real container numbers. The dragons on the module's directory card explain those gaps before an agent edits them.
 
 ## What one spec produces
 
-Each target below reads the same model. Every violation report gives the rule ID, the generated rule sentence, the reason and the exact `file:line`. A rule's fix, citation and exemplar appear there too when it has them.
+Each target below reads the same model. A violation report gives the rule ID, generated sentence, `Because` and offending `file:line`, plus any citation, fix and exemplar.
 
 | Target | What it is |
 |---|---|
@@ -88,13 +90,13 @@ Each target below reads the same model. Every violation report gives the rule ID
 | [`sliderule mcp`](https://github.com/andypgray/sliderule/blob/main/CLI.md#mcp) | `arch_check`, `arch_status`, `arch_explain`, `arch_context`, and `arch_graph`, plus a `derive_spec` prompt |
 | [`sliderule hook`](https://github.com/andypgray/sliderule/blob/main/CLI.md#hook) | `check` when a Claude Code agent's turn ends; a red rule blocks the stop |
 
-The adapter's failure text is byte-identical to the CLI's. The two share one renderer, and a product test pins them equal. The managed block plus `sliderule explain` are also the generated architecture documentation, written for agents first and readable by people. The [SlideRule on itself](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md#the-prose-it-generates) page shows the gate that keeps it current.
+An xUnit failure uses the CLI's rule block from the same renderer; a test requires their text to match. The managed block and `sliderule explain <rule-id>` provide the architecture documentation, including a rule's reason and fix. `render --model` writes `sliderule.model.json`; later renders refresh it whenever it exists. `render --diagram <path>` puts both diagrams in that file's managed block. In this repository, tests recompose the root block and every committed card and fail on drift. [SlideRule on itself](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md#the-prose-it-generates) shows the generated files.
 
-The [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#which-agents-use-what) page explains which agents read the `AGENTS.md` files and use each surface. It also gives the line a repository with its own `CLAUDE.md` adds for Claude Code.
+The [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#which-agents-use-what) page maps agents to the surfaces they read. If your repository has its own `CLAUDE.md`, add `@AGENTS.md` to import the managed block into Claude Code. `render` warns when it finds a Claude instruction file without that import.
 
 ## Compared with ArchUnitNET and NetArchTest
 
-[NetArchTest](https://github.com/BenMorris/NetArchTest) and [ArchUnitNET](https://github.com/TNG/ArchUnitNET) run architecture rules inside your unit tests, and they are good at it. SlideRule moves the rules out of test code into one spec and renders every surface above from it.
+[NetArchTest](https://github.com/BenMorris/NetArchTest) and [ArchUnitNET](https://github.com/TNG/ArchUnitNET) run architecture rules through your test runner. SlideRule defines the rules in a separate spec project that supplies every target above.
 
 | Tool | What you write | Where it runs |
 |---|---|---|
@@ -102,17 +104,17 @@ The [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGEN
 | ArchUnitNET | ArchUnit-style rules in test classes | your test runner |
 | SlideRule | one spec in its own project | every target above |
 
-The grammar comes from surveying that prior art, and [GRAMMAR.md](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md) records each divergence. Constraints negate in the verb (`MustNotReference`), following ArchUnitNET. ArchUnit's `FreezingArchRule` accepts a rule's current violations as a baseline, and here that is `Migrate` with its counted baseline. `Quarantine` applies the same ratchet to a region of code, counting the references into it today and failing any new one that bypasses its sanctioned surface.
+[GRAMMAR.md](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md) records the differences from ArchUnit, ArchUnitNET and NetArchTest. Negation belongs in the constraint verb, as in `MustNotReference`, following ArchUnitNET; there is no `ShouldNot()`. ArchUnit's `FreezingArchRule` accepts current violations as a baseline. SlideRule uses `Migrate` with a counted baseline for that purpose. `Quarantine` applies the same ratchet to references into a scope.
 
-`Because` is mandatory. A rule without one is an invalid spec, and `check` stops before it evaluates anything, reporting every spec error in one pass. Even the predicate escape hatch, `Must(condition, description:)`, does not compile without its description. Agents read every reason through `explain`, the MCP server and the report of a failed rule. In the [Interchange example](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Interchange), each of the 12 rules has a `Citation` naming the learn.microsoft.com page its reason rests on. Of those 12, 9 come from a shared rule pack, an ordinary class library of static methods. The pack owns the citation, and the spec picks the posture. That pack is a worked example in this repository rather than a published package. A pack of your own is a class library in your repository, with no registry to depend on.
+Every rule and scope requires `Because`; omitting it produces `MissingBecause`. An invalid spec stops `check` before evaluation and reports all spec errors in one pass. The predicate escape hatch, `Must(predicate, description:)`, requires a description even to compile. Reasons reach agents through the directory cards, `explain`, MCP's `arch_explain` and failed-rule reports. The [Interchange example](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Interchange) has 12 rules, each citing a learn.microsoft.com page. Nine come from the `DotNetGuidance` pack, an ordinary class library of static methods; three are written in the spec. Each pack method supplies its rule's citation, and the spec chooses a `PackPosture`, such as `PackPosture.Enforce`. The pack is a worked example in this repository and is not published as a package.
 
 ## Starting on a codebase that already exists
 
-SlideRule is built for long-lived, business-critical .NET codebases, where the architecture is real but lives in a few people's heads. You can write the first rules yourself or have an agent draft them through the `derive_spec` prompt, as [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md) shows. You review every rule the agent proposes, and accept, edit or drop it before anything is committed. [A reference architecture held to its own book](https://github.com/andypgray/sliderule/tree/main/examples/eShopOnWeb) shows the whole adoption on Microsoft's reference application, from the agent's draft to CI.
+Start by writing down the boundaries your team already intends to preserve. You can write the rules yourself or ask an agent to draft them through the `derive_spec` prompt in [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md). The recipe stops for you to accept, edit or drop each proposed rule individually. It leaves `baseline init`, `render` and the commit to you. [A reference architecture held to its own book](https://github.com/andypgray/sliderule/tree/main/examples/eShopOnWeb) shows an agent-drafted, human-curated spec on a public fork of Microsoft's reference application.
 
 ## What it handles
 
-Real solutions are rarely one shape. Each row is one case and what the checker does with it. The [changelog](https://github.com/andypgray/sliderule/blob/main/CHANGELOG.md) records the release each landed in.
+The survey reports which parts of a solution it could read. These cases describe how projects and references enter the model; see the [changelog](https://github.com/andypgray/sliderule/blob/main/CHANGELOG.md) for release history.
 
 | Case | What the checker does |
 |---|---|
@@ -128,70 +130,70 @@ Real solutions are rarely one shape. Each row is one case and what the checker d
 | A second run over the same solution | reuses a [persisted cache](https://github.com/andypgray/sliderule/blob/main/CLI.md#caching) and re-extracts only the changed projects, and their dependents when a declaration changed |
 | An edit confined to method bodies | re-extracts the edited project alone |
 
-A project in a language the checker does not read makes the model smaller. The check, status and graph documents list it with the reason, and the run still answers. The survey, `sliderule graph`, names the framework a multi-targeting project's shared types follow. It also lists every type name that two projects, or a project and a package, both declare. `.Authored()` on a rule's subject keeps the rule off generated code.
+Projects in unsupported languages remain visible in the check, status and graph documents, with reasons under `unsupportedProjects`; the run still answers. A solution filter's omitted projects appear under `uncheckedProjects`. `sliderule graph` identifies the framework supplying shared types' members and hierarchy, and lists names declared in multiple projects or shadowing package types. For each shared type, members and hierarchy come from the first framework that declares it; references include every framework. Apply `.Authored()` to a rule's subject to exclude generated types. CI scaffolds and checks the documented spec project with per-project package versions and with central package management.
 
-After an edit, a check loads only the projects it re-extracts and the projects they reference. That is the check `hook` runs when an agent's turn ends, and its output is byte for byte what a cold run prints. The [command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md#caching) lists the cases where such a check loads the whole solution instead.
+The persisted cache has one directory per solution. After an edit, a cached check loads the projects needing extraction and the projects they reference. Its stdout, stderr and exit code match a `--no-cache` run. `hook` uses that cached check when one is due. A missing spec-resolution record, rejected filter or structural edit can require loading the whole solution. Changes to a project file or `Directory.Build.props` are examples; the [command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md#caching) lists the fallback cases.
 
 ## .NET Framework
 
-The tool runs on .NET 10. The codebase it checks does not have to, and neither does the spec that governs it.
+The tool runs on .NET 10. Your application and its spec can target .NET Framework.
 
-A spec project can target `net48` and compile at that framework's default language level, C# 7.3. It references the same netstandard2.0 `SlideRule` package every other spec does, and the CLI loads the built DLL in an isolated load context. A `typeof()` reference to a product type works while that type and everything it depends on stay inside netstandard2.0. Anything past that, such as a .NET Framework type with no .NET counterpart, is named by a namespace pattern. A filter such as `DerivedFrom` also takes the type's full name as a string. Neither needs an assembly load.
+A spec project can target `net48` at its default C# 7.3 language version and build on any OS, including Linux. It references the `netstandard2.0` `SlideRule` contract package. The CLI loads its built DLL into a collectible, isolated `AssemblyLoadContext` and builds the model on .NET 10. A `typeof()` anchor on a product type works when that runtime can load the type and its dependencies. A type implementing `System.Web.IHttpHandler` cannot load there; the resulting `TypeLoadException` becomes a user error naming the unavailable type. Use a namespace pattern for such types. Patterns require no assembly load, even from a spec that cannot reference `System.Data`. `DerivedFrom` also accepts a base type's fully qualified name as a string when the spec cannot compile against it.
 
-Old project files load too. A non-SDK-style Framework project is the kind in the 2003 MSBuild XML namespace, with explicit `<Reference>` items and a hand-maintained `AssemblyInfo.cs`. It loads through the .NET Framework build host Roslyn ships and reports at `file:line` like anything else:
+Non-SDK-style projects load through Roslyn's `net472` Framework build host. These include projects in the 2003 MSBuild XML namespace, with explicit `<Reference>` items and a `Properties\AssemblyInfo.cs` compile item. A check reports at `file:line` even from an unbuilt tree:
 
 ```text
 FAIL data-access/no-inline-sql — Types in `Classic.*` must not reference types in `System.Data.*`.
   Classic.Billing/BillingCalculator.cs:10 — Classic.Billing.BillingCalculator references System.Data.SqlClient.SqlConnection
 ```
 
-`check --binlog` replays a binary log from a real build of the solution on the same machine, in place of its own design-time build. The log can come from .NET Framework `MSBuild.exe`. Replaying the log and opening the workspace directly produce byte-identical output.
+`check --binlog` replays a `.binlog` from a real build of the solution on the same machine, replacing the design-time build. The capture persists; later runs replay it automatically while it remains structurally valid. The log can come from .NET Framework `MSBuild.exe`, with stdout, stderr and exit code identical to a direct workspace check. Basic.CompilerLog replays it into an `AdhocWorkspace`; it opens no `MSBuildWorkspace` and starts no build host. It reads current sources from the disk paths recorded by the build.
 
-Loading a non-SDK-style project and replaying a log from .NET Framework `MSBuild.exe` both need Windows, because that is where the Framework build host and `MSBuild.exe` come from. The [command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md#framework-host-selection) explains which Visual Studio or Build Tools install the tool takes, and how to choose one. A net48 spec project has no such requirement and builds anywhere.
+Direct loading of non-SDK-style projects needs Windows and a Visual Studio or Build Tools MSBuild installation, located with `vswhere`. A log from Framework `MSBuild.exe` is also made and replayed on Windows, on its originating machine. The [command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md#framework-host-selection) explains host selection and the `SLIDERULE_VS_INSTALL_PATH` override.
 
 ## Examples
 
-Six of the worked examples in [`examples/`](https://github.com/andypgray/sliderule/tree/main/examples) share one fictional freight-forwarding company. Four are solutions. CI builds each one, keeps `check` green against the committed tree, and runs `render --check` to prove every file a render writes under `examples/` current:
+Six examples in [`examples/`](https://github.com/andypgray/sliderule/tree/main/examples) use Meridian, a fictional freight-forwarding company. Four are solutions that CI builds and checks for a passing verdict, then verifies with `render --check`, including their diagrams:
 
-- [Enforce-only clean architecture](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Quoting): the greenfield quoting subsystem. Nine rules govern a four-layer clean architecture, and every rule runs as a named xUnit test.
+- [Enforce-only clean architecture](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Quoting): nine `Enforce` rules over Domain, Application, Infrastructure and Api. CI also runs each rule as a named xUnit test.
 
-- [Three of the four postures on one codebase](https://github.com/andypgray/sliderule/tree/main/examples/Meridian): a mid-migration monolith. It has the law, three ratchets and their burndown, and one quarantined scope.
+- [Three of the four postures on one codebase](https://github.com/andypgray/sliderule/tree/main/examples/Meridian): `Enforce` rules that already hold, three `Migrate` rules and a quarantined clearance engine. Two migrations are written locally; one comes from the rule pack. The quarantine's entry points are `IClearanceGateway` and `ClearanceGateway`.
 
-- [Module isolation as law](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Operations): a modular monolith. Every module directory has its own rendered rule card, and one module is quarantined behind its facade.
+- [Module isolation as law](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Operations): rendered cards for all five modules, Demurrage, Dispatch, Host, Invoicing and Tracking. Demurrage is quarantined behind `IDemurrageCalculator` and `DemurrageCalculator`.
 
-- [Microsoft guidance, enforced and cited](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Interchange): the cookbook page. It shows the canon sentence, spec excerpt, and real violation, rule by rule.
+- [Microsoft guidance, enforced and cited](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Interchange): a cookbook showing each rule's guidance sentence, spec excerpt and real violation.
 
-The other two walk a flow on the Meridian monolith, with captured output:
+Two walkthroughs use the Meridian monolith:
 
-- [Day-one adoption on an existing codebase](https://github.com/andypgray/sliderule/blob/main/examples/Meridian/ADOPTING.md): the full derive flow, every step a real command with real output.
+- [Day-one adoption on an existing codebase](https://github.com/andypgray/sliderule/blob/main/examples/Meridian/ADOPTING.md): derive the first spec, review its rules and capture the baseline, with command output.
 
-- [The agent loop, closed by a hook](https://github.com/andypgray/sliderule/tree/main/examples/Meridian/hooks): the storyboard for the loop above, walked beat by beat. It also has the paste-in hook config.
+- [The agent loop, closed by a hook](https://github.com/andypgray/sliderule/tree/main/examples/Meridian/hooks): a storyboard of a violation caught at turn end, with hook configuration.
 
-The seventh runs on code you may already know:
+The seventh example uses Microsoft's reference application:
 
-- [A reference architecture held to its own book](https://github.com/andypgray/sliderule/tree/main/examples/eShopOnWeb): a public fork of eShopOnWeb, Microsoft's reference application, with a spec an agent drafted from the application's e-book and a person then curated. CI fetches the fork's pinned commit and re-runs every command output the page shows.
+- [A reference architecture held to its own book](https://github.com/andypgray/sliderule/tree/main/examples/eShopOnWeb): a public eShopOnWeb fork with an agent-drafted, human-curated spec derived from its e-book. `showcase.json` pins the fork's commit. CI fetches it, checks it and runs the page's commands against a fresh clone. Tests compare the page's output and excerpts with that checkout.
 
 ## Installing
 
-The CLI is a .NET global tool, and the machine that runs it needs a .NET 10 SDK. The [requirements](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#requirements) in Getting started cover the rest, including an install inside a repository whose `global.json` pins an SDK below 10.
+Install `SlideRule.Cli` as a .NET global tool on a machine with a .NET 10 SDK. The [requirements](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#requirements) cover setup, including repositories whose `global.json` pins an SDK below 10.
 
-The [command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md) covers each command's options and exit codes, and what a run does when a project fails to load or a solution filter narrows it.
+The [command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md) describes every command's options and exit codes, including failed loads and filtered solutions.
 
-The command is `sliderule`. Five lockstep-versioned packages make up a release, and a spec project references `SlideRule` at the version `sliderule --version` prints:
+The command is `sliderule`. Five lockstep-versioned packages make up a release. Reference `SlideRule` at the version `sliderule --version` prints; `init` writes that version into the scaffold:
 
 | Package | What it is |
 |---|---|
-| [`SlideRule.Cli`](https://www.nuget.org/packages/SlideRule.Cli) | The `sliderule` global tool: `check`, `render`, `explain`, `status`, `graph`, `baseline`, `hook`, and the MCP server (`sliderule mcp`). |
+| [`SlideRule.Cli`](https://www.nuget.org/packages/SlideRule.Cli) | The `sliderule` global tool: `init`, `check`, `render`, `explain`, `status`, `graph`, `baseline`, `hook`, and the MCP server (`sliderule mcp`). |
 | [`SlideRule`](https://www.nuget.org/packages/SlideRule) | The spec contract, zero dependencies. It includes an analyzer that reports a spec's bad string literals as compiler warnings while you write it, and completion for namespace and type names. |
 | [`SlideRule.Xunit`](https://www.nuget.org/packages/SlideRule.Xunit) | The xUnit adapter: every rule as an individually named test. |
 | [`SlideRule.Analyzers`](https://www.nuget.org/packages/SlideRule.Analyzers) | The build analyzer: a broken rule as a squiggle in the editor and a compiler warning in `dotnet build`, read from the model file `render --model` writes. |
 | [`SlideRule.Guidance.DotNet`](https://www.nuget.org/packages/SlideRule.Guidance.DotNet) | Microsoft's .NET guidance as compiler warnings, one ID per rule, with no spec to write. |
 
-[Operating SlideRule](https://github.com/andypgray/sliderule/blob/main/OPERATING.md#upgrading) explains how to keep the tool and the packages on one version as releases come out.
+Guidance diagnostics start at `SR3001` and need no spec, model file or tool. [Operating SlideRule](https://github.com/andypgray/sliderule/blob/main/OPERATING.md#upgrading) explains how to upgrade the packages and tool together.
 
 ## Connecting an MCP client
 
-An MCP client launches the same tool with the `mcp` command; the server speaks stdio. The `.mcp.json` shape:
+For a stdio MCP server, launch the tool's `mcp` command with this `.mcp.json` configuration:
 
 ```json
 {
@@ -204,29 +206,29 @@ An MCP client launches the same tool with the `mcp` command; the server speaks s
 }
 ```
 
-A config generated from the MCP registry passes no solution. The server then finds one as every command does, from a committed `sliderule.json` or by walking up from its working directory. Where it cannot, bind one at install time. The [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md) page covers binding, the tools and the `derive_spec` prompt.
+Registry-generated configurations pass `mcp` alone. Without a solution argument, the server reads `SLIDERULE_SOLUTION_PATH`, then walks upward from its working directory. It stops at the first directory with a `sliderule.json` or exactly one solution. If that finds none, pass a solution argument, set the environment variable at installation, or commit `sliderule.json` at the repository root. [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md) covers binding the server, its tools and the `derive_spec` prompt.
 
 ## Documentation
 
-- [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md): the first run, from no spec to a green check.
+- [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md): create your first spec project and reach a green check.
 
-- [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md): the parts of a rule, the postures and scopes, and what a rule covers.
+- [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md): rule parts, postures, subjects and scopes.
 
-- [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md): the context files, the MCP server and the hook.
+- [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md): context files, MCP connections and the turn-end hook.
 
-- [Operating SlideRule](https://github.com/andypgray/sliderule/blob/main/OPERATING.md): CI, ratchets, the build analyzer, upgrades and failed runs.
+- [Operating SlideRule](https://github.com/andypgray/sliderule/blob/main/OPERATING.md): CI, reducing baselines, analyzer rollout, upgrades and failed runs.
 
-- [Command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md): every command, option, exit code and document.
+- [Command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md): command help, options, exit codes and JSON documents.
 
 - [GRAMMAR.md](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md): the language reference.
 
-- [SlideRule on itself](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md): this repository's own spec, checked and rendered over its own code.
+- [SlideRule on itself](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md): this repository's spec checked and rendered over its own code.
 
 ## Status
 
-SlideRule 0.1.0 is the first release. Every surface on this page exists today, and all four postures evaluate. [SlideRule on itself](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md) shows these surfaces running over this repository's own code, and CI uploads that `check --sarif` run to code scanning. The build analyzer is the exception, [proven on the four example solutions](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md#in-the-build) instead. The fluent surface can still move; [GRAMMAR.md](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md) is its spec, and [its vocabulary table](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md#5-vocabulary-v1-closed-every-member-ships-with-pinned-fragments) is generated from the shipped API.
+SlideRule's first release was 0.1.0 on 2026-10-09. All four postures evaluate. CI checks this repository through its own GitHub action and uploads the SARIF result to code scanning. The build analyzer runs at its last released version over this repository's projects, and as built from this repository's source over [the four example solutions](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md#in-the-build). CI treats its diagnostics as errors. [GRAMMAR.md](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md) specifies the language; [its vocabulary table](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md#5-vocabulary-v1-closed-every-member-ships-with-pinned-fragments) is generated from the shipped API.
 
-The packages version in lockstep under 0.x semver. Every spec-API change is listed under Breaking in the [changelog](https://github.com/andypgray/sliderule/blob/main/CHANGELOG.md) and ships without a shim, and a patch version makes none. The [JSON documents](https://github.com/andypgray/sliderule/blob/main/CLI.md#documents-and-versions) have a `schemaVersion` that moves when their shape does, and the human-readable reports can gain lines in any release. Tests pin the public surface of `SlideRule` and `SlideRule.Xunit`, the two packages a consumer compiles against. That surface is the spec language and the adapter's test base class, and the engine behind them is internal. The surface is also compared with the previous release at pack time, so a change there cannot slip in by accident.
+The packages share one root `<Version>` under 0.x semantic versioning. Spec-API changes appear in the [changelog](https://github.com/andypgray/sliderule/blob/main/CHANGELOG.md) and ship without a shim. The 0.2.0 selection-namespace move required rebuilding 0.1.x specs; an unrebuilt spec is rejected with a message naming the move. The [JSON documents](https://github.com/andypgray/sliderule/blob/main/CLI.md#documents-and-versions) have a top-level `schemaVersion` that moves when their shape does; the hook document's shape is Claude Code's and has none. Human-readable reports can gain lines in any release. Tests pin the public spec language in `SlideRule` and the `SlideRule.Xunit` test base, `ArchRuleTests<TSpec>`. These are the two packages a consumer compiles against. Both packages also validate against the last published release at pack time. The checking engine is internal.
 
 ## Building
 
@@ -235,7 +237,7 @@ dotnet build SlideRule.slnx
 dotnet test SlideRule.slnx
 ```
 
-[CONTRIBUTING.md](https://github.com/andypgray/sliderule/blob/main/CONTRIBUTING.md) covers the rest of working on SlideRule itself.
+[CONTRIBUTING.md](https://github.com/andypgray/sliderule/blob/main/CONTRIBUTING.md) covers working on SlideRule itself.
 
 ## License
 

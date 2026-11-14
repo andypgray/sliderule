@@ -65,8 +65,8 @@
          version names the last published release, as PackageValidationBaselineVersion below does, and
          moves with it.
 
-         Six projects take it as an ordinary private PackageReference, the way a consumer does. The
-         analyzer project and the two it references, Core and Extraction, cannot: NuGet walks a project's
+         Every src project takes it as an ordinary private PackageReference, the way a consumer does,
+         except the analyzer project and the two it references, Core and Extraction: NuGet walks a project's
          references for cycles before PrivateAssets prunes anything, so a reference in either of those
          two reaches the analyzer project's own graph as the package of its own name, and restore fails
          with NU1108. Those three download the package instead, which keeps it out of the dependency

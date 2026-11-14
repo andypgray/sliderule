@@ -1,14 +1,14 @@
 # Command-line reference
 
-`sliderule` is the command SlideRule installs as a .NET global tool, and this page is its reference. Each command's help appears as the tool prints it, followed by what the help has no room for. The topics that span several commands come after the commands, from how a command finds its solution to the environment variables SlideRule reads.
+`sliderule` is the command installed by the `SlideRule.Cli` .NET global tool package. This page lists each command's help as the tool prints it, followed by details about its behavior. Commands appear in root-help order, with subcommands after their group. Shared topics follow, from solution and spec resolution to environment variables.
 
-The install and what the machine needs are in [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#requirements). Writing rules is covered in [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md), with the whole vocabulary in [GRAMMAR.md](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md#5-vocabulary-v1-closed-every-member-ships-with-pinned-fragments). Running the check in CI, working a ratchet down and upgrading are in [Operating SlideRule](https://github.com/andypgray/sliderule/blob/main/OPERATING.md). The help on this page is printed at a width of 100 columns, and a terminal wraps it to its own.
+[Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#requirements) covers installation and machine requirements. [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md) covers rule authoring, and [GRAMMAR.md](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md#5-vocabulary-v1-closed-every-member-ships-with-pinned-fragments) lists the full vocabulary. [Operating SlideRule](https://github.com/andypgray/sliderule/blob/main/OPERATING.md) covers CI, reducing baselines and upgrades. Help blocks use invariant-culture output at 100 columns; a terminal wraps help to its own width.
 
 ## Commands
 
-Every command that takes a solution finds it, and its spec, the same way, as [Solution and spec resolution](#solution-and-spec-resolution) describes. A repository that commits a [settings file](#the-settings-file) can leave both out of every command.
+Commands resolve solutions through the argument, `SLIDERULE_SOLUTION_PATH`, a settings file or a walk up the directory tree. Commands that use a spec take `--spec`, the settings file's spec or the convention, in that order. See [Solution and spec resolution](#solution-and-spec-resolution) for the search rules. A committed [settings file](#the-settings-file) lets you omit both paths. `init` uses the argument, environment variable and walk up, without reading settings, and rejects an existing settings file.
 
-A token that begins with `-` where a solution goes, or where `explain` takes its rule ID, is rejected with `Unrecognized option '<token>'.` Write a path that begins with a dash as `./-name`. A `--` in front of it does not help, because the refusal applies after `--` as well.
+A positional token beginning with `-` produces `Unrecognized option '<token>'.` during parsing. This applies to solution paths, `explain` rule IDs and subcommand arguments, including tokens after `--`. The exit code is 2, except for the `hook` verb, which reports its own errors with exit 1. Write a path beginning with a dash as `./-name`.
 
 ```text
 Description:
@@ -100,25 +100,27 @@ Options:
   -?, -h, --help                 Show help and usage information
 ```
 
-`init` writes a solution's first spec project, the same one the [`derive_spec` recipe](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#drafting-a-spec-with-derive_spec) scaffolds. It writes `arch/MyApp.Architecture/` in the directory of `MyApp.sln`, holding the csproj and an `ArchitectureSpec` class with no rules. It then adds the project to the solution with `dotnet sln add`, which maps it in every configuration the solution declares, and writes a [settings file](#the-settings-file) naming both. The settings file goes at the root of the git work tree above the solution, or in the solution's directory outside one. Last, it builds the spec project and runs `check`, and its exit code is that check's. Restore the solution first, because `init` surveys it as `graph` does, and a project that fails to load or to restore stops the run with exit 2.
+`init` creates the first spec project from the csproj and class templates embedded in the [`derive_spec` recipe](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#drafting-a-spec-with-derive_spec). For `MyApp.sln`, it writes `arch/MyApp.Architecture/MyApp.Architecture.csproj` and `ArchitectureSpec.cs` in the solution directory. `ArchitectureSpec.Define` is empty unless you pass `--from-graph`. Use `--name` to change the project name and namespace, and `--output` to change the parent folder.
 
-The csproj references `SlideRule` at the version `sliderule --version` prints. It opts out of central package management, package validation, generated documentation and an inherited target framework, any of which would otherwise break its first build. Where the solution's `.editorconfig` sets a `file_header_template`, the spec class starts with that header.
+It runs `dotnet sln <solution> add <csproj>`, then writes a [settings file](#the-settings-file) naming the solution and spec project. That file goes at the containing git work-tree root, or in the solution directory outside a work tree. It then builds the spec with `dotnet build` and runs `check` with it, returning the check's exit code. Restore the solution first. The initial survey uses the same loading rules as `graph`; failed loads or restores stop it with exit 2 unless you pass `--allow-workspace-diagnostics`.
 
-Its target framework, unless `--framework` names one, is the highest .NET Framework one on an estate whose projects target only .NET Framework, and `net10.0` otherwise. Under a `global.json` that pins an SDK below 10, without a `rollForward` across majors, it is the pinned SDK's own `netN.0`. A pin below SDK 6, which cannot compile the spec class, stops the run.
+The csproj references `SlideRule` at the running tool's informational version before the first `+`. `sliderule --version` prints the full version, which can include a `+<commit>` suffix. The scaffold sets `ManagePackageVersionsCentrally`, `IsPackable` and `GenerateDocumentationFile` to `false`, and clears an inherited `TargetFramework` before setting `TargetFrameworks`. These settings prevent inherited central versioning, package validation, documentation generation or framework settings from causing NU1008, NU1101, CS1591 or NETSDK1005. An applicable `.editorconfig`'s `file_header_template` becomes `//` comment lines above the spec class; blank or `unset` values add no header.
 
-`init` exits 2, before it writes anything, in these cases:
+Without `--framework`, a solution targeting only .NET Framework gets its highest framework, such as `net48`. Other solutions get `net10.0`, subject to the nearest `global.json` at or above the solution directory. If it pins an SDK below 10, the target is that SDK's `netN.0`, unless `rollForward` is `major` or `latestMajor`. In this case, a pin below SDK 6 exits 2 because the class requires C# 10.
 
-- a project in the solution already references `SlideRule`;
-- a `sliderule.json` exists in the solution's directory or in a directory between it and the work-tree root;
-- the spec project's folder already exists, or a folder above it contains a project file, whose project would compile the spec class;
-- the solution is a solution filter;
-- a segment of the namespace is `Arch`, which hides the `Arch` type `Define` takes (CS0118).
+`init` exits 2 before writing any file in these cases:
 
-Once it has written the files, a failed `dotnet sln add` or build exits 2 with the output and the commands that finish the job by hand. A second `init` stops at the folder the first one wrote.
+- The solution is a `.slnf` solution filter.
+- A `sliderule.json` exists between the solution directory and the work-tree root, including both endpoints.
+- The spec folder already exists, or an ancestor up to the work-tree root contains a `.csproj`, `.vbproj` or `.fsproj` that would compile the class.
+- A solution project already references `SlideRule` by package or project reference. The error names that project.
+- A namespace segment is `Arch`, which hides the `Arch` type used by `Define` and causes CS0118.
 
-`--from-graph` also writes rules recorded from the project graph. It writes a layer for each product project, a solution member that declares types and references no test framework. For each project it then writes a rule that the project must not reference the projects it is not connected to in either direction. A connection follows the references the projects declare and the ones the code makes. Each rule's reason names the project graph as its source and gives the day, so the rendered rules read as unreviewed until someone rewrites them. A rule allows any reference that follows a path the graph already has, and no rule binds a project added later. With no unconnected pair, `--from-graph` writes no rule and prints a line explaining why.
+After writing begins, a failed `dotnet sln add` or build prints the command's output on stderr and exits 2. The error includes commands to finish by hand. A second `init` also exits 2 before writing, because the spec folder or settings file from the first attempt remains.
 
-`init` does not connect a coding agent. It ends by printing the `claude mcp add` command that registers the [MCP server](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#connecting-the-mcp-server), and where the [hook entries](https://github.com/andypgray/sliderule/tree/main/hooks) are.
+`--from-graph` records `Enforce` rules using `MustNotReference`. A product project must be a solution member declaring at least one type. It must have no package reference starting with `Microsoft.NET.Test.Sdk`, `xunit`, `NUnit`, `MSTest` or `TUnit`. Each product project gets a layer and rule only if another product project is unconnected to it. The rule forbids references to all such projects. Connection means either project transitively reaches the other through declared references, inferred references or observed project edges. References along existing paths therefore break no recorded rule, and the fixed layers do not cover projects added later. A generated comment identifies `sliderule init --from-graph` as the source. Each `Because` reads `Recorded from the project graph on <yyyy-MM-dd>: no reference either way then. Replace this with the reason the boundary exists.` With no unconnected pair, it writes no rules and prints `no rule recorded: every two product projects are connected one way or the other`.
+
+`init` finishes by printing next steps to write rules and rebuild. It also prints `claude mcp add --scope project sliderule -- sliderule mcp <solution>` to register the [MCP server](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#connecting-the-mcp-server), and `sliderule install-hook` to add the [hook entries](https://github.com/andypgray/sliderule/tree/main/hooks). Run those commands to complete agent setup; `init` performs neither registration.
 
 ### `check`
 
@@ -181,9 +183,9 @@ Options:
   -?, -h, --help                          Show help and usage information
 ```
 
-Without `--diff-base` every tripwire reports skipped, which is not the same as clean. A pull-request check therefore passes the pull request's base ref, and the checkout has to be deep enough for that ref to resolve. A tripwire touch is one of the [warnings](#warnings) a check can raise, and a warning never fails the run.
+Without `--diff-base`, quarantine and caution tripwires are skipped. The reason is `Tripwire: no diff context — run 'sliderule check --diff-base <ref>' to check changed files against this quarantined scope.` Caution tripwires use `cautioned scope` in that message. With a ref, git lists files committed since it plus changes against HEAD, including untracked files. Each tripwire warns once per changed file declaring a type in its scope, and the tripwire rule passes. These [warnings](#warnings), `quarantinedScopeTouched` and `cautionedScopeTouched`, change neither rule status nor exit code. An unresolved ref exits 2 with `--diff-base could not resolve changed files: …`. A pull-request checkout must include enough history to resolve its base ref.
 
-Seven options have a section of their own below. `--sarif` is under [SARIF](#sarif), `--annotations` and `--annotations-summary` under [GitHub annotations](#github-annotations), `--grain` under [Grains](#grains), and `--binlog` and `--no-cache` under [Caching](#caching). What `--allow-workspace-diagnostics` accepts is under [Wrong and smaller models](#wrong-and-smaller-models).
+See [SARIF](#sarif) for `--sarif`, [GitHub annotations](#github-annotations) for `--annotations` and `--annotations-summary`, and [Grains](#grains) for `--grain`. [Caching](#caching) covers `--binlog` and `--no-cache`. [Wrong and smaller models](#wrong-and-smaller-models) explains what `--allow-workspace-diagnostics` accepts.
 
 ### `explain`
 
@@ -213,11 +215,15 @@ Options:
   -?, -h, --help  Show help and usage information
 ```
 
-`explain` prints one rule whole, and `arch_explain` returns the same text over MCP. The rule ID is the one `check` prints. A rule that a scope contributes has the scope's ID in front of its own, such as `<scope-id>/containment`.
+`explain <rule-id>` prints a `<rule-id> (<posture>)` header, then `sentence:`, `because:`, `citation:`, `fix:` and `exemplar:` fields where present. `Migrate` adds `from:`, `policy:` and `baseline:`. Scope rules add applicable `scope:`, `boundary:`, `baseline:`, `dragons:` and `dragons-doc:` fields. Use the post-desugar ID printed by `check`; scopes generate `<scope-id>/containment` or `<scope-id>/tripwire`. The MCP tool `arch_explain` uses the same runner and returns the same text. Its selectors are `ruleId`, `type` and `path`.
 
-With `--type` or `--path` in place of the rule ID, `explain` answers which layers, rules and scopes claim a type, and why. `--type` takes a full name as `check` prints it, or a simple name, which explains every type that has it. An unknown name fails with the closest full names. `--path` explains every type declared in a file or under a directory. With either option, a lone positional argument is the solution.
+Pass exactly one of a rule ID, `--type` or `--path`. Other combinations exit 2 with `Pass exactly one of a rule ID, --type and --path.` With either option, a lone positional argument names the solution. `--type` first matches the full name printed by `check`, preferring a declared type over an external type with that name. Otherwise it matches every declared type with the given simple name. An unknown name exits 2; matching name fragments produce up to 10 suggestions under `Closest full names`. `--path` explains every type declared in a file or directory, using an absolute path or one relative to the solution.
 
-Under each claim, indented lines give the facts that admitted the type, such as the glob its namespace matched, the project that declares it, or each container registration that names it, with its file and line. The `operand of` group lists the rules that name the type in one of their operands, such as the scoped end of `MustNotInject(arch.Registered(Lifetime.Scoped))`, each with the operand's role: `target operand`, `allow-list operand`, `membership` or `among operand`. The `excepted by` group lists the rules and scopes whose `Except` removed the type, with the reason the type matched it. A rule that drops the type for any other reason is not listed. A type that no layer, rule or scope claims gets the line `claimed by: no layer, rule or scope`. A framework or package type the solution references, named in full, is claimed by no layer, scope or rule subject. The answer still lists a rule whose target or allow-list names it, such as `MustNotCatch(typeof(Exception))`, under `operand of`. One that no operand names gets the line `claimed by: nothing; it is declared outside the solution, where no layer, scope or rule subject reaches, and no rule names it as an operand`. This form extracts the solution as `check` does, so it uses the [extraction cache](#caching). A project that fails to load is named at the top of the answer, and the command still exits 0. `arch_explain` takes `type` or `path` for the same answer.
+Each answer lists the layers, rules and scopes that claim the type. Indented traces identify namespace globs, declaring projects or container registrations, with an `at <file>:<line>` line for each registration site. `operand of` lists rules naming the type in an operand, such as `MustNotInject(arch.Registered(Lifetime.Scoped))`. Each entry identifies its role as `target operand`, `allow-list operand`, `membership` or `among operand`. `excepted by` lists layers, rules and scopes whose selection admitted the type before their own `Except` removed it, with the matching trace. Other selection filters do not qualify.
+
+A declared type with no claim, including operand claims, gets `claimed by: no layer, rule or scope`. External framework or package types require full names. They are outside layer, scope and rule subjects, but targets and allow-lists can name them under `operand of`, as in `MustNotCatch(typeof(Exception))`. An external type with no operand claim or other trace gets `claimed by: nothing; it is declared outside the solution, where no layer, scope or rule subject reaches, and no rule names it as an operand`.
+
+Type and path queries extract through the [cache](#caching), which `--no-cache` bypasses. Failed loads, failed restores or missing project files produce a caveat naming the affected projects above an otherwise successful answer. That answer still exits 0.
 
 ### `render`
 
@@ -271,11 +277,11 @@ Options:
   -?, -h, --help                       Show help and usage information
 ```
 
-`render` writes the managed block into the `AGENTS.md` in the solution's directory. It also writes a card into each scope's directory and into the directory of each layer a rule governs. Everything outside a block's markers stays as it was. The [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-context-files) page explains which agents read these files, and why `render` names a `CLAUDE.md` on stderr when it finds one.
+`render` updates `AGENTS.md` in the solution directory, plus a card in each scope's directory and in the directory of each layer with rules of its own. Cards placed in the same directory merge into one file. Text outside the managed markers is preserved byte for byte. [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-context-files) explains which agents read these files. If a `CLAUDE.md`, `.claude/CLAUDE.md` or `CLAUDE.local.md` exists in or above the solution directory and none imports the root `AGENTS.md`, stderr warns about the nearest one. Claude Code reads those files in place of `AGENTS.md` by default.
 
-`render` adds and updates files, and never deletes one. When a spec change moves a rule, the card in the directory the rule left stays on disk until you delete it, and `render --check` does not report it. Under `--check`, each file a render would write is listed as `current` or `stale`, including a card the spec now places where none is committed.
+`render` creates and updates files but never deletes them. Delete obsolete cards after a spec change removes their placement; `render --check` does not report those files. It compares only files the current render would write, printing `current` or `stale` for each. A missing card at a newly required location is stale too. It writes no files and exits 1 if any target is stale.
 
-The build analyzer reads the model file `--model` writes. The model file is never written while a project has failed to load or a declared project file is not on disk. Under `--allow-workspace-diagnostics`, such a render fails whole when `--model` or the settings file asks for the model file. One that would only refresh an existing model file leaves it as it was, with a warning. A [settings file](#the-settings-file) can ask for the model file or the diagram without the option. A `--diagram` on the command line replaces the settings file's whole `diagram` entry, its `only` and `exclude` lists included.
+The build analyzer reads `sliderule.model.json` next to the root `AGENTS.md`. Render writes it when `--model` is passed, the settings file sets `render.model` to `true`, or the file already exists. Failed loads or missing declared project files block model-file writes even with `--allow-workspace-diagnostics`; failed restores alone do not. An explicit model request, through the flag or settings, then exits 2 before writing any files. An automatic refresh leaves the existing model unchanged, warns and continues with the other targets. A [settings file](#the-settings-file) can also request a diagram through `render.diagram`. A command-line `--diagram` replaces that entire entry, including its `only` and `exclude` lists.
 
 ### `baseline`
 
@@ -307,11 +313,11 @@ Commands:
                                 the baseline files, never the code.
 ```
 
-A baseline records a ratcheted rule's current violations, so that only new ones fail. The ratcheted rules are the `Migrate` rules and each `Quarantine` scope's containment. A rule's baseline is the file `arch/baselines/<rule-id>.json` under the solution directory, unless the rule names a path of its own with `.Baseline(path)`. Commit the files `baseline` writes along with the spec.
+A baseline grandfathers a ratcheted rule's recorded violations. Unrecorded violations fail, as does a recorded source/target pair whose site count exceeds its allowance. Only `Migrate` rules and `Quarantine` containment rules have baselines; `add` and `rename` reject other rules with exit 2. The default path is `arch/baselines/<rule-id>.json` under the solution directory, with each `/` becoming a directory. Quarantine containment uses `arch/baselines/<scope-id>/containment.json`. `.Baseline(path)` overrides this location; relative paths resolve against the solution directory. Commit baselines with the spec. The line-per-entry layout makes removing one paid-off violation a one-line diff.
 
-Each entry in a baseline file is one line with a seal of its own, so an edit by hand is caught. A file whose entry no longer matches its seal fails its integrity check. Every command that reads it then exits 2, naming the file and the entry. Restore that line from version control, and resolve a merge conflict in a baseline file by keeping whole entry lines from either side. A baseline shrinks through `baseline accept-reductions` and grows only through `baseline add`, one attributed entry at a time.
+Baseline files are line-oriented JSON. Each entry's `seal` covers the rule ID and the entry's fields, including count and reason. Reformatting or CRLF line endings preserve validity; editing those fields fails the integrity check. The error reads `Baseline file '<path>' failed its integrity check: the entry '<entry>' under rule '<rule-id>' does not match its seal.` Commands reading that file exit 2. The `hook` verb maps this failure to its own error, exit 1, which Claude Code treats as non-blocking. The recovery hint directs you to restore a hand-edited line from version control. Resolve merge conflicts by keeping whole entry lines from either side; the merged file needs no re-sealing command. Deleting whole entries or sections is accepted, and any violations they grandfathered fail the next check. After capture, shrink a baseline with `baseline accept-reductions`; grow it only with `baseline add`, one attributed entry at a time.
 
-`baseline` is yours to run. A baseline turns a red rule green without fixing anything. The MCP server therefore has no tool that writes one, and the [hook settings](https://github.com/andypgray/sliderule/blob/main/hooks/settings.snippet.json) deny the command to an agent.
+Baselines can turn red rules green without code changes, so `baseline` is yours to run. The MCP server's five tools are read-only and cannot write one. The [hook settings](https://github.com/andypgray/sliderule/blob/main/hooks/settings.snippet.json) deny the command to an agent through `Bash(sliderule baseline*)`, `Bash(*dnx SlideRule.Cli* baseline*)`, `PowerShell(sliderule baseline*)` and `PowerShell(*dnx SlideRule.Cli* baseline*)`.
 
 #### `baseline init`
 
@@ -335,6 +341,8 @@ Options:
                                  exit 2.
   -?, -h, --help                 Show help and usage information
 ```
+
+`baseline init` captures only rules without a baseline section. Before capture, it reports each section filed under an ID absent from the spec. Both `init` and `accept-reductions` always extract fresh and take no `--no-cache` option.
 
 #### `baseline accept-reductions`
 
@@ -397,7 +405,7 @@ Options:
   -?, -h, --help                 Show help and usage information
 ```
 
-The reason given with `--because` is kept in the entry, and SARIF repeats it on the alert for that site.
+`--rule` and a non-blank, single-line `--because` are required, although help does not mark them required. Pass exactly one entry form, either `--source` with `--target`, or `--subject`. Missing or conflicting inputs exit 2 before the workspace loads. The rule must already have a baseline section; otherwise the error directs you to run `sliderule baseline init` first. Adding an already recorded violation prints `entry already baselined`, replaces its reason and records its current site count. SARIF repeats the stored reason as `grandfathered: <because>` in both the result message and its external suppression's justification.
 
 #### `baseline rename`
 
@@ -423,7 +431,7 @@ Options:
   -?, -h, --help            Show help and usage information
 ```
 
-`status` lists a baseline section filed under an ID the spec no longer declares, with the rename that would move it. That rename ends `--to <new-id>` for you to fill in, and `check` names it with the failing rule's ID as `--to`.
+`baseline rename --from <old> --to <new>` moves a section to the new rule's baseline file. It preserves entry identities, site counts and reasons, then re-seals each entry under the new ID. An emptied source file is deleted. The destination must be a ratcheted rule in the spec without a baseline section, and the old ID must be absent from the spec. `status` lists orphaned sections after its summary, including their old IDs, paths and entry counts. Each line suggests `sliderule baseline rename --from <old-id> --to <new-id>` for you to complete. If a ratcheted rule fails without a captured baseline while an orphan exists, `check` raises `orphanedBaseline`. Its rename hint supplies the failing rule's ID as `--to`.
 
 ### `status`
 
@@ -456,7 +464,7 @@ Options:
   -?, -h, --help                 Show help and usage information
 ```
 
-`status` suggests `Enforce` for a `Migrate` rule whose baseline has reached zero. `--json` writes the burndown document `arch_status` returns.
+`status` reports per-rule burndown and exits 0 even over red rules. Errors exit 2. Failed loads or restores also produce exit 2 after the burndown, unless `--allow-workspace-diagnostics` is passed. A `Migrate` rule gets `0 remaining; promotable to Enforce (baseline is empty)` only after a captured baseline is fully reduced. It must have no grandfathered violations, new violations or entries awaiting `baseline accept-reductions`, and the run must have measured the rule as written. Quarantine containment never gets a promotion suggestion. `status --json` writes the same burndown document returned by `arch_status`.
 
 ### `graph`
 
@@ -513,7 +521,7 @@ Options:
   -?, -h, --help                          Show help and usage information
 ```
 
-`graph` needs no spec, so it is the first command to run on a solution that has none. Besides the projects and their references, it lists each type name that two projects, or a project and a package, both declare. `--json`, or `--format json`, writes the survey `arch_graph` returns, and `--grain` coarsens it by the rungs under [Grains](#grains). `--format mermaid` writes the projects and their references as one Mermaid fence instead, the drawing `render --diagram` commits, so a team with no spec can see its graph drawn. It draws only the projects the solution file declares, and with `--projects` it keeps an edge only when both of its ends are drawn. It has no grain. When the load left projects out, `%%` comment lines inside the fence name them.
+`graph` surveys the codebase without a spec and takes no `--spec` option. It lists project references, types declared by multiple projects, and type names declared both by a project and an external assembly, including packages or frameworks. `--json` and `--format json` produce the document returned by `arch_graph`. Combining `--json` with another format exits 2. Both JSON and text support the detail levels under [Grains](#grains). `--format mermaid` produces the codebase fence from `render --diagram` for the same project globs, without its caption. It draws only solution-declared projects and keeps an edge only when both ends are drawn. A grain coarser than `full` exits 2 because Mermaid has no grain. Inside the fence, `%%` comments name failed projects accepted by `--allow-workspace-diagnostics`, projects left unchecked by a solution filter, and unsupported projects. A clean load adds no comments. A `--projects` filter matching no project exits 2 and lists available names. Failed loads or restores also exit 2 unless allowed; the codebase's contents never fail the survey.
 
 ### `mcp`
 
@@ -534,9 +542,9 @@ Options:
   -?, -h, --help  Show help and usage information
 ```
 
-The [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#connecting-the-mcp-server) page covers the client config, how the server binds a solution, and its tools. A solution argument that does not resolve exits 2 before the handshake. Without an argument, the server starts even when it finds no solution, but `mcp` still exits 2 when a `sliderule.json` it reaches is malformed or names a missing solution. Started at a terminal, with no client on its input, `mcp` prints how to configure one and exits 2.
+Configure an MCP client to launch this command, as [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#connecting-the-mcp-server) describes. With stdin attached to a terminal, `mcp` prints `sliderule mcp is an MCP stdio server; it is started by an MCP client, not interactively.` It then prints client-configuration guidance and exits 2. An unresolved solution argument also exits 2 before the server starts or completes a handshake. With no argument, failed discovery starts an unbound server whose tool calls report that discovery failure. An applicable `sliderule.json` that is malformed or names a missing solution still causes exit 2 while the request is built.
 
-The server keeps the solution loaded between calls, and never reads or writes the persisted cache. It exits after a stretch with no tool call, and when the process that launched it exits. The variables that change either are listed under [Environment variables](#environment-variables).
+The server keeps the solution loaded between calls unless `SLIDERULE_DISABLE_WARM_WORKSPACE` is `true`. Every tool request bypasses the persisted extraction cache, which the server neither reads nor writes. It exits after `SLIDERULE_IDLE_TIMEOUT_MINUTES` without a tool call, 30 minutes by default. On Windows, it also exits when its launching process exits, unless `SLIDERULE_DISABLE_PARENT_WATCH` is `true`. Other systems rely on stdin closing. See [Environment variables](#environment-variables) for these settings.
 
 ### `hook`
 
@@ -569,7 +577,7 @@ Options:
   -?, -h, --help             Show help and usage information
 ```
 
-The [exit-code contract](https://github.com/andypgray/sliderule/blob/main/hooks/README.md#the-exit-code-contract) maps the hook's exit codes onto the ones under [Exit codes](#exit-codes). The [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-turn-end-hook) page shows where the hook fits. [`hook install`](#hook-install) writes the settings that run it, and [`hooks/`](https://github.com/andypgray/sliderule/tree/main/hooks) explains them for anyone who edits them by hand.
+The hook uses Claude Code's exit codes. Exit 0 permits the stop, exit 2 blocks it with the report on stderr, and exit 1 reports SlideRule's own error without blocking. The [exit-code contract](https://github.com/andypgray/sliderule/blob/main/hooks/README.md#the-exit-code-contract) compares these with the CLI's [Exit codes](#exit-codes). `--diff-base` defaults to `HEAD`; `--max-rounds` defaults to 3 and rejects values below 1. [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-turn-end-hook) explains the hook's place in a session. Use [`install-hook`](#install-hook) to configure it, or follow [`hooks/`](https://github.com/andypgray/sliderule/tree/main/hooks) to edit settings by hand.
 
 ### `install-hook`
 
@@ -595,31 +603,49 @@ Options:
   -?, -h, --help  Show help and usage information
 ```
 
-`hook install` merges the hook entries and the `baseline` deny rules from the [settings snippet](https://github.com/andypgray/sliderule/blob/main/hooks/settings.snippet.json) into `.claude/settings.json`. The file is the one at the root of the git work tree you run it in, or in the working directory outside a work tree. A missing file or `.claude` directory is created, and every other setting stays where it is.
+`hook install` uses the CLI's exit codes and needs no workspace load. It merges the embedded [settings snippet](https://github.com/andypgray/sliderule/blob/main/hooks/settings.snippet.json) into `.claude/settings.json`, including its baseline deny rules. The snippet runs `sliderule hook` on `UserPromptSubmit` with a 30-second timeout, and on `Stop` and `SubagentStop` with 600-second timeouts. Installation targets the git work-tree root containing your working directory, or your working directory outside a work tree. Missing directories and files are created. Existing settings retain their values and order; the merge removes no settings. Invalid JSON or an incorrect object or array shape where the merge must write exits 2, naming the file. A blank file counts as empty.
 
-An entry is already there when the file has a group on the same event, with the same matcher, and one of that group's commands runs `sliderule hook`. That group is left as you wrote it, timeout and arguments included, and the command prints `kept` for it. It prints `added` for each entry and deny rule it writes, then `wrote .claude/settings.json`. When every entry is already there, it prints `nothing to change in .claude/settings.json` and leaves the file as it was. A run that writes uses 2-space indentation and LF line endings, so any other formatting the file had is lost.
+An existing group counts as installed when its event and matcher match and one command parses as the `sliderule hook` verb itself. Absent matchers match each other; `hook install` and `hook --help` commands do not qualify. A qualifying group keeps its timeout and arguments. Deny rules match by exact string and produce no output when already present. The report prints `kept <event>: <command>` or `added <event>: <command>` for hook entries, plus `added permissions.deny: <rule>` for added deny rules. A changed file ends with `wrote <path>`. With no additions, the report ends with `nothing to change in <path>`, preserving the file's bytes and modification time. Paths in these messages are relative to your working directory, so installation from the root reports `.claude/settings.json`. A write uses 2-space indentation, LF line endings and a final newline, replacing the previous formatting.
 
-A `<solution>` or `--spec` you pass is added to each command it writes, as a path relative to the work-tree root. A path named `install` or starting with `-` is written as `./install` or `./-name`, and a path with a space is quoted. A path with a double quote, a `$`, a backtick or a line break fails the command, because a shell reads those even inside quotes. Leave both out when the hook finds the solution from the root by itself, through a `sliderule.json` there or the walk up. When it would not, the command exits 2 before writing the file. Arguments go after `install`, so `sliderule hook <solution> install` fails, and a solution directory named `install` is passed to `hook` as `./install`.
+Put arguments after `install`. Passing them to `hook` before the subcommand exits 2 with `hook install takes its arguments after 'install'`. Any supplied solution or `--spec` path is appended to each new hook command, relative to the work-tree root and with `/` separators. Paths equal to `install` or beginning with `-` get a `./` prefix. Spaces and shell metacharacters such as `;`, `&`, `|`, `*`, `#` or `'` trigger double quotes. Paths containing a double quote, `$`, a backtick or a line break fail because a shell interprets those inside quotes. Before writing, installation checks solution discovery from the root with the arguments it would write, through `sliderule.json` or the walk up. It does not validate the spec. If discovery fails, it exits 2 with `Nothing was written to <path>: the hook runs from <root> and would find no solution there.` Omit both paths when discovery already works from the root. To run the hook against a solution directory named `install`, write `sliderule hook ./install`.
 
 ## Solution and spec resolution
 
-A command finds its solution in this order:
+A command chooses its solution in this order:
 
-1. The argument, a solution file or a directory to search.
-2. `SLIDERULE_SOLUTION_PATH`, which names a solution file, when the argument is left out.
-3. A walk up from the working directory, which stops at the first directory with a `sliderule.json` or exactly one solution file.
+1. A non-blank solution argument. An existing directory starts a search; any other value names a solution file.
+2. A non-blank `SLIDERULE_SOLUTION_PATH`, read as a solution file.
+3. A search starting at the working directory.
 
-The walk climbs past a directory with several solution files, and counts a `.slnf` filter only where no `.sln` or `.slnx` is in the same directory. A walk that reaches the root without a match fails. It names the solution files of the first directory it climbed past, or else any solution one level below where it started. A command run from the repository root therefore finds no solution under `src/` without the argument or a settings file there.
+Relative argument and environment paths resolve against the working directory. A missing argument file produces `Solution file not found: <path>`. A missing environment file produces `SLIDERULE_SOLUTION_PATH points to a file that does not exist: <path>`.
 
-The spec comes from `--spec`, a built DLL or a csproj in the solution. Without it, the spec is the one the settings file names, and otherwise the one project in the solution that references `SlideRule`. A solution with no such project fails with `No spec project found`, and one with several fails with `Multiple spec projects found` and lists them.
+A search walks upward and stops at the first directory containing `sliderule.json` or exactly one solution file. It climbs past directories with several solutions. Solution files are `.sln`, `.slnx` and `.slnf`; filters count only where the same directory has no `.sln` or `.slnx`. A directory argument uses this same search, including settings files. An explicit solution file or the environment variable takes precedence over settings; settings take precedence over plain solution discovery.
 
-Apart from `init`, which builds the spec project it writes, no command builds the spec. Each runs it from the spec project's last build. Every command that loads a spec project compares its sources with that build. When they differ, the command continues and prints `warning: the spec project '<name>' differs from its last build ('<file>' has changed since it was built); this run used the rules that build holds. Rebuild it: dotnet build <csproj>` on stderr. The check and status documents record the same fact as `staleSpec`, with the project, the file, the reason (`changed`, `missing`, `added` or `newer`) and the comparison it rests on (`checksum` or `fileTime`). `explain` and the server's `arch_context` print the sentence above their answer, without the `warning:` prefix. Where the build has a portable PDB, embedded or next to the DLL, and the sources it lists are found on this machine, the comparison is of the checksum the PDB records for each source. So a checkout, a touch or an edit made and undone does not count. A source the build did not compile counts when it was written after the build. Without a PDB, or when none of its sources is found (as in a build that mapped its source paths), any source written after the build counts. Files under `bin` and `obj` and the project file itself are not compared. A spec passed to `--spec` as a DLL names no project, so it is never compared. The hook passes the warning to the agent on a clean stop and keeps it in the report on a red one.
+If the search reaches the filesystem root without a match, it reports the first directory it passed with several solutions. The message begins `Multiple solution files found in '<directory>':` and lists those files. Otherwise it reports `No .sln, .slnf or .slnx file found in '<directory>' or any parent directory.` Any solutions immediately below the starting directory follow under `Solution files one level down:`. That list skips `bin`, `obj`, `.git`, `.vs`, `node_modules` and `packages`, quotes at most 5 entries and counts the rest. Both failures end with `Pass the solution as the argument (<command> <solution>, or in your MCP client config's args), or set SLIDERULE_SOLUTION_PATH to it.`
 
-A solution file named by the argument or by the environment variable wins over a settings file, and a settings file wins over the plain walk. A directory argument is searched the way the working directory is, settings file included. A solution file chosen any of these ways takes its spec and render settings from the nearest `sliderule.json` above it, and only when that file names it.
+The search never descends. From a repository root, pass a solution under `src/` explicitly or name it in a root settings file. A solution one level down appears in the failure's suggestions, but is not selected.
+
+The spec comes from `--spec`, then the applying settings file's `spec`, then the convention. `--spec` takes a built DLL or a solution-member `.csproj`. A missing DLL produces `--spec '<value>' was not found. Pass a built spec DLL or a solution-member csproj.` An unknown project produces `--spec '<value>' is not a project in the solution.`
+
+The convention selects the single C# project declared in the solution that references `SlideRule.dll`. A project brought in only through `ProjectReference` is not a candidate; a multi-targeted project counts once. On a clean load, zero candidates produces `No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.` The message also counts the C# projects considered. Several candidates produces `Multiple spec projects found; pass --spec to disambiguate:` with one line per candidate. If the load was incomplete or otherwise unclean, the zero-candidate error names that problem instead. A failed load or restore can hide the spec's reference too.
+
+Only `init` builds a spec project. Other commands load its last built output. Without one, the error begins `The spec project '<name>' has no built output` and ends `Build the solution first (dotnet build).`
+
+Every run that resolves a spec project compares its sources with the build it loads. A difference does not stop the run. It prints `warning: the spec project '<name>' differs from its last build ('<file>' has changed since it was built); this run used the rules that build holds. Rebuild it: dotnet build <csproj>` on stderr. The parenthesis can instead report `'<file>' no longer exists`, `'<file>' was added after it was built` or `'<file>' was written after it was built`. Paths are solution-relative.
+
+Under `--json`, the stderr line omits `warning:`. Check and status documents include `staleSpec`, with `project` (the csproj path), `file`, `reason` (`changed`, `missing`, `added` or `newer`) and `comparison` (`checksum` or `fileTime`). These paths use forward slashes. `explain` and the MCP tool `arch_context` also print the sentence on stdout above their answer, without the prefix. The hook treats a stale spec as a warning, returning the line to the agent on a clean stop and retaining it in a red report.
+
+Checksum comparison needs a portable PDB embedded in the DLL or stored next to it with a matching ID. At least one source listed in the PDB must exist locally. SlideRule compares the recorded SHA-1 or SHA-256 checksums, reporting changed or missing sources. A checkout, a touch or an edit reverted to the original bytes does not count. A `.cs` file under the project directory that the build did not compile counts as added only when written after the DLL.
+
+Without a usable portable PDB, or when none of its sources exists locally, comparison uses file times. A source written after the DLL then counts as newer. Generated sources under the project's `bin` and `obj` build-output directories, nested projects' sources, the project file and its imports are excluded. A DLL passed directly to `--spec` names no project and is never compared.
 
 ### The settings file
 
-A `sliderule.json` at the root of a repository names the solution and the spec once. Every command run below it reads it, and so do the MCP server and the hook. A run inside a nested directory with exactly one solution file of its own stops there instead, and uses the settings file only if it names that solution. It is JSON with comments and trailing commas allowed, and its paths are relative to the file.
+For a selected solution, SlideRule checks the nearest `sliderule.json` at or above its directory. Its spec and render settings apply only when it names that same solution. If it names another, no settings apply; the search does not continue farther up. This also applies when discovery stops at a nested directory's single solution.
+
+All commands except `init` use settings resolution, including `mcp`, `hook` and `install-hook`; `graph` uses it without needing a spec. `init` never reads settings and rejects an existing file found between the solution directory and the repository root. A malformed settings file fails before loading, with exit 2. An applying file naming a missing solution produces `<file> names a solution that does not exist: <path>. Fix its 'solution', or pass the solution as the argument.`
+
+The file is JSON with comments and trailing commas allowed. Every relative path resolves against the settings file's own directory.
 
 | Key | What it sets |
 |---|---|
@@ -630,11 +656,13 @@ A `sliderule.json` at the root of a repository names the solution and the spec o
 | `render.diagram.only` | project-name globs to draw |
 | `render.diagram.exclude` | project-name globs to leave out |
 
-`$schema` is read and ignored, for an editor's schema pointer. Any other key fails the command, naming the file and the key, so a misspelt key never passes for a setting. [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#next-steps) shows a first file.
+`solution` must be a non-blank string. The optional `spec` names a solution-member csproj or built DLL. `render.model` takes `true` or `false`; `true` requests the model file on every render, as `--model` does. `render.diagram` requires `path`; its optional `only` and `exclude` values are arrays of non-blank project-name globs. It supplies the diagram target when no `--diagram` is passed.
+
+A top-level `$schema` is accepted and ignored, for an editor's schema pointer. Any other unknown key fails with `<file>: unknown key '<key>'; <where> takes <known keys>.`, so a misspelt key is reported instead of ignored. [Getting started](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#next-steps) shows a first settings file.
 
 ## Warnings
 
-A warning is something `check` noticed that does not affect the verdict. It never changes a rule's status or the exit code. In the text report, a rule that passed with a warning is headed `warn`. The JSON report lists each warning under its rule with a `kind`. SARIF reports a warning that names a file as a `warning`-level result, and a warning about the spec itself as a notification, as [SARIF](#sarif) describes.
+A check warning never changes its rule's status or the check's exit code. It can accompany a passed or failed rule. The human report uses `FAIL` for failed rules, `skip` for skipped rules, `pass` for passes without warnings and `warn` for passes with warnings. `check --json` lists warnings under each rule with camelCase `kind`, `message` and an optional `hint`. [SARIF](#sarif) uses warning-level results for warnings naming a file, and invocation configuration notifications for warnings about the spec.
 
 | Kind | Raised when |
 |---|---|
@@ -645,7 +673,15 @@ A warning is something `check` noticed that does not affect the verdict. It neve
 | `quarantinedScopeTouched` | a changed file declares a type in a quarantined scope |
 | `cautionedScopeTouched` | a changed file declares a type in a cautioned scope |
 
-An `inertTarget` rule can never fire, so either its target is wrong or what it forbids does not exist yet. A `deadOperand` rule was not measured as written, so `status` never suggests promoting it and `baseline init` skips it. A `deadExemplar` leaves the verdict and the counts as they were. An `orphanedBaseline` warning appears when a ratcheted rule fails with no baseline while a section is filed under a rule ID the spec does not declare. Its hint gives the `baseline rename` that would move the section. The two tripwire kinds need `--diff-base`. A quarantine warning asks whether the change had to edit inside the scope at all, and a caution warning asks that the scope's dragons be read first.
+`inertTarget` means a forbidden-set dependency verb's entire target matched no types, so the rule cannot fire. Check the target or confirm that the forbidden code does not exist yet. An absent `typeof` target raises no warning, and `MustOnly` verbs never raise this kind.
+
+`deadOperand` identifies a list pattern that matched no types. It can be a forbidden target among live targets, an allow-list pattern, a membership, a reside verb's glob or project name, or part of `among:`. The rule was not measured as written. Such a rule is never suggested for promotion, and `baseline init` skips it.
+
+`deadExemplar` means part of the exemplar matched no solution-declared type, or the exemplar could not be resolved. It affects neither verdict nor counts, and is suppressed on solution-filter runs.
+
+`orphanedBaseline` appears once per undeclared baseline section when a ratcheted rule fails without a captured baseline. Its hint gives the `sliderule baseline rename` command to move that section. When the rule was measured in full, it also suggests `sliderule baseline init` if the rule is new.
+
+The two scope warnings need `check --diff-base`. They identify a changed file declaring a type in the scope. The quarantine message is `Changed file '<file>' is inside quarantined scope '<scope>' — does the task actually require editing dragon territory? Dragons: sliderule explain <rule-id>.` The caution message is `Changed file '<file>' is inside cautioned scope '<scope>' — read the dragons before editing: sliderule explain <rule-id>.`
 
 ## Exit codes
 
@@ -655,11 +691,17 @@ An `inertTarget` rule can never fire, so either its target is wrong or what it f
 | `1` | `check` found a red rule, or `render --check` a stale file |
 | `2` | SlideRule's own error: a refusal, a usage error, an incomplete model |
 
-`status` exits 0 over red rules, because a burndown is its answer. A command line that does not parse exits 2 with the parse error on stderr. One that names no command also prints the root help, and one that names a group without its subcommand, such as `sliderule baseline`, prints that group's help. Both go to stderr, which keeps stdout empty for a caller that parses it. A run cancelled with Ctrl+C or a termination signal prints `Cancelled.` and exits 2 when it stops within System.CommandLine's two-second grace. A run that outlives the grace is ended by System.CommandLine, which exits 130 after Ctrl+C and 143 after a termination signal.
+Commands that do not evaluate rules exit 0 on success. `status` exits 0 even over red rules, and 2 when the incomplete-model gate refuses. `init` returns its final check's exit code. Apart from that delegated check, only `check` and `render --check` return 1. Exit 2 also covers parse errors and bugs.
+
+`sliderule hook` uses Claude Code's exit codes instead: 0 proceeds, 2 blocks and 1 reports a non-blocking error. A command line that fails to parse under `hook` is its own non-blocking error, not the CLI's exit 2.
+
+Other parse failures exit 2 and print the error on stderr. Root help follows when no command was named, the command was mistyped or an unknown option appeared at the root. A group without its subcommand, such as `sliderule baseline`, prints that group's help. Errors and accompanying help both use stderr, leaving stdout empty.
+
+Cancellation by Ctrl+C or a termination signal prints `Cancelled.` on stderr and exits 2 if the run stops within System.CommandLine's termination grace. SlideRule uses the default grace of 2 seconds in System.CommandLine 2.0.14. If the run outlives it, System.CommandLine terminates the process with exit 130 after Ctrl+C or 143 after a termination signal.
 
 ## Documents and versions
 
-Every JSON document a command writes has a `schemaVersion` at its top, except the hook document, whose shape is Claude Code's.
+Each SlideRule JSON document below begins with `schemaVersion`, except the hook document, which follows Claude Code's unversioned format.
 
 | Document | Written by | `schemaVersion` |
 |---|---|---|
@@ -670,13 +712,15 @@ Every JSON document a command writes has a `schemaVersion` at its top, except th
 | model file | `render --model` | 2 |
 | hook document | `hook` | unversioned |
 
-A version moves when a key is removed, renamed or given a new meaning, which a reader written for the old shape would misread. A key added for something new does not move it, except in the model file, whose reader rejects a key it does not know. A key appears only when it has something to report, so a document with no new facts is byte for byte what it was. The human-readable reports have no version and can gain lines in any release. A baseline reader still accepts the version before the current one, and any write upgrades the file.
+A version changes when the document's shape changes. Added keys and new values of existing enums, such as `caution` or `cautionedScopeTouched`, are additive and retain the version, except in the model file. Optional keys are omitted when null, preserving the earlier bytes for documents that need none of the additions. At grains that include them, the check report writes `violations`, `sites`, `warnings` and `workspaceDiagnostics` even when empty.
 
-Every document is written with LF line ends and ends with one, on every operating system, so a run on Windows writes the same bytes as the same run on Linux. The hook's report on stderr and the `additionalContext` it puts in the hook document use LF too.
+The model reader rejects unknown keys, because ignoring a selection constraint could widen the selection. Later renders also refresh an existing model file without `--model`. The baseline reader accepts versions 1 and 2; the next baseline command that writes a version-1 file upgrades it to 2.
 
-The check report, the status burndown and the graph survey also list the NuGet audit advisories the load raised, under `packageAudit`. Each advisory is one entry, with NuGet's message and the projects that reported it. An advisory is about a package's published record, so it never marks the model incomplete.
+Every JSON document uses LF line endings and exactly one trailing LF on every operating system. The same document therefore has the same bytes on Windows and Linux. The hook's own stderr lines, relayed reports and `additionalContext` use LF too.
 
-The hook document is the `hookSpecificOutput` object Claude Code reads from a hook's stdout. `hook` writes it when a clean check warned, with the report as `additionalContext`, and names the event it answers:
+Check, status and graph documents include the load's NuGet audit advisories under `packageAudit`, with one entry per distinct advisory. Each has `message`, containing NuGet's text, and `projects`, naming the reporting projects; `projects` is omitted when none is known. Audit advisories never mark the model incomplete.
+
+The hook document is one JSON object on the hook's stdout. It contains `hookSpecificOutput`, with `hookEventName` and `additionalContext`, plus an optional `systemMessage` for Claude Code to show the user. When a clean check warned, `hook` writes the report as `additionalContext` and names the event it answers:
 
 | Event | When `hook` writes the document |
 |---|---|
@@ -684,9 +728,11 @@ The hook document is the `hookSpecificOutput` object Claude Code reads from a ho
 | `Stop` | an agent's turn ended clean with a warning |
 | `SubagentStop` | a worker's turn ended clean with a warning |
 
+A hand run uses `PostToolUse`. The hook also writes a document when it discovers that an earlier stop passed unchecked because its check never completed. That notice appears in both `additionalContext` and `systemMessage`; the event is the one that found it, `UserPromptSubmit` or `Stop`.
+
 ## Grains
 
-`check --json` and `graph --json` take `--grain`, and `arch_check` and `arch_graph` take `grain`. Each rung keeps less than the one before it, and every rung answers about the same rules and projects. `--rules` and `--projects` narrow the subject instead. A coarsened document has a `grain` key naming its rung, and a full one has none.
+`check --json` and `graph --json` accept `--grain`; `arch_check` and `arch_graph` accept `grain`. Names are case-insensitive, and a blank or missing value means `full`. Each grain retains a subset of the preceding grain's detail while answering about the same rules and projects. Use `--rules` or `--projects` to narrow the subject. Coarsened documents include a `grain` key; full documents omit it.
 
 | Grain | `check --json` drops | `graph --json` drops |
 |---|---|---|
@@ -695,13 +741,19 @@ The hook document is the `hookSpecificOutput` object Claude Code reads from a ho
 | `skeleton` | each rule's violations, keeping their count | package references; external references and shared type names, as counts |
 | `index` | rule prose; audit advisories and diagnostics, as counts | frameworks, packaging, project references; edges, audit advisories and diagnostics, as counts |
 
-`index` lists every rule ID and every project name, which are what `--rules` and `--projects` take, so it is the menu to narrow from. Over MCP the server steps a document down these rungs until it fits, as [the response budget](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-response-budget) explains.
+Check reports retain `siteCount` and `violationCount` when their arrays disappear. At `index`, omitted prose is `sentence`, `because`, `fix`, `citation`, `exemplar` and each warning's `hint`. `packageAuditCount` and `workspaceDiagnosticCount` replace the corresponding non-empty arrays. Every grain retains the trust stamps and summary counts.
+
+For graph surveys, the shared-type counts at `skeleton` describe multiply declared and shadowed types. At `index`, each project retains `name`, `solutionMember`, `types` and `generated` where present; observed edges become a count. Every rule ID and project name remains available at `index` for the `--rules` and `--projects` filters.
+
+Over MCP, an over-budget `arch_check` or `arch_graph` response is tried at successively coarser grains until a whole document fits. If even `index` exceeds the budget, the response is truncated. See [the response budget](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-response-budget).
 
 ## SARIF
 
-`check --sarif <path>` writes the check as SARIF 2.1.0, the format GitHub code scanning reads. The file contains one run. Its driver lists every rule in the spec's order. Each has the generated sentence, the `Because`, the `Fix` followed by each exemplar type's file and line, and the `Citation` as the help link. A rule reports at `error` by default, and a scope's tripwire at `warning`.
+`check --sarif <path>` atomically writes a UTF-8 SARIF 2.1.0 log with one run, one invocation and one trailing LF. Human and `--json` output are unchanged.
 
-Each violation site is one result, at its file and line. The file's URI is relative to the git repository's root, where code scanning resolves it, or to the solution directory outside a repository; the fingerprint keeps the path relative to the solution directory:
+The driver is named `SlideRule`. It lists every rule in the run in model order, including passes and skips; `--rules` limits that list to the selected rules. Each descriptor uses the generated sentence as `shortDescription` and `Because` as `fullDescription`. Scope tripwires have no sentence, so their short description is omitted. The `help` combines `Fix`, exemplar types with `Exemplar: <type> (<file>:<line>)`, and `See <citation>.` The citation also becomes `helpUri`. A rule's `defaultConfiguration` level is `error`; a scope tripwire's is `warning`.
+
+Each violation site produces one result at its file and start line. Its URI combines the solution directory's path below the git work-tree root with the site's solution-relative path. Outside git, URIs resolve from the solution directory. All use base ID `SRCROOT`; files on another drive use absolute URIs. Fingerprints keep the solution-relative path.
 
 | Result | `level` | `baselineState` |
 |---|---|---|
@@ -709,25 +761,31 @@ Each violation site is one result, at its file and line. The file's URI is relat
 | a grandfathered site | `note` | `unchanged` |
 | a check warning that names a file, such as a tripwire touch | `warning` | `new` |
 
-A grandfathered site also has an external suppression that quotes its baseline entry's reason, or names the baseline file when the entry has none. Its message repeats that attribution, since code scanning shows the message and ignores the suppression. A violation with no site, such as a rule whose subject matched no types, adds no result and still fails the run. Workspace diagnostics and an incomplete model are reported as notifications on the run's invocation. An `inertTarget`, `deadOperand` or `deadExemplar` warning is about the spec and names no file, and code scanning rejects a whole upload that contains a result with no location. So each one is a `warning`-level configuration notification on the invocation instead, with its rule ID as the associated rule. Code scanning raises no alert for it, and the [GitHub annotations](#github-annotations) and job summary still list it.
+File warnings have no line number. A tripwire names the changed file; an orphaned section names its baseline file. A grandfathered result includes an `external` suppression whose justification is `grandfathered: <because>`, or `grandfathered in <baseline file>` without an entry reason. The message repeats that attribution in parentheses because code scanning displays the message and ignores the suppression. A violation without a site, including an empty subject or rule error, produces no result but still fails the check through its exit code.
 
-Each result's `partialFingerprints` includes `slideRuleViolationIdentity/v1`, built from the violation's source, target and subject, the file, and the site's ordinal within that file. Code that moves around a site leaves the key alone, so one violation stays one alert across runs. The [SARIF section](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md#as-sarif) of SlideRule on itself shows a grandfathered result from a real run.
+The invocation records NuGet audit advisories and workspace diagnostics as warning-level tool-execution notifications. Missing project files, failed loads and failed restores add error-level notifications. Solution-filter narrowing and unsupported projects add warning-level notifications. `executionSuccessful` is false when the incomplete-model gate will exit 2.
+
+`inertTarget`, `deadOperand` and `deadExemplar` name no file. They become warning-level tool-configuration notifications, with their message and associated rule ID, rather than results. A locationless result would cause code scanning to reject the upload. The [GitHub annotations](#github-annotations) and job summary still include these warnings.
+
+Each result has a `partialFingerprints` entry named `slideRuleViolationIdentity/v1`, formatted as `v1|<source>|<target>|<subject>|<path>|<ordinal>`. Violation results use their identity slots and the site's zero-based ordinal among that violation's sites in the same solution-relative file. File warnings use the same format with ordinal 0 and the warning's key, when present, in the target slot. Line numbers are excluded, so moving code around a site leaves its fingerprint unchanged. The [SARIF section](https://github.com/andypgray/sliderule/blob/main/SELF-CHECK.md#as-sarif) of SlideRule on itself shows a grandfathered result from a real run.
 
 ## GitHub annotations
 
-`check --annotations <path>` writes the check as GitHub Actions workflow commands, one line per finding, and a step that prints the file puts each finding on its line of code. The step needs no code scanning upload and no permission beyond its own log. Each red violation is an `::error` at each line the human report gives it, with the rule ID as its title. A violation with no site, such as a rule whose subject matched no types, is an `::error` with no file. Each check warning is a `::warning`, at the file it names and no line. Grandfathered sites are left out. A file path is absolute, which the runner makes relative to the repository, so a solution below the repository root still annotates the right file.
+`check --annotations <path>` atomically writes GitHub Actions workflow commands, creating the directory as needed. Print the file in a workflow step to emit one annotation per finding. Every red edge violation produces an `::error` at each site; a shape violation uses its first site, matching the human report's placement. Each has `title=<rule-id>`. A violation without a site produces an error without a file.
 
-GitHub shows 10 error and 10 warning annotations a step and drops the rest. `check --annotations-summary <path>` writes a Markdown job summary, for a step to append to `$GITHUB_STEP_SUMMARY`: the report's closing line, a note when the model is incomplete, and a table of every finding `--annotations` writes. A step summary over 1 MiB fails to upload, so the table stops short of that and ends with a count of the findings it left out.
+Every check warning produces an `::warning`, with its named file and no line, or no file when the warning names none. Grandfathered sites are excluded from both annotations and the summary. The `file=` property uses an absolute path with forward slashes. Messages and properties use the same escaping as `@actions/toolkit`.
 
-The [GitHub Action](https://github.com/andypgray/sliderule/blob/main/action.yml) passes both options and prints both files.
+`check --annotations-summary <path>` writes Markdown for `$GITHUB_STEP_SUMMARY`. It starts with `## SlideRule check`, followed by the human report's summary line and the incomplete-model caveat when that gate fails the run. A `| Level | Rule | Where | Finding |` table lists the same findings as annotations. The table stops before the summary exceeds 900 KiB, including its footer. If findings were omitted, the footer counts them, explains GitHub's size limit and ends `The check report in the job log lists every finding.`
+
+The [GitHub Action](https://github.com/andypgray/sliderule/blob/main/action.yml) appends the summary file to `$GITHUB_STEP_SUMMARY`. It also requests and prints annotations when `annotate` is `true`, the default. Both options are used only when the installed command's `check --help` lists `--annotations-summary`.
 
 ## Caching
 
-`check`, `explain`, `render`, `status`, `graph`, `baseline add` and `hook` keep what they extract in a persisted cache, one directory per solution. `baseline init` and `baseline accept-reductions` always extract fresh. When no file has changed, or an edit changed only whitespace or comments, the next run builds the model from the cache without loading the workspace. Such an edit still re-extracts its project when it splits a line's code across two lines or adds or removes a generated-code banner.
+`check`, `explain`, `render`, `status`, `graph`, `init`, `baseline add` and `hook` read and write a persisted extraction cache. `init` uses it for both its survey and first check; the hook uses it for its check. `baseline init` and `baseline accept-reductions` always extract fresh and have no `--no-cache` option. They use absence as evidence: an unseen rule could be recorded as zero debt, or an unseen violation deleted as fixed. `baseline add` may use cached facts because it records a violation the run observed. `baseline rename` reads only the spec and baseline files, extracts no code and has no `--no-cache` option. When every project is clean, cached fragments are merged without loading the workspace. A run needing a spec also needs a recorded resolution for that spec.
 
-After an edit, a run loads only the projects it re-extracts and the projects they reference, through a temporary solution filter. An edit inside member bodies, non-constant initializers or top-level statements re-extracts only its own project. A project that references an edited one, directly or through another, is re-extracted only when the edit changed a declaration, even a private one.
+The source digest excludes whitespace, line endings and comments, except the generated-code banner's yes/no verdict. Adding or removing that banner re-extracts the project. Other whitespace or comment edits reuse the facts with adjusted line numbers, provided each old line's code remains on one new line. Splitting it across lines re-extracts the project. After a code edit, a temporary solution filter loads the projects needing extraction and their transitive project references. Changes inside member bodies, non-constant initializers or top-level statements re-extract only their own project. Direct and transitive dependants are re-extracted when the edited project's declaration surface changes; private declarations count too.
 
-The cache's record of the last whole load provides the spec's resolution and the load results of the projects the filter leaves out. The run loads the whole solution instead when the record lacks the spec's resolution, or a project to re-extract is not declared in the solution. It does the same when the load rejects the filter, or the filtered load finds a restore failure or workspace diagnostic the record lacks, or any failed project. A change to the solution file, a project file, a restore's `project.assets.json`, or a `Directory.Build.props`, `Directory.Build.targets`, `Directory.Packages.props` or `global.json` starts over. So does a cache another SlideRule version wrote.
+A filtered cache load reuses the last whole load's spec resolution and the load results for omitted projects. A whole load is required if the requested spec resolution is absent, a dirty project is not a member the solution builds, or the solution format cannot be expressed in a filter. It is also required if loading rejects the filter or misses a dirty project, finds any failed or missing project, or reports a restore failure or workspace diagnostic absent from the record. Content or existence changes to structural inputs invalidate the whole cache. These inputs include the solution file, a filter's referenced solution, project files and `project.assets.json`. They also include `Directory.Build.props`, `Directory.Build.targets`, `Directory.Packages.props` and `global.json` in each project's directory or any parent directory. A previously absent probe file appearing counts. A different SlideRule informational version, including its commit, also invalidates it. Cache read or validation failures fall back to a cold run. The default root is .NET's local application data directory followed by `SlideRule/cache`:
 
 | OS | Default cache root |
 |---|---|
@@ -735,37 +793,39 @@ The cache's record of the last whole load provides the spec's resolution and the
 | Linux | `$XDG_DATA_HOME/SlideRule/cache`, else `~/.local/share/SlideRule/cache` |
 | macOS | `~/Library/Application Support/SlideRule/cache` |
 
-Each solution gets a directory under the root, named after the solution file with a short hash of its full path. `SLIDERULE_CACHE_DIR` moves the root. The cache is local derived data, so deleting it costs one cold run.
+Each solution has one directory under that root. Its name is the solution filename without its extension, a hyphen, and the first 16 hexadecimal characters of its canonical full path's SHA-256. Canonicalization resolves symlinks and folds case where the operating system ignores case. `SLIDERULE_CACHE_DIR` replaces the root; a blank value keeps the default. The cache is disposable local derived data. Deleting it costs one cold extraction, which writes it back.
 
-A `--binlog` capture is kept in the solution's cache directory. Later `check`, `status`, `graph` and `hook` runs replay the whole capture whenever they need the workspace, even after an edit. A run the cache serves whole skips the replay. A stored capture can go stale, become unreadable or come from another SlideRule version. A run that then needs the workspace prints a `warning:` line on stderr and runs a design-time build instead. For a stale capture the line is `warning: build capture is stale ('<path>' no longer matches the capture); running a design-time build instead. Re-capture: rebuild with -bl and re-run with --binlog.` A `--binlog` file that cannot be replayed fails the run with exit 2 and names the cause.
+`check`, `status` and `graph` accept `--binlog`. Unless `--no-cache` is passed, replay copies the log to `capture.binlog` with a `capture.json` manifest in the solution's cache directory. Later `check`, `status`, `graph` and `hook` runs replay a stored capture when they need a workspace. `explain`, `render`, `baseline` and `init` never replay one. Captures are keyed on structure; replay reads source text from disk, so code edits remain visible. A complete extraction-cache hit skips stored replay. A stale, unreadable or other-version capture produces one `warning:` line on stderr when a workspace is needed, then a design-time build. The stale message is `warning: build capture is stale ('<path>' no longer matches the capture); running a design-time build instead. Re-capture: rebuild with -bl and re-run with --binlog.` A stored copy that fails during replay also warns and falls back. An explicit `--binlog` that is missing or cannot replay exits 2, naming the cause and quoting the reader error's first line where available. Storing a capture also exits 2 for a solution filter, a structural file newer than the log, missing coverage of a project the solution builds, or an undeclared project in the log.
 
-A run with `--no-cache` bypasses the cache and any stored capture, loads and extracts fresh, and leaves both as they were.
+`--no-cache` is available on `check`, `explain`, `render`, `status`, `graph` and `baseline add`. It neither reads nor writes extraction fragments, and neither replays nor stores a build capture. The run loads and extracts fresh, leaving both caches unchanged. Combined with `--binlog`, it replays the supplied log without storing it.
 
 ## Wrong and smaller models
 
-A project that fails to load makes the model wrong, because every rule would be judged without that project's code. `check`, `render`, `graph`, `status` and every `baseline` subcommand except `rename` exit 2 and name the projects that failed. `--allow-workspace-diagnostics` opts into the partial model. With or without it, the check and status documents say `modelIncomplete: true` and list `failedProjects`.
+A missing declared project file, failed project load or unresolved NuGet restore makes the model incomplete. `check`, `render`, `graph`, `status`, `init`, `baseline init`, `baseline accept-reductions` and `baseline add` exit 2 and name the affected projects. `--allow-workspace-diagnostics` opts into the partial model. `baseline rename` reads no code and has no such gate. `status` renders its burndown before exiting 2. When produced, check, status and graph JSON documents include `modelIncomplete: true` regardless of opt-in. Failed loads appear in `failedProjects`; a complete load omits these keys. Graph normally stops before producing its document unless the opt-in is passed.
 
-A project the solution declares whose file is not on disk, such as one in a git submodule that was never initialised, gates in the same way and takes the same opt-out. Its refusal lists it in a block of its own, ahead of the others, because no restore or build creates a project file. Initialise its submodule or check out its tree, generate it, or remove its entry from the solution. The documents list it as `missingProjects`.
+A declared project file missing from disk, perhaps in an uninitialised submodule, appears under `missingProjects` in those documents. Its refusal block comes before failed loads and restore failures, with the remedy `No restore or build creates a project file: initialise the submodule or check out the tree that holds it, generate it, or remove its entry from the solution`. The same opt-in applies.
 
-A project whose NuGet packages did not resolve is wrong in the same way, though it loads. Only the edges its package references would have produced are missing. Without the gate, a rule about a package would report itself inert and the run would pass. This covers a restore that failed and one that never ran. An SDK-style project writes `obj/project.assets.json` every time it restores, so a missing one is a fact about that project. A non-SDK-style .NET Framework project never writes one and is left alone. These projects take the same opt-out and are listed as `restoreFailedProjects`. Their refusal lists them in a block of their own and sends you to `dotnet restore`. A project that failed to load is sent to `dotnet build` instead.
+A project with unresolved packages can load completely while missing the edges its package references would produce. The check's refusal explains that a package rule would then be measured against a model that never saw the package. This covers restores that failed or never ran. Restore failures include non-audit errors in the assets file's `logs` and, for SDK-style projects, an absent assets file. SDK-style restores write `project.assets.json`, normally under `obj/`. Non-SDK-style .NET Framework projects are not marked failed for that file's absence. NuGet audit advisories (`NU19xx`) never count as restore failures, even when promoted to errors. These projects appear under `restoreFailedProjects`, take the same opt-in and have a separate refusal block directing you to `dotnet restore`. Failed loads direct you to `dotnet build`.
 
-The xUnit adapter answers both cases the same way: one named test fails with both causes, every rule case skips, and an `AllowWorkspaceDiagnostics` override opts in.
+In the xUnit adapter, an incomplete model fails `Workspace_LoadedCompletely` with all causes named, and every rule case skips. Override `AllowWorkspaceDiagnostics` to `true` to obtain rule verdicts. The completeness test then skips, still naming the affected projects.
 
-A solution filter makes the model smaller, and still right. `check`, `status`, `graph` and the `arch_context` tool answer, and the JSON documents list the declared projects the filtered run never checked as `uncheckedProjects`. `explain --type` and `explain --path` answer too, and list those projects above the answer, as `check` does above its text report. A green over a subset then cannot pass for a green over the solution. `baseline init`, `baseline accept-reductions` and `render` exit 2 instead, because the files they would write describe projects the run never measured. Run them against the solution the filter references.
+A solution filter narrows the model without making it incomplete or triggering that gate. `check`, `status`, `graph` and `arch_context` answer over the subset. Check, status and graph documents list the declared projects left unchecked as `uncheckedProjects`. `explain --type` and `explain --path` print that list above their answer, as `check` does above its text report. `baseline init`, `baseline accept-reductions` and `render` exit 2 before writing when projects remain unchecked, because their lasting files would describe unmeasured code. Run them against the referenced solution. `baseline add` can proceed.
 
-The narrowing is measured from what loaded, so a filter whose references pull in the whole solution counts as the whole solution and lists no unchecked projects. Committed baselines, render targets, `arch_context` paths, diff resolution and the reported paths all resolve against the solution the filter references. A filter kept apart from its solution therefore answers with the solution's own paths. A rule whose whole selection lies in the unchecked projects reports as skipped and names the filter. An unfiltered run still fails a rule whose subject matches no types. The xUnit adapter keeps every rule verdict over a filter and skips `Workspace_LoadedCompletely`, naming what was not checked.
+Unchecked projects are determined by what the load checked, so a filter whose references pull in the whole solution lists none. Baselines, render targets, `arch_context` paths, diff resolution and reported paths resolve against the referenced solution's directory, even when the filter is elsewhere. In a narrowed run, a rule whose subject matches no types is skipped with a reason naming the filter and the missing measurement. A subject anchored on a project SlideRule never surveys still fails; an unfiltered run also fails an empty subject. The xUnit adapter retains the filtered run's rule verdicts and skips `Workspace_LoadedCompletely`, naming unchecked projects.
 
-Two more stamps describe a model that is smaller and still right. `unsupportedProjects` names the projects SlideRule cannot read, such as F#, VB or SQL projects, each with its reason. No rule can be violated in one. A shared project is listed as well, because its code is read only inside the projects that import it. So is a project the solution's default build configuration does not build. The build leaves it out even for a project that references it, so it stays out of the model too. A run from a `--binlog` describes the build that log records instead. A project that build compiled, as a `Release` build can where the configurations differ, is in the model and is not listed. A Web Site entry has no project file, so it is listed by the name the solution gives it. A rule whose subject is one of these projects, such as a layer defined by `arch.Project("Legacy")` over a VB project, selects no types and fails. Its hint names the project as one the run does not survey rather than suggesting the name is misspelt. A target that is only such a project gets the same hint on its inert warning. `multiTargetedProjects` names the projects compiled for several frameworks, each with the framework whose members and hierarchy their shared types follow; their references come from every framework.
+`unsupportedProjects` lists projects SlideRule cannot survey, each with its reason. These include other languages such as F#, VB and SQL, shared projects, C# projects excluded by the solution's default build configuration, and Web Site entries. Such projects contribute no violations. Shared code is read within importing projects. A configuration-excluded project stays outside the model even when referenced by a built project; replay keeps it if the recorded build compiled it. A Web Site has no project file and is listed by its solution name. A rule anchored on an unsupported project, such as `arch.Project("Legacy")` for a VB project, selects no types and fails. Its hint identifies the unsurveyed project instead of suggesting a spelling correction. A forbidden target anchored only on such a project gets the same hint with its inert warning.
+
+The check document's `multiTargetedProjects` lists projects compiled for several frameworks. A shared type's members and hierarchy follow the first framework that declares it; references are combined from every framework.
 
 ## Framework host selection
 
-Loading a non-SDK-style project, and replaying a binary log from .NET Framework `MSBuild.exe`, both run the .NET Framework build host that Roslyn ships. That host needs Windows and a Visual Studio or Build Tools install that includes `MSBuild\Current\Bin\MSBuild.exe`, which the tool finds with `vswhere`.
+A design-time load of a non-SDK-style project uses Roslyn's .NET Framework build host, which requires Windows. It needs a Visual Studio or Build Tools installation containing `MSBuild\Current\Bin\MSBuild.exe`. A `--binlog` replay opens no `MSBuildWorkspace` and starts no build host, including when the log came from .NET Framework `MSBuild.exe`.
 
-Where several are installed, it prefers Visual Studio 2019, 2022 or 2026. Where none of those is installed, it takes the newest it found and names it on stderr, next to any load failure. Set `SLIDERULE_VS_INSTALL_PATH` to an install root, the parent of `MSBuild\Current\Bin`, to choose one yourself. A spec project that targets `net48` needs none of this and builds anywhere.
+On Windows, SlideRule discovers installations through `vswhere` with `-all -prerelease -products *`. It chooses the newest installed Visual Studio 2019, 2022 or 2026 (majors 16, 17 and 18). If none is installed, it chooses the newest other version and describes it as outside the tested VS 2019/2022/2026 envelope. The selected installation supplies the Framework host's MSBuild. SlideRule's in-process engine normally uses the .NET SDK's MSBuild, falling back to the selected installation's path if SDK registration fails. Workspace load failures include `MSBuild for this run: ...` on stderr. Set `SLIDERULE_VS_INSTALL_PATH` to the installation root containing `MSBuild\Current\Bin` to choose it explicitly. A nonexistent root or missing `MSBuild.exe` fails with a message naming the variable and the probed path.
 
 ## Environment variables
 
-SlideRule reads the variables below. You configure it through the `SLIDERULE_*` ones, and it reads the ones Claude Code or the operating system sets only to fit in with its host.
+SlideRule reads the variables below. The `SLIDERULE_*` variables configure SlideRule; the others belong to Claude Code or the operating system. Blank, negative or unparsable idle-timeout values keep the default. The two disable flags accept `true` in any case; parent watching runs only on Windows. The file-log level accepts Serilog or Microsoft names, with unrecognised values using the default. The hook state directory replaces the temporary directory. Home and Claude configuration paths locate user `CLAUDE.md` files, which are excluded from the instruction files `render` checks for an import of its block.
 
 | Variable | Set by | What it does |
 |---|---|---|
@@ -784,4 +844,4 @@ SlideRule reads the variables below. You configure it through the `SLIDERULE_*` 
 | `USERPROFILE` | the operating system | your home directory on Windows |
 | `HOME` | the operating system | your home directory elsewhere |
 
-The MCP server writes a daily log to the `logs` directory next to the default cache root, such as `%LOCALAPPDATA%\SlideRule\logs` on Windows. The launcher that runs the server from a source checkout reads two variables of its own, which [hooks/README.md](https://github.com/andypgray/sliderule/blob/main/hooks/README.md#why-a-source-checkout-needs-the-launcher) documents.
+The MCP server writes daily rolling `sliderule-mcp-<date>.log` files in `logs` next to the default cache root (`%LOCALAPPDATA%\SlideRule\logs` on Windows). It retains the 7 newest files; `SLIDERULE_CACHE_DIR` does not move them. The source-checkout launcher, `hooks/mcp-launch.sh`, reads `SLIDERULE_MCP_BUILD_OUTPUT` and `SLIDERULE_MCP_RUN_ROOT`; the product itself does not. [hooks/README.md](https://github.com/andypgray/sliderule/blob/main/hooks/README.md#why-a-source-checkout-needs-the-launcher) documents both.
