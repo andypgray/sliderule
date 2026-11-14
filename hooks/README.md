@@ -82,11 +82,17 @@ Build first. The CLI has to exist before anything can run it:
 dotnet build SlideRule.slnx
 ```
 
-Paste [`settings.snippet.json`](settings.snippet.json) into `.claude/settings.json`. It has a `UserPromptSubmit` entry, a `Stop` entry and a `SubagentStop` entry, each running `sliderule hook`. The hook reads this repository's solution and spec from its committed `sliderule.json`, so the snippet needs no edits.
+The hook entries run the `sliderule` on your PATH, so install the tool as [below](#lifting-it-into-your-own-repository) to put one there. A `command` pointed at `bin/Debug` instead would bring back the build lock described above.
+
+Then write the settings, from anywhere in the clone:
+
+```bash
+sliderule install-hook
+```
+
+It merges [`settings.snippet.json`](settings.snippet.json) into `.claude/settings.json` at the root of the clone. The snippet has a `UserPromptSubmit` entry, a `Stop` entry and a `SubagentStop` entry, each running `sliderule hook`. The hook reads this repository's solution and spec from its committed `sliderule.json`, so the command needs no arguments. Settings already in the file stay as they are, and a second run leaves the file unchanged. To edit the file by hand instead, paste the snippet.
 
 The snippet also denies the agent `baseline`, the command that records, shrinks and renames a baseline, because that step is yours. One rule stops the installed `sliderule baseline`. The other stops the same command run through `dotnet dnx`, which is how an agent is told to run the tool when no `sliderule` command is installed. Each rule is written twice, once for the Bash tool and once for the PowerShell tool, which Claude Code turns on by default on Windows. A rule matches the command as the agent writes it and stops no other spelling. `check` and `status` still show the agent where each ratchet stands.
-
-The entries run the `sliderule` on your PATH, so install the tool as [below](#lifting-it-into-your-own-repository) to put one there. A `command` pointed at `bin/Debug` instead would bring back the build lock described above.
 
 To get the `arch_*` query tools in the session as well, register the MCP server in `.mcp.json` through the launcher. The [next section](#why-a-source-checkout-needs-the-launcher) explains why. The registration names no solution and no spec. The launcher starts the server at the repository root, which Claude Code names in `CLAUDE_PROJECT_DIR`, and the server reads both from the committed [`sliderule.json`](../sliderule.json) there.
 
@@ -132,19 +138,31 @@ The launcher covers the server's own binaries, whose path is the launcher's to c
 
 ## Lifting it into your own repository
 
-Install the tool:
+Install SlideRule as a .NET global tool:
 
 ```bash
 dotnet tool install -g SlideRule.Cli
 ```
 
-If your repository's `global.json` pins an SDK below 10, run that install from outside the repository, because the pinned SDK cannot install a tool built for .NET 10.
+If your repository's `global.json` pins an SDK below 10, run the install from outside that repository. Inside it, `dotnet` selects the pinned SDK, which cannot install a tool built for .NET 10.
 
-Then tell the hook what to check. Commit a `sliderule.json` at the root of your repository, naming your solution and your spec, as [Getting started](../GETTING-STARTED.md#next-steps) shows. Every command reads it, the hook included. Without one, pass the solution in each entry's command, as `sliderule hook src/MyApp.sln`, and add `--spec` where the convention does not find your spec.
+Commit a `sliderule.json` at your repository root naming your solution and spec, as [Getting started](../GETTING-STARTED.md#next-steps) shows. Every command reads these settings, including the hook.
 
-Then paste the snippet. It needs no change for the warnings above, because their channel is the hook's own stdout and the entries already route it. Leave the launcher out. An installed tool's binaries live outside your tree, where your build never writes, so the server registers as `sliderule` directly.
+Without a settings file, pass the solution to the installer: `sliderule install-hook src/MyApp.sln`. It writes `sliderule hook src/MyApp.sln` into each added entry, with the path relative to the work-tree root. Add `--spec <path>` if the convention does not find your spec; that path is recorded the same way.
 
-[The Meridian storyboard](../examples/Meridian/hooks/storyboard.md) walks the whole loop on an example codebase, beat by beat with captured output. Its snippet names that example's solution, because the example is inside this repository, whose own settings file names a different solution.
+Then write the settings:
+
+```bash
+sliderule install-hook
+```
+
+The installer merges the snippet's hook entries and baseline deny rules into `.claude/settings.json` at the root of the git work tree. Outside a work tree, it writes in the working directory. It preserves every other setting. If the hook would find no solution from that root with the supplied arguments, the command exits 2 before writing the file. The [`hook install` reference](../CLI.md#hook-install) explains how existing entries are recognized, what the command prints, and which path forms it accepts.
+
+The tripwire warnings described above need no extra setup. The hook writes them as context to stdout, and the installed entries already route that output to the agent.
+
+For MCP queries, register `sliderule` directly with `mcp` as its argument. The installed binaries live outside your repository, where your builds never write, so the launcher is unnecessary.
+
+[The Meridian storyboard](../examples/Meridian/hooks/storyboard.md) walks the whole loop beat by beat with captured output. Its snippet names Meridian's solution explicitly because the example is inside SlideRule's repository, whose `sliderule.json` names a different solution.
 
 ## In CI
 

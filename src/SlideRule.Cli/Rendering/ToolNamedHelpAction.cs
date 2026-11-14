@@ -39,6 +39,7 @@ internal sealed class ToolNamedHelpAction(HelpAction inner, string toolName) : S
         TextWriter output = configuration.Output;
         StringWriter page = new();
         configuration.Output = page;
+
         int exitCode;
         try
         {

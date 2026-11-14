@@ -58,7 +58,8 @@ internal static class CliHelpFences
         new("sliderule status", "sliderule status [<solution>] [options]"),
         new("sliderule graph", "sliderule graph [<solution>] [options]"),
         new("sliderule mcp", "sliderule mcp [<solution>] [options]"),
-        new("sliderule hook", "sliderule hook [<solution>] [options]")
+        new("sliderule hook", "sliderule hook [<solution>] [options]"),
+        new("sliderule install-hook", "sliderule install-hook [<solution>] [options]")
     ];
 
     /// <summary>The help fences as captured fences, so the quote gates hold each marker to exactly one fence.</summary>
@@ -130,12 +131,15 @@ internal static class CliHelpFences
     }
 
     /// <summary>
-    ///     Whether <paramref name="text" />, a command line read from <paramref name="doc" />, is one of the page's
-    ///     Usage lines: the synopsis a help fence shows under its Usage heading, which no shell runs.
+    ///     The 1-based numbers of the lines <paramref name="page" />'s registered help fences hold: what help prints,
+    ///     which no shell runs, though its Usage line and a wrapped description can open with the tool's name.
     /// </summary>
-    internal static bool IsUsageLine(string doc, string text)
+    internal static IReadOnlySet<int> HelpLineNumbers(string page)
     {
-        return doc == DocPaths.Cli && Rows.Any(row => row.Marker == text);
+        return HelpBlocks(page)
+            .SelectMany(static help => help.Block)
+            .Select(static line => line.Number)
+            .ToHashSet();
     }
 
     // Each fence of the page that carries exactly one registered marker, with the row it carries.

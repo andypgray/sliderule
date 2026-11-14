@@ -29,7 +29,13 @@ internal static class CommandFactory
     ///     The command a user types, as the CLI project's <c>ToolCommandName</c> declares it; help prints it on every
     ///     Usage line in place of the running assembly's name.
     /// </summary>
-    private const string ToolCommandName = "sliderule";
+    internal const string ToolCommandName = "sliderule";
+
+    /// <summary>
+    ///     The name of <c>hook</c>'s one subcommand. It takes the word from the verb's solution argument, so a solution
+    ///     directory of that name is passed as <c>./install</c>.
+    /// </summary>
+    internal const string HookInstallCommandName = "install";
 
     /// <summary>
     ///     The command tree. <paramref name="hostSource" /> serves any run that would otherwise open a fresh one-shot
@@ -55,7 +61,8 @@ internal static class CommandFactory
             BuildStatusCommand(hostSource, environment),
             BuildGraphCommand(hostSource, environment),
             BuildMcpCommand(environment),
-            BuildHookCommand(hostSource, environment, input)
+            BuildHookCommand(hostSource, environment, input),
+            BuildInstallHookCommand(environment)
         };
 
         // Attached here rather than per verb, so a positional argument added later cannot go without it, and
@@ -803,6 +810,40 @@ internal static class CommandFactory
             HookRunner.RunReportingConfigErrorAsync);
 
         return hook;
+    }
+
+    // Under the CLI's own exit codes, not the hook's: a person runs it, never Claude Code. It needs no workspace, so it
+    // does not pass the MSBuild gate.
+    private static Command BuildInstallHookCommand(IEnvironment environment)
+    {
+        Argument<string?> solution = SolutionArgument(
+            "Solution file, or a directory to search, written into each hook command relative to the repository "
+            + "root. Omit it when the hook finds the solution from the root by itself, through sliderule.json or "
+            + "the walk up; the run refuses when it would not.");
+        Option<string?> spec = SpecOption(
+            "A built spec DLL, or a csproj that is a member of the target solution, written into each hook command "
+            + "relative to the repository root. Omit it to use the settings file, or the convention.");
+
+        Command install = new(
+            "install-hook",
+            "Merge the hook entries and the baseline deny rules into .claude/settings.json at the root of the git "
+            + "work tree, or in the working directory outside one. Every other setting is kept, and so is a group "
+            + "already on the same event and matcher that runs sliderule hook. A run with nothing to add leaves the "
+            + "file untouched.")
+        {
+            solution,
+            spec
+        };
+        SetRequestAction(
+            install,
+            parseResult => new InstallHookRequest(
+                parseResult.GetValue(solution),
+                parseResult.GetValue(spec),
+                Directory.GetCurrentDirectory(),
+                parseResult.RootCommandResult.Command),
+            (request, output, _, ct) => new InstallHookRunner(output, environment).RunAsync(request, ct));
+
+        return install;
     }
 
     // Every command but init, which writes the settings file, resolves its solution and spec through it the same way,

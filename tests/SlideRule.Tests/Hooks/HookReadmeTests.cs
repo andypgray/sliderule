@@ -271,7 +271,6 @@ public sealed class HookReadmeTests
             .Single(command => command.Name == name);
     }
 
-    // Every command an event's matcher groups run: hooks.<event>[].hooks[].command.
     private static IEnumerable<string> Commands(JsonElement groups)
     {
         return groups.EnumerateArray()

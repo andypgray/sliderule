@@ -1,6 +1,5 @@
 using System.CommandLine;
 using System.CommandLine.Invocation;
-using System.CommandLine.Parsing;
 using SlideRule.Cli.Init;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
@@ -91,11 +90,8 @@ internal static class CliEntry
         new ParseErrorAction { ShowHelp = namedNoRunnableCommand }.Invoke(parseResult);
     }
 
-    // The hook verb itself, not a command that shares its name further down the tree.
-    private static bool IsHookVerb(ParseResult parseResult)
+    internal static bool IsHookVerb(ParseResult parseResult)
     {
-        CommandResult named = parseResult.CommandResult;
-        return named.Command.Name == CommandFactory.HookCommandName
-               && named.Parent is CommandResult { Parent: null };
+        return parseResult.CommandResult.Command.Name == CommandFactory.HookCommandName;
     }
 }

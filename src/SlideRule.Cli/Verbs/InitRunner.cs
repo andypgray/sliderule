@@ -194,12 +194,12 @@ internal sealed class InitRunner(
             .Append(", so running it again refuses that folder. To finish by hand, fix the error above, then:");
         if (beforeSettings)
         {
-            steps.Append("\n  dotnet sln ").Append(Quoted(solutionPath)).Append(" add ").Append(Quoted(layout.ProjectFile));
+            steps.Append("\n  dotnet sln ").Append(CommandLineArgument.Quoted(solutionPath)).Append(" add ").Append(CommandLineArgument.Quoted(layout.ProjectFile));
             steps.Append("\n  write ").Append(layout.SettingsFile).Append(":\n")
                 .Append(Indented(SettingsJson(layout, solutionPath)));
         }
 
-        steps.Append("\n  dotnet build ").Append(Quoted(layout.ProjectFile));
+        steps.Append("\n  dotnet build ").Append(CommandLineArgument.Quoted(layout.ProjectFile));
         steps.Append("\n  sliderule check");
         return steps.ToString();
     }
@@ -218,9 +218,7 @@ internal sealed class InitRunner(
                + $"  Write the rules in {layout.Relative(layout.SpecFile)}, rebuild it, and run sliderule check.\n"
                + "  Register the MCP server for Claude Code: claude mcp add --scope project sliderule -- sliderule mcp "
                + layout.Relative(solutionPath) + "\n"
-               + "  Check every agent turn: paste the hook entries in "
-               + "https://github.com/andypgray/sliderule/blob/main/hooks/settings.snippet.json into "
-               + ".claude/settings.json (hooks/README.md there explains them).";
+               + "  Wire the hook into every agent turn: sliderule install-hook";
     }
 
     // Paths relative to the settings file's directory, written with '/' as every committed settings file is.
@@ -229,11 +227,6 @@ internal sealed class InitRunner(
         var settings = new SettingsFileJson(layout.Relative(solutionPath), layout.Relative(layout.ProjectFile));
         string document = JsonSerializer.Serialize(settings, SlideRuleJson.Context.SettingsFileJson);
         return SlideRuleJson.Terminated(document);
-    }
-
-    private static string Quoted(string path)
-    {
-        return path.Contains(' ', StringComparison.Ordinal) ? $"\"{path}\"" : path;
     }
 
     private static string Indented(string text)

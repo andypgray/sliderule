@@ -62,6 +62,9 @@
              Mcp\Prompts\). House style embeds by short name; the .NET default is dotted
              assembly-qualified ids — the deliberate divergence EmbeddedResourceText.Load consumes. -->
         <EmbeddedResource Include="Mcp\Prompts\derive-spec.md" LogicalName="derive-spec.md" />
+        <!-- The settings snippet install-hook merges, embedded from the committed file adopters read, so the two
+             cannot differ. -->
+        <EmbeddedResource Include="..\..\hooks\settings.snippet.json" LogicalName="settings.snippet.json" />
     </ItemGroup>
 
     <ItemGroup>

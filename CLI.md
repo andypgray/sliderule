@@ -57,6 +57,12 @@ Commands:
                                 warnings on stdout as context for the agent; 2 refuses it, with the
                                 report on stderr; 1 is SlideRule's own error, reported on stderr
                                 without blocking.
+  install-hook <solution>       Merge the hook entries and the baseline deny rules into
+                                .claude/settings.json at the root of the git work tree, or in the
+                                working directory outside one. Every other setting is kept, and so
+                                is a group already on the same event and matcher that runs
+                                sliderule hook. A run with nothing to add leaves the file
+                                untouched.
 ```
 
 ### `init`
@@ -563,7 +569,37 @@ Options:
   -?, -h, --help             Show help and usage information
 ```
 
-The [exit-code contract](https://github.com/andypgray/sliderule/blob/main/hooks/README.md#the-exit-code-contract) maps the hook's exit codes onto the ones under [Exit codes](#exit-codes). The [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-turn-end-hook) page shows where the hook fits, and [`hooks/`](https://github.com/andypgray/sliderule/tree/main/hooks) has the settings to paste.
+The [exit-code contract](https://github.com/andypgray/sliderule/blob/main/hooks/README.md#the-exit-code-contract) maps the hook's exit codes onto the ones under [Exit codes](#exit-codes). The [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-turn-end-hook) page shows where the hook fits. [`hook install`](#hook-install) writes the settings that run it, and [`hooks/`](https://github.com/andypgray/sliderule/tree/main/hooks) explains them for anyone who edits them by hand.
+
+### `install-hook`
+
+```text
+Description:
+  Merge the hook entries and the baseline deny rules into .claude/settings.json at the root of the
+  git work tree, or in the working directory outside one. Every other setting is kept, and so is a
+  group already on the same event and matcher that runs sliderule hook. A run with nothing to add
+  leaves the file untouched.
+
+Usage:
+  sliderule install-hook [<solution>] [options]
+
+Arguments:
+  <solution>  Solution file, or a directory to search, written into each hook command relative to
+              the repository root. Omit it when the hook finds the solution from the root by
+              itself, through sliderule.json or the walk up; the run refuses when it would not.
+
+Options:
+  --spec <spec>   A built spec DLL, or a csproj that is a member of the target solution, written
+                  into each hook command relative to the repository root. Omit it to use the
+                  settings file, or the convention.
+  -?, -h, --help  Show help and usage information
+```
+
+`hook install` merges the hook entries and the `baseline` deny rules from the [settings snippet](https://github.com/andypgray/sliderule/blob/main/hooks/settings.snippet.json) into `.claude/settings.json`. The file is the one at the root of the git work tree you run it in, or in the working directory outside a work tree. A missing file or `.claude` directory is created, and every other setting stays where it is.
+
+An entry is already there when the file has a group on the same event, with the same matcher, and one of that group's commands runs `sliderule hook`. That group is left as you wrote it, timeout and arguments included, and the command prints `kept` for it. It prints `added` for each entry and deny rule it writes, then `wrote .claude/settings.json`. When every entry is already there, it prints `nothing to change in .claude/settings.json` and leaves the file as it was. A run that writes uses 2-space indentation and LF line endings, so any other formatting the file had is lost.
+
+A `<solution>` or `--spec` you pass is added to each command it writes, as a path relative to the work-tree root. A path named `install` or starting with `-` is written as `./install` or `./-name`, and a path with a space is quoted. A path with a double quote, a `$`, a backtick or a line break fails the command, because a shell reads those even inside quotes. Leave both out when the hook finds the solution from the root by itself, through a `sliderule.json` there or the walk up. When it would not, the command exits 2 before writing the file. Arguments go after `install`, so `sliderule hook <solution> install` fails, and a solution directory named `install` is passed to `hook` as `./install`.
 
 ## Solution and spec resolution
 

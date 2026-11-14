@@ -895,6 +895,42 @@ jobs:
             exit 1
           }
 
+          # The command init's closing lines name, run where init left the repository: every event and deny rule
+          # of the snippet the tool embeds lands in .claude/settings.json, and a second run leaves the file alone.
+          (cd "$plain" && sliderule install-hook) || {
+            echo "::error::sliderule install-hook did not write the hook settings where sliderule init left the repository"
+            exit 1
+          }
+          settings="$plain/.claude/settings.json"
+          snippet=hooks/settings.snippet.json
+          for event in $(jq -r '.hooks | keys[]' "$snippet"); do
+            jq -e --arg event "$event" 'any(.hooks[$event][]?.hooks[]?; .command == "sliderule hook")' "$settings" > /dev/null || {
+              echo "::error::sliderule hook install wrote no $event entry running sliderule hook"
+              cat "$settings"
+              exit 1
+            }
+          done
+          jq -e --slurpfile snippet "$snippet" '(.permissions.deny // []) as $deny | all($snippet[0].permissions.deny[]; . as $rule | $deny | index($rule) != null)' "$settings" > /dev/null || {
+            echo "::error::sliderule install-hook did not write every deny rule of the snippet"
+            cat "$settings"
+            exit 1
+          }
+          touch -d '2001-02-03 04:05:06' "$settings"
+          stamped="$(stat -c %Y "$settings")"
+          again="$(cd "$plain" && sliderule install-hook)" || {
+            echo "::error::A second sliderule install-hook failed over the settings the first one wrote"
+            exit 1
+          }
+          grep -Fq 'nothing to change in .claude/settings.json' <<<"$again" || {
+            echo "::error::A second sliderule install-hook did not report nothing to change"
+            echo "$again"
+            exit 1
+          }
+          [ "$(stat -c %Y "$settings")" = "$stamped" ] || {
+            echo "::error::A second sliderule install-hook rewrote .claude/settings.json with nothing to add"
+            exit 1
+          }
+
           checked_rule "$plain/arch/MyApp.Architecture"
           dotnet build "$plain/MyApp.slnx"
           (cd "$plain" && sliderule check) || {
@@ -1310,7 +1346,8 @@ jobs:
       #   - the page: its install line compared with the one this job ran (which adds the pack as a
       #     source), the restore it asks for, its init line, its spec class written where it says, then
       #     its build, check and render, with the contract asserted to come from the pack and AGENTS.md
-      #     to carry the page's rule;
+      #     to carry the page's rule, then its install-hook, with the settings it wrote asserted to run
+      #     the hook at a stop;
       #   - the quickstart again, now green;
       #   - the sliderule.json init wrote, compared with the one the page quotes, and then the page's CI
       #     lines, which name no path and so run on what the file names;
@@ -1333,10 +1370,11 @@ jobs:
           project="$(fence GETTING-STARTED.md bash 'sliderule init MyApp.sln')"
           spec="$(fence GETTING-STARTED.md csharp 'public sealed class ArchitectureSpec : IArchitectureSpec')"
           first="$(fence GETTING-STARTED.md bash 'dotnet build MyApp.sln')"
+          hook="$(fence GETTING-STARTED.md bash 'sliderule install-hook')"
           settings="$(fence GETTING-STARTED.md json '"solution": "MyApp.sln"')"
           ci="$(fence GETTING-STARTED.md bash 'sliderule render --check')"
           quickstart="$(fence README.md bash 'dotnet tool install -g SlideRule.Cli')"
-          [ -n "$install" ] && [ -n "$project" ] && [ -n "$spec" ] && [ -n "$first" ] && [ -n "$settings" ] && [ -n "$ci" ] && [ -n "$quickstart" ] || {
+          [ -n "$install" ] && [ -n "$project" ] && [ -n "$spec" ] && [ -n "$first" ] && [ -n "$hook" ] && [ -n "$settings" ] && [ -n "$ci" ] && [ -n "$quickstart" ] || {
             echo "::error::Could not cut every fence this step runs out of GETTING-STARTED.md and README.md; one of them has moved or changed shape. Those pages are what a new user follows, so fix the page or fix this cut; do not delete the assertion."
             exit 1
           }
@@ -1388,6 +1426,15 @@ jobs:
           grep -Fq 'layering/domain-independent' AGENTS.md || {
             echo "::error::render wrote no AGENTS.md carrying the page's rule, layering/domain-independent, beside the solution"
             cat AGENTS.md || true
+            exit 1
+          }
+          bash -e -c "$hook" || {
+            echo "::error::GETTING-STARTED.md's sliderule install-hook failed beside the sliderule.json init wrote"
+            exit 1
+          }
+          jq -e 'any(.hooks.Stop[]?.hooks[]?; .command == "sliderule hook")' .claude/settings.json > /dev/null || {
+            echo "::error::GETTING-STARTED.md's sliderule hook install wrote no Stop entry running sliderule hook"
+            cat .claude/settings.json || true
             exit 1
           }
 

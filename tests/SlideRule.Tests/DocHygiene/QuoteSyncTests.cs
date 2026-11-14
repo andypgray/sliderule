@@ -306,6 +306,7 @@ public sealed class QuoteSyncTests
         new(DocPaths.GettingStarted, "getting-started-install", "dotnet tool install -g SlideRule.Cli", GettingStartedWalk),
         new(DocPaths.GettingStarted, "getting-started-spec-project", "sliderule init MyApp.sln", GettingStartedWalk),
         new(DocPaths.GettingStarted, "getting-started-first-check", "dotnet build MyApp.sln", GettingStartedWalk),
+        new(DocPaths.GettingStarted, "getting-started-install-hook", "sliderule install-hook", GettingStartedWalk),
         // The settings file the page says init wrote, which the walk compares with the one init wrote before it
         // runs the page's CI lines, since those name no path and so run on what the file names.
         new(DocPaths.GettingStarted, "getting-started-settings", "\"solution\": \"MyApp.sln\"", GettingStartedWalk),

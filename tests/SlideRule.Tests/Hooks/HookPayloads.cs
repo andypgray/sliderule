@@ -12,6 +12,15 @@ internal static class HookPayloads
     internal const string Session = "s1";
 
     /// <summary>
+    ///     The path of the state file <paramref name="name" /> the hook keeps for <see cref="Session" /> under
+    ///     <paramref name="stateDirectory" />, the layout the hook's state store writes.
+    /// </summary>
+    internal static string StatePath(string stateDirectory, string name)
+    {
+        return Path.Combine(stateDirectory, "sliderule-hook", Session, name);
+    }
+
+    /// <summary>
     ///     A turn-end payload: the fields the hook reads out of a <c>Stop</c> or <c>SubagentStop</c> document, for a
     ///     session that ran from <paramref name="cwd" />. <paramref name="agentId" /> is carried only on a worker's
     ///     stop, as Claude Code sends it: the main agent's payload has no such key. The two transcripts are carried

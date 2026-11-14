@@ -64,6 +64,14 @@ sliderule render MyApp.sln
 
 `check` takes the spec project from the `sliderule.json` that `init` wrote. Without that file, it uses the one project in the solution that references `SlideRule`. It prints a line for each rule and [exits 0](https://github.com/andypgray/sliderule/blob/main/CLI.md#exit-codes) while every rule passes. `render` writes the rules into a managed block in the `AGENTS.md` in the solution's directory, the file [coding agents read](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-context-files). It also writes a card into the directory of each layer a rule governs, here `src/MyApp.Domain/AGENTS.md`. Commit the spec project, the solution file and the `AGENTS.md` files `render` wrote.
 
+To have Claude Code run the check each time an agent's turn ends, add the hook to the repository's settings:
+
+```bash
+sliderule install-hook
+```
+
+It writes the hook entries, and the rules that keep `baseline` from the agent, into `.claude/settings.json` at the root of your repository. Commit that file as well. [Coding agents](https://github.com/andypgray/sliderule/blob/main/CODING-AGENTS.md#the-turn-end-hook) explains what the hook does when a turn ends.
+
 Next, write down what the code already keeps as more `Enforce` rules. A rule the code does not keep yet takes `.Migrate(from:, to:)` in place of `.Enforce(...)`. The constraint moves into `to`, and `from` describes the old pattern in words. Then `sliderule baseline init MyApp.sln` records the rule's current violations in `arch/baselines/<rule-id>.json` for you to commit. New violations fail from then on, and `sliderule baseline accept-reductions` shrinks the baseline as sites are fixed. [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md) shows a `Migrate` rule and both kinds of scope in code, and the [Meridian](https://github.com/andypgray/sliderule/tree/main/examples/Meridian) example shows `Migrate` rules and their baselines on a codebase partway through a migration.
 
 On a new codebase this path starts with every rule green. The [Meridian.Quoting](https://github.com/andypgray/sliderule/tree/main/examples/Meridian.Quoting) example shows where it ends, a four-layer clean architecture governed by `Enforce` rules alone.

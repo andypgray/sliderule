@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `render` prints a warning on stderr for each `AGENTS.override.md` next to a file it writes. Codex reads
   that file in place of `AGENTS.md` in its directory, even when it is empty, so its sessions never see the
   managed block or the card there.
+- `sliderule install-hook` merges the hook entries and the `baseline` deny rules from
+  `hooks/settings.snippet.json` into `.claude/settings.json` at the root of the git work tree. Other settings
+  stay as they are, a group on the same event and matcher that already runs `sliderule hook` is left alone,
+  and a run that finds every entry present does not write the file. A solution or `--spec` passed to it is
+  written into each command. When the hook would find no solution from that root, it exits 2 before writing
+  the file. `init` now ends by naming this command in place of a link to the snippet.
 
 ### Changed
 

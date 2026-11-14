@@ -1743,7 +1743,7 @@ public sealed class HookRunnerTests
 
     private static string StatePath(HookSandbox sandbox, string name)
     {
-        return Path.Combine(sandbox.StateDirectory, "sliderule-hook", HookPayloads.Session, name);
+        return HookPayloads.StatePath(sandbox.StateDirectory, name);
     }
 
     /// <summary>

@@ -35,7 +35,8 @@ public sealed class InitCommandTests : IDisposable
         // Assert
         result.ShouldSucceed(
             "pass layering/myapp-independent — The MyApp layer must not reference the MyApp.Reports layer.",
-            "pass layering/myapp-reports-independent — The MyApp.Reports layer must not reference the MyApp layer.");
+            "pass layering/myapp-reports-independent — The MyApp.Reports layer must not reference the MyApp layer.",
+            "Wire the hook into every agent turn: sliderule install-hook");
         string project = _temp.PathOf("graph", "arch", "MyApp.Architecture", "MyApp.Architecture.csproj");
         commands.Calls.ShouldBe([$"add {solution} {project}", $"build {project}"]);
         File.ReadAllText(_temp.PathOf("graph", "sliderule.json")).ShouldBe(

@@ -8,8 +8,8 @@ namespace SlideRule.Tests.DocHygiene;
 ///     The gate over the <c>sliderule</c> commands the docs tell a reader to run. Every such line in a fenced
 ///     code block of a tracked doc must parse on the command tree the tool ships, so a renamed or removed flag
 ///     fails the suite at every doc that still spells it, instead of failing in the reader's shell. The unit
-///     tests below pin what the scan reads as a command. The Usage line in each of the command-line reference's
-///     help fences is skipped, because it is a synopsis rather than a command.
+///     tests below pin what the scan reads as a command. The command-line reference's help fences are skipped,
+///     because they show what help prints rather than a command.
 /// </summary>
 /// <remarks>
 ///     A parse checks spelling, not effect: an argument that names a file nobody has, or a flag used where
@@ -18,13 +18,12 @@ namespace SlideRule.Tests.DocHygiene;
 /// </remarks>
 public sealed class FencedCommandTests
 {
-    // A help Usage line such as "sliderule check [<solution>] [options]" is a synopsis the parser refuses, and
-    // the help holder already holds it exactly, so a registered Usage line is not a command here.
+    // A help fence's Usage line such as "sliderule check [<solution>] [options]" is a synopsis the parser refuses,
+    // a wrapped description line can open with the tool's name, and the help holder already holds every fence
+    // exactly, so no line of a registered help fence is a command here.
     private static readonly Lazy<IReadOnlyList<(string Doc, FencedCommands.FencedCommand Command)>> DocCommands =
         new(() => FencedCommands.InstructionDocs
-            .SelectMany(static doc => FencedCommands.Find(RepoRoot.ReadText(doc))
-                .Where(command => !CliHelpFences.IsUsageLine(doc, command.Text))
-                .Select(command => (doc, command)))
+            .SelectMany(static doc => DocCommandsOf(doc, RepoRoot.ReadText(doc)))
             .ToList());
 
     [Fact]
@@ -203,5 +202,13 @@ public sealed class FencedCommandTests
 
         // Assert
         errors.ShouldContain(error => error.Contains("--jsn"));
+    }
+
+    private static IEnumerable<(string Doc, FencedCommands.FencedCommand Command)> DocCommandsOf(string doc, string text)
+    {
+        IReadOnlySet<int> help = doc == DocPaths.Cli ? CliHelpFences.HelpLineNumbers(text) : new HashSet<int>();
+        return FencedCommands.Find(text)
+            .Where(command => !help.Contains(command.Line))
+            .Select(command => (doc, command));
     }
 }

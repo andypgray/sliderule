@@ -474,14 +474,11 @@ internal sealed class HookRunner(
     }
 
     // The check this firing calls for, with the solution and spec resolved from the tree rather than from where the
-    // process started: relative paths are the tree's, and so is the settings file. Given the changed files, the check
-    // reads them rather than listing its own since the diff base.
+    // process started. Given the changed files, the check reads them rather than listing its own since the diff base.
     private CheckRequest CheckRequestFor(TreeTurn turn, HookRequest request)
     {
         string tree = Path.GetFullPath(turn.Tree);
-        string? solution = FullPath(request.Solution, tree);
-        string? spec = FullPath(request.Spec, tree);
-        InvocationTargets targets = InvocationTargets.Resolve(solution, spec, tree, environment);
+        InvocationTargets targets = TargetsFor(request.Solution, request.Spec, tree, environment);
 
         return new CheckRequest(
             targets.Solution,
@@ -690,6 +687,12 @@ internal sealed class HookRunner(
             0 => "/",
             _ => path[..slash]
         };
+    }
+
+    // The solution and spec a hook run over tree resolves: relative paths are the tree's, and so is the settings file.
+    internal static InvocationTargets TargetsFor(string? solution, string? spec, string tree, IEnvironment environment)
+    {
+        return InvocationTargets.Resolve(FullPath(solution, tree), FullPath(spec, tree), tree, environment);
     }
 
     private static string? FullPath(string? path, string tree)
