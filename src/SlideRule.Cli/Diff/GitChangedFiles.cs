@@ -56,9 +56,10 @@ internal static class GitChangedFiles
         IEnumerable<string> uncommitted = StatusPaths(statusOutput);
         IEnumerable<string> changed = committed.Concat(uncommitted);
 
-        // git's spelling of its top level and the paths below it need not be the spelling the solution was reached
-        // by, which the model's sites carry, so the root is the caller's and a path below the solution directory is
-        // joined onto the caller's spelling of that directory. Path.Combine keeps such a path as it is.
+        // The model's sites carry the spelling the solution was reached by, and git answers with links, substituted
+        // drives and mapped drives resolved. The root is therefore the caller's, which keeps a substituted drive, and a
+        // path below the solution directory is joined onto the caller's spelling of that directory, which keeps a link
+        // below the root that a solution filter's path leads through. Path.Combine keeps such a joined path as it is.
         string root = location?.Root ?? toplevel;
         if (location is { Below.Length: > 0 })
         {

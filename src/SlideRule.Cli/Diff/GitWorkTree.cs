@@ -22,11 +22,14 @@ internal static class GitWorkTree
     ///     Where <paramref name="directory" /> lies in the work tree it belongs to, or null when git names none, or
     ///     when the ancestor that git's path below the root leads back to is not, to git, that work tree's top level.
     /// </summary>
-    // The root is cut from the caller's own spelling rather than taken from git's, which need not be spelled the way
-    // the caller reached the directory and can then fail to contain it. The names below the root are git's, because
-    // they are the names another clone has. The cut counts segments and compares no names, so git is asked again at
-    // the candidate, and only its answer that the candidate is the same top level makes it the root. A directory inside a .git directory has a prefix and no work tree, and
-    // asking for the top level is what makes it answer null.
+    // The root is cut from the caller's own spelling rather than taken from git's, because git answers a substituted
+    // drive with its target, a mapped network drive with its share's UNC path (verified 2026-11-10, git
+    // 2.56.0.windows.1) and a link with the directory it leads to, while the model's sites keep the spelling the
+    // solution was reached by. The names below the root are git's, because git spells them as the disk does, letter
+    // case included, and they are the names another clone has. The cut counts segments and compares no names, so git
+    // is asked again at the candidate, and only its answer that the candidate is the same top level makes it the root.
+    // A directory inside a .git directory has a prefix and no work tree, and asking for the top level is what makes it
+    // answer null.
     public static async Task<Location?> LocateAsync(string directory, CancellationToken ct)
     {
         if (await TopLevelAndPrefixAsync(directory, ct) is not var (topLevel, below)) return null;
@@ -43,6 +46,40 @@ internal static class GitWorkTree
         bool isTheTopLevel = candidateBelow.Length == 0
                              && string.Equals(candidateTopLevel, topLevel, PathComparison.Comparison);
         return isTheTopLevel ? new Location(root.FullName, string.Join("/", below)) : null;
+    }
+
+    /// <summary>
+    ///     <paramref name="fullPath" /> as a committed file records it: git's names for the directories below the work
+    ///     tree's root, and the leaf as its directory lists it, letter case included. A path outside a work tree, or one
+    ///     whose directory does not exist, keeps its own spelling.
+    /// </summary>
+    public static async Task<string> CommittedSpellingAsync(string fullPath, CancellationToken ct)
+    {
+        if (Directory.Exists(fullPath)) return (await LocateAsync(fullPath, ct))?.Directory ?? fullPath;
+
+        string directory = Path.GetDirectoryName(fullPath)!;
+        if (!Directory.Exists(directory)) return fullPath;
+
+        string spelled = (await LocateAsync(directory, ct))?.Directory ?? directory;
+        return Path.Join(spelled, NameOnDisk(directory, Path.GetFileName(fullPath)));
+    }
+
+    /// <summary>
+    ///     <paramref name="fileName" /> as <paramref name="directory" /> lists it. Only a case-insensitive file system
+    ///     lists it in another case, and an exact match wins where a case-sensitive one holds several. A name carrying
+    ///     a wildcard keeps its own spelling: the listing treats it as a pattern, and a match is another file.
+    /// </summary>
+    public static string NameOnDisk(string directory, string fileName)
+    {
+        var options = new EnumerationOptions { MatchCasing = MatchCasing.CaseInsensitive, AttributesToSkip = 0 };
+        string[] listed = Directory.GetFiles(directory, fileName, options)
+            .Select(Path.GetFileName)
+            .OfType<string>()
+            .Where(name => string.Equals(name, fileName, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (listed.Contains(fileName, StringComparer.Ordinal)) return fileName;
+
+        return listed is [var onDisk] ? onDisk : fileName;
     }
 
     private static async Task<(string TopLevel, string[] Below)?> TopLevelAndPrefixAsync(

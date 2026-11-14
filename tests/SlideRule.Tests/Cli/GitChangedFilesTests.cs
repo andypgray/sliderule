@@ -251,6 +251,36 @@ public sealed class GitChangedFilesTests
                 + "solution discovery gives that directory.");
     }
 
+    [Fact]
+    public async Task ResolveAsync_SolutionDirectoryOnASubstitutedDrive_ListsChangedFilesOnThatDrive()
+    {
+        // git answers a substituted drive with its target, while the model's sites keep the drive the solution was
+        // reached through, so a file listed on the target would match no site.
+        // Arrange
+        using TempDirectory temp = TestTempRoot.Fresh("git-changed-files");
+        using SubstDrive drive = SubstDrive.OverOrSkip(temp.Path);
+        string repository = Path.Combine(temp.Path, "repo");
+        string application = Path.Combine(repository, "app");
+        Directory.CreateDirectory(application);
+        GitCommand.Run(repository, "init");
+        GitCommand.Commit(repository, "--allow-empty", "-m", "baseline");
+        string atRoot = Path.Combine(repository, "Root.cs");
+        string belowSolution = Path.Combine(application, "Probe.cs");
+        File.WriteAllText(atRoot, "public sealed class Root;\n");
+        File.WriteAllText(belowSolution, "public sealed class Probe;\n");
+
+        // Act
+        DiffContext context = await GitChangedFiles.ResolveAsync("HEAD", drive.Spelling(application), Ct);
+
+        // Assert
+        context.Contains(drive.Spelling(belowSolution))
+            .ShouldBeTrue($"A file below the solution directory is listed on {drive.Drive}, as the solution was reached.");
+        context.Contains(drive.Spelling(atRoot))
+            .ShouldBeTrue($"A file at the repository root is listed on {drive.Drive}, as the solution was reached.");
+        context.Contains(atRoot)
+            .ShouldBeFalse($"A file is listed on {drive.Drive} only, never on the directory the drive stands for.");
+    }
+
     // Initialises the repository on first use, then writes and commits one C# file at its root.
     private static string CommitFile(string dir, string name)
     {

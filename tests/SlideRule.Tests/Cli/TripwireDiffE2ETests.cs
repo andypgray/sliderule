@@ -281,6 +281,64 @@ public sealed class TripwireDiffE2ETests
         }
     }
 
+    [Fact]
+    public async Task CheckDiffBase_SolutionOpenedThroughASubstitutedDrive_StillWarns()
+    {
+        // git answers a substituted drive with its target, while the workspace keeps the drive the solution was opened
+        // through, so the changed files are listed on the drive the sites carry or the tripwire matches none of them.
+        using var repo = new TempGitRepo();
+        using SubstDrive drive = SubstDrive.OverOrSkip(repo.Root);
+        repo.WriteQuarantineNote();
+
+        // Cache off, for the reason the symlinked-root row gives.
+        CliResult result = await CliRunner.InvokeAsync(
+            "check", drive.Spelling(repo.SolutionPath), "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD",
+            "--no-cache");
+
+        result.ShouldSucceed("warn legacy/billing/tripwire", QuarantineWarning);
+    }
+
+    [Fact]
+    public async Task CheckDiffBase_FilterReachingItsSolutionThroughALinkBelowTheRoot_StillWarns()
+    {
+        // A solution filter's path is read as written, so the workspace spells the sites through a link it leads
+        // through, while git lists a changed file below that link at the directory the link leads to.
+        using var repo = new TempGitRepo();
+        string billing = repo.PathOf("MyApp.Legacy.Billing");
+        File.WriteAllText(
+            Path.Combine(billing, "Billing.slnx"),
+            """
+            <Solution>
+              <Project Path="MyApp.Legacy.Billing.csproj" />
+            </Solution>
+            """);
+        string link = repo.PathOf("billing-link");
+        SymlinkSupport.CreateDirectorySymlink(link, billing);
+        try
+        {
+            string filter = repo.PathOf("Billing.slnf");
+            File.WriteAllText(
+                filter,
+                """{ "solution": { "path": "billing-link/Billing.slnx", "projects": [ "MyApp.Legacy.Billing.csproj" ] } }""");
+            repo.WriteQuarantineNote();
+
+            // Cache off, for the reason the symlinked-root row gives.
+            CliResult result = await CliRunner.InvokeAsync(
+                "check", filter, "--spec", CliRunner.QuarantinedSpecDll, "--diff-base", "HEAD", "--no-cache");
+
+            // The verdict is not this row's subject: the filter leaves the web shell out, so its containment rule
+            // matches nothing and reds. The tripwire warns whatever the verdict.
+            result.Out.ShouldContain(
+                "Changed file 'LegacyNote.cs' is inside quarantined scope 'legacy/billing'",
+                customMessage: result.Transcript());
+        }
+        finally
+        {
+            // Delete only the symlink (non-recursive), never through it into the real repo.
+            if (Directory.Exists(link)) Directory.Delete(link);
+        }
+    }
+
     // A human report with the blocks headed `pass` taken out, a block being its header line and the indented
     // lines beneath it, every other byte kept. Written against the rendered text on purpose: it states the
     // context's contract in the terms its reader sees, so a rendering that reshaped anything else would red here.

@@ -51,14 +51,13 @@ internal sealed class InitRunner(
                 $"{solutionPath} is a solution filter, which dotnet sln add cannot edit. Pass the solution it filters.");
 
         string solutionDirectory = Path.GetDirectoryName(Path.GetFullPath(solutionPath))!;
+        string solutionFileName = GitWorkTree.NameOnDisk(solutionDirectory, Path.GetFileName(solutionPath));
         GitWorkTree.Location? workTree = await GitWorkTree.LocateAsync(solutionDirectory, ct);
-        if (workTree is not null)
-        {
-            // The settings file is committed, so the paths it records take git's names below the root, never a short
-            // name the solution happened to be reached through.
-            solutionDirectory = workTree.Directory;
-            solutionPath = Path.Join(solutionDirectory, Path.GetFileName(solutionPath));
-        }
+
+        // The settings file is committed, so the paths it records take the names on disk, which another clone has,
+        // whatever letter case the solution was given in: git's names below the root, and the file's own as listed.
+        if (workTree is not null) solutionDirectory = workTree.Directory;
+        solutionPath = Path.Join(solutionDirectory, solutionFileName);
 
         Layout layout = Layout.For(solutionPath, solutionDirectory, workTree?.Root ?? solutionDirectory, request);
         RefuseExistingSettings(layout);

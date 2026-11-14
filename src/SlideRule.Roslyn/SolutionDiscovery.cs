@@ -8,7 +8,8 @@ namespace SlideRule.Roslyn;
 ///     Resolves which solution file to load, by the precedence <see cref="Choose" /> states, and returns it absolute
 ///     and symlink-free (<see cref="PathCanonicalizer" />), so it compares equal to a path another tool resolved
 ///     through the same links. A Windows short name in it comes back in long names, as
-///     <see cref="Path.GetFullPath(string)" /> expands one.
+///     <see cref="Path.GetFullPath(string)" /> expands one, while a substituted drive and the letter case it was given
+///     in stay as spelled, since the canonicalizer follows links only.
 /// </summary>
 /// <remarks>
 ///     A search climbs from its start to the first directory holding exactly one <c>.sln</c>, <c>.slnx</c> or

@@ -147,6 +147,29 @@ public sealed class InitCommandTests : IDisposable
         ShouldHaveWrittenSettingsAtRoot("short", "Application Folder");
     }
 
+    [Theory]
+    [InlineData(false)]
+    // A directory listing leaves hidden files out unless told otherwise.
+    [InlineData(true)]
+    public async Task Init_ThroughAFolderAndFileSpelledInAnotherCase_RecordsTheCaseOnDisk(bool hidden)
+    {
+        // A solution named in another letter case still opens on a case-insensitive file system, and the committed
+        // settings record the names as the disk spells them, which a clone on a case-sensitive one has.
+        // Arrange
+        string onDisk = RestoredProductTree(Path.Combine("cased", "app"));
+        if (hidden) File.SetAttributes(onDisk, File.GetAttributes(onDisk) | FileAttributes.Hidden);
+        GitCommand.Run(_temp.PathOf("cased"), "init");
+        string solution = _temp.PathOf("cased", "APP", "MYAPP.SLNX");
+        Assert.SkipUnless(File.Exists(solution), "The file system under the run's temp root is case-sensitive.");
+        ScriptedSpecProjectCommands commands = ScriptedSpecProjectCommands.Answering();
+
+        // Act
+        await CliRunner.InvokeWithSpecProjectCommandsAsync(commands, "init", solution);
+
+        // Assert
+        ShouldHaveWrittenSettingsAtRoot("cased", "app");
+    }
+
     [Fact]
     public async Task Init_ASettingsFileAtTheRepositoryRoot_RefusesBeforeWritingAnything()
     {
