@@ -62,6 +62,7 @@ internal sealed class ConstraintEvaluator
     private readonly EdgeIndex<ReferenceEdge> _edgesByTarget;
     private readonly EdgeIndex<ExposureEdge> _exposureEdgesBySource;
     private readonly ModelCaveats _caveats;
+    private readonly DeadExceptions _exceptions;
     private readonly EdgeIndex<InjectionEdge> _injectionEdgesBySource;
     private readonly EdgeIndex<MemberEdge> _memberEdgesBySource;
     private readonly IReadOnlyList<ProjectNode> _projects;
@@ -82,6 +83,7 @@ internal sealed class ConstraintEvaluator
         _throwEdgesBySource = new EdgeIndex<ThrowEdge>(model.ThrowEdges, e => e.Source);
         _exposureEdgesBySource = new EdgeIndex<ExposureEdge>(model.ExposureEdges, e => e.Source);
         _selections = selections;
+        _exceptions = new DeadExceptions(selections, model.Projects, caveats);
     }
 
     /// <summary>
@@ -113,10 +115,27 @@ internal sealed class ConstraintEvaluator
     ///     which dispatches before the subject is read at all. <paramref name="memberSubject" /> is null exactly
     ///     where the constraint is not a <see cref="MemberConstraint" />. Every gate below judges what it is
     ///     handed, so the evaluator's own reading of an empty subject or a dead name — an authoring error — is
-    ///     unchanged and belongs to whoever chose the subject.
+    ///     unchanged and belongs to whoever chose the subject. A rule whose subject and operands it measured also
+    ///     carries a warning for each exception in them that removes nothing, read off
+    ///     <paramref name="exceptionSubject" /> in place of <paramref name="subject" /> where it is given: a
+    ///     quarantine's subject as written, before the exception its containment adds.
     /// </remarks>
     internal (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings, SubjectCoverage Coverage)
-        Evaluate(Constraint constraint, Selection? subject, MemberSelection? memberSubject)
+        Evaluate(Constraint constraint, Selection? subject, MemberSelection? memberSubject, Selection? exceptionSubject = null)
+    {
+        (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings, SubjectCoverage coverage) =
+            Measured(constraint, subject, memberSubject);
+        // An empty subject, or a dead piece of one, is reported on its own, and the verbs never ran over it.
+        if (violations.Any(violation => violation.Kind == ViolationKind.EmptySubject)) return (violations, warnings, coverage);
+
+        IReadOnlyList<CheckWarning> exceptions = _exceptions.Of(constraint, exceptionSubject ?? subject, memberSubject);
+        return exceptions.Count == 0
+            ? (violations, warnings, coverage)
+            : (violations, warnings.Concat(exceptions).ToList(), coverage);
+    }
+
+    private (IReadOnlyList<Violation> Violations, IReadOnlyList<CheckWarning> Warnings, SubjectCoverage Coverage)
+        Measured(Constraint constraint, Selection? subject, MemberSelection? memberSubject)
     {
         // A project constraint ranges over the solution's PROJECTS (GRAMMAR §4.10), and its own empty check
         // speaks in project terms.
@@ -433,7 +452,7 @@ internal sealed class ConstraintEvaluator
             yield break;
         }
 
-        if (OpenedParts(selection) is { } parts)
+        if (DeadNames.OpenedParts(selection, _selections) is { } parts)
             foreach (Selection part in parts)
             {
                 SelectionAdmission partMatched = SelectionAdmission.Collect(_selections, part, position);
@@ -443,19 +462,6 @@ internal sealed class ConstraintEvaluator
 
         foreach (Selection deadName in DeadNames.In(selection, matched.Nodes, _selections))
             yield return deadName;
-    }
-
-    // The parts DeadPieces opens: a union's always, since any of them can be empty; a layer's definition only
-    // where it is compound itself or carries a list of its own, since otherwise it is dead exactly when the
-    // layer is.
-    private IReadOnlyList<Selection>? OpenedParts(Selection selection)
-    {
-        if (selection is UnionSelection union) return union.Parts;
-
-        return selection.Noun is LayerNoun { Definition: { } definition }
-               && (_selections.Composite(definition) is not null || DeadNames.Possible(definition))
-            ? [definition]
-            : null;
     }
 
     // One warning per rendered reference, which is what every surface downstream keys on: two warnings
@@ -1064,7 +1070,10 @@ internal sealed class ConstraintEvaluator
         List<TypeNode> types = whole.Nodes
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
             .ToList();
-        if (_caveats.Narrowing is not null || dead.Count == 0) return (types, NoWarnings);
+        if (_caveats.Narrowing is not null) return (types, NoWarnings);
+
+        IReadOnlyList<CheckWarning> exceptions = _exceptions.OfExemplar(exemplar);
+        if (dead.Count == 0) return (types, exceptions);
 
         // One warning per distinct reference: the reference is the warning's key, so two parts that render
         // alike warn once.
@@ -1074,6 +1083,7 @@ internal sealed class ConstraintEvaluator
             .Select(group => group.First())
             .Select(entry => CheckWarning.DeadExemplar(
                 entry.Reference, AuthoringHints.ForExemplar(entry.Part, _caveats)))
+            .Concat(exceptions)
             .ToList();
         return (types, warnings);
     }

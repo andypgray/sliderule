@@ -476,8 +476,9 @@ other `(first, more)` lists have no sequence form yet (§11).
   where the subject matched something, each listed name no type of it carries fails the rule
   with the same message as an empty union operand, quoted as the subject would read with that
   name alone ("types named `B`"), so the two spellings fail alike. This reads the subject's own
-  lists and those of each union operand; a list inside an `Except` exempts and is not read, and
-  a subject that matched nothing fails once, whole, with no per-name failures beside it. A run
+  lists and those of each union operand; a list inside an `Except` belongs to the exception, which
+  warns rather than fails (below), and a subject that matched nothing fails once, whole, with no
+  per-name failures beside it. A run
   over one project's compilation drops from these lists the names that project does not
   declare, as it drops a union operand that is empty there, since another project may declare
   them. An **`Under` list** (§5.2) is read per glob on all of these terms, since
@@ -515,8 +516,8 @@ other `(first, more)` lists have no sequence form yet (§11).
   a layer used as a target, is tested as it is written, before the union's or the layer's own
   adjectives: a part that matched nothing warns as itself, and a dead name in its list warns as
   above. A layer used as a subject is not opened. Only the operand's own
-  `Named` adjectives are read this way: a list inside an `Except` exempts, and a name there that
-  matches nothing exempts nothing, which leaves the ban stricter rather than quieter. The
+  `Named` adjectives are read this way; a list inside an `Except` belongs to the exception, which
+  is read against what it removes (below). The
   `MustOnly*` verbs run the per-operand test too, on every pattern in the allow-set whether or not
   the rest of it matched, and warn **"rule is stricter than written"** naming each dead allowed
   pattern, part or name. What that pattern was meant to allow is then reported as violations under
@@ -538,6 +539,42 @@ other `(first, more)` lists have no sequence form yet (§11).
   they resolve no target set, so "no subject matched this anchor" is what a *satisfied* ban looks
   like, and resolving the name instead does not separate a typo from a ban on something this
   codebase has never held (§4.5, §4.6).
+- **An exception that removes nothing warns.** Each `Except` the spec writes is read against the
+  set it subtracts from: what its selection names in that position, narrowed by the adjectives
+  written before it. An exception none of whose types is in that set removes nothing. When it is a
+  **pointer**, one that names a specific type, namespace, project, layer, exact name or folder
+  (`typeof`, `arch.Namespace`, `arch.Project`, a layer, `Named`, `InNamespace`, `Under`), it names
+  something gone or misplaced, yet the sentence still prints it. An exception that describes a kind
+  instead (a shape, an accessibility, an attribute, a name pattern, `Where`, `Authored`, a member's
+  override or interface adjective) states a policy: removing nothing, it is true of no type today, and
+  the sentence still holds. A kind warns only where the set it is written on holds a type the
+  solution only references and the kind cannot see one: `arch.Types` holds no such type, and a base,
+  interface, attribute or `Under` adjective never matches one. The check warns, quoting the exception
+  and the selection it is written on: *"This rule is stricter than written: its exception "types named `SqlException`" removes
+  nothing from "types in `System.Data.SqlClient`"."* The warning changes no verdict. A live
+  exception is read per name, per glob and per union part, as a dead operand is, so one name of its
+  `Named` list that removes nothing warns on its own. The register follows the position:
+  - An exception from a subject or a forbidden-set target spares nothing, so the rule is
+    **stricter than written**. It counts as a dead allowed pattern does: `baseline init` skips the
+    rule, and the rule is never suggested for promotion.
+  - An exception from an allow-list or a membership forbids nothing, so the rule is **partly
+    inert**. It counts as a dead target pattern does, and `baseline accept-reductions` leaves the
+    rule's unmatched entries alone.
+  - An exception from an `among:` part keeps a counterpart it was meant to drop, which can add a
+    violation or hide one, so the rule is **not measured as written**.
+  - An exception inside an exception flips the direction, since it narrows what the outer one
+    removes.
+
+  The same reading covers a member `Except` (§4.6), a project `Except` (§4.10) and an exception
+  inside an exemplar (§5.5), which warns under the dead-exemplar kind. A bare `typeof` exception the
+  codebase never references stays silent, as a bare `typeof` target does: there is nothing to
+  remove until the code names the type. The exception a quarantine's containment adds to remove
+  its sanctioned surface (§7) is not read, since a surface outside the scope is lawful. A narrowed
+  run reads no exception, because its types may sit in a project the run never loaded. To except a
+  package's type, name it by `typeof(SqlException)` or by
+  `arch.Namespace("System.Data.SqlClient").Named("SqlException")`. `arch.Types` holds only the
+  types the solution declares, and a hierarchy adjective or `Under` never matches a type the
+  solution only references, so an exception spelled with either removes nothing there.
 - **Edges are definition-level (v1).** A source-level reference to `IHandler<Order>` is a
   reference to *both* the open definition `IHandler<T>` and the argument `Order`; the checker
   mints no edge to the closed construction. A closed generic in an `arch.Type(...)` /
@@ -900,8 +937,8 @@ Quarantine desugaring (§7) — is the underlying **type** selection.
   side's terms (§4.1): where the member subject matched something, each listed name no member of
   it carries fails the rule with *"The subject selection operand "…" matched no
   solution-declared members."*, quoted as the subject would read with that name alone ("`Ghost`
-  methods of types named `Program`"). A list inside an `Except` payload exempts and is not read,
-  a subject that matched nothing fails once, whole, and a run over one project's compilation
+  methods of types named `Program`"). A list inside an `Except` payload belongs to the exception,
+  which warns when it removes nothing (§4.1), a subject that matched nothing fails once, whole, and a run over one project's compilation
   reads no member name this way, since another project's members may carry it.
 - **Member exclusions.** `.Except(memberSelection, …)` removes from a member subject every member
   any payload names (§5.7). Each payload is a member selection over a type selection of its own,
@@ -1604,7 +1641,7 @@ What the table cannot show, per adjective:
   - **Several files.** A type is under a glob when *any* file declaring it is: a partial type is wherever any of its parts is, so the author's part of a generator-completed partial puts the type in the author's folder. The opposite of `.Authored()`'s every-file rule, for the opposite question: a location selects what lives there, where generated code is what a reader wants left out.
   - **Generated files.** A generator's document carries whatever path its host gives it. A build that writes generator output puts it under the project's `obj` directory, which a source-folder glob does not reach, and a host that writes none gives a path outside the solution directory, which no glob reaches. A type only a generator declares is under a source folder only where its host put the document there.
   - **External types** are declared in no file of the solution and are under no glob, in every position.
-  - **Dead globs** are read one at a time, as a `Named` list's names are (§4.1): beside globs that match, a glob that matches nothing fails the rule on a subject, warns partly inert on a forbidden-set target and stricter than written on an allow-list or a membership, is dropped by a run over one project's compilation, and is not read inside an `Except` payload.
+  - **Dead globs** are read one at a time, as a `Named` list's names are (§4.1): beside globs that match, a glob that matches nothing fails the rule on a subject, warns partly inert on a forbidden-set target and stricter than written on an allow-list or a membership, is dropped by a run over one project's compilation, and inside an `Except` payload warns when it removes nothing (§4.1).
   - **One project's view.** On a subject the adjective is decidable from one project, whose own types carry their files. Read over other projects' types, as a target or in an `Except` payload, it is left to the whole solution, because a project compiled against another's assembly sees none of its source files.
 - `.Implementing(typeof(IHandler<>))` / `.Implementing("MyApp.Web.IHandler<T>")` — the string form renders byte-identically (string anchors, below)
 - `.AttributedWith(typeof(ApiControllerAttribute))` / `.AttributedWith("ModelContextProtocol.Server.McpServerToolAttribute")` — `Attribute` suffix stripped, bracketed; the string form renders byte-identically (string anchors, below)
@@ -2445,7 +2482,8 @@ reaches items 15–16, a foreign operand or a foreign `Except` payload inside a 
 item 10, and an empty union nested in another reaches item 36. **Per-operand emptiness is not a
 §8 error**: whether an operand matches any type is a fact about the codebase, not the spec, so it
 is check-time — one empty-subject violation naming
-the operand (§4.1, §5.1). The walks descend through a family the same way: a family's layer cells
+the operand (§4.1, §5.1). An exception that removes nothing is check-time for the same reason, and
+warns (§4.1). The walks descend through a family the same way: a family's layer cells
 and its own adjectives are walked (a foreign cell reaches item 10, a blank glob on a family's
 adjective item 15), and the project selection inside a project family reaches items 22, 23 and 36.
 Two of a family's cells holding one copy of a type is likewise a codebase fact and is check-time — a

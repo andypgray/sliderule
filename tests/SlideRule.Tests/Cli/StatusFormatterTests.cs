@@ -677,6 +677,47 @@ public sealed class StatusFormatterTests
     }
 
     [Fact]
+    public void Migrate_ABansExceptionThatRemovesNothing_ReadsStricterThanWrittenAndNamesTheException()
+    {
+        // An exception from a ban that removes nothing spares nothing, so it only adds violations, as a dead
+        // allowed pattern does, and the sub-line says what the exception did rather than what it matched.
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Passed, grandfathered: 1, stale: 1,
+            captured: true, banExceptions: ["types named `Ghost`"]));
+
+        lines[1]
+            .ShouldBe("  stricter than written: the exception \"types named `Ghost`\" removed nothing.");
+    }
+
+    [Fact]
+    public void Migrate_ABansExceptionAndUncaptured_SaysInitSkipsTheRuleUntilTheExceptionRemovesSomething()
+    {
+        // An exception can match a real type and still remove nothing, so "matches" would not clear it.
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Failed, 2, banExceptions: ["types named `Model`"]));
+
+        lines[1]
+            .ShouldBe(
+                "  stricter than written: the exception \"types named `Model`\" removed nothing, so 'sliderule "
+                + "baseline init' skips this rule until each dead operand removes something or is removed.");
+    }
+
+    [Fact]
+    public void Migrate_ADeadTargetBesideAnAllowListsDeadException_NamesEachInItsOwnWords()
+    {
+        // Both leave the unmatched entries untested, so they share the not-measured line, each named by its noun.
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Passed, stale: 1, captured: true,
+            inertOperands: ["the Legacy layer"], allowExceptions: ["types named `Ghost`"]));
+
+        lines[1]
+            .ShouldBe(
+                "  not measured: the target operand \"the Legacy layer\" matched no types and the exception "
+                + "\"types named `Ghost`\" removed nothing, so this rule's unmatched entries may be untested rather "
+                + "than fixed.");
+    }
+
+    [Fact]
     public void Migrate_DeadAmongPartAndUncaptured_ReadsNotMeasuredAndSaysWhyInitSkipsIt()
     {
         // A dead among part can pass a subject as readily as red one, so the rule's entries are in doubt and its
@@ -782,7 +823,8 @@ public sealed class StatusFormatterTests
         bool captured = false, string? skipReason = null, int sitesEach = 0, int shrunk = 0, int uncounted = 0,
         IReadOnlyList<Violation>? debt = null, string? inertHint = null, string? emptySubjectHint = null,
         string[]? inertOperands = null, string? operandHint = null, string[]? allowedOperands = null,
-        string[]? memberships = null, string[]? amongOperands = null)
+        string[]? memberships = null, string[]? amongOperands = null, string[]? banExceptions = null,
+        string[]? allowExceptions = null)
     {
         IReadOnlyList<Violation> remaining = debt
                                              ?? (sitesEach > 0
@@ -805,6 +847,10 @@ public sealed class StatusFormatterTests
             warned.Add(CheckWarning.DeadOperand(DeadOperandRole.Membership, membership, operandHint));
         foreach (string operand in amongOperands ?? [])
             warned.Add(CheckWarning.DeadOperand(DeadOperandRole.Among, operand, operandHint));
+        foreach (string exception in banExceptions ?? [])
+            warned.Add(CheckWarning.DeadException(DeadOperandRole.BanException, exception, "host", operandHint));
+        foreach (string exception in allowExceptions ?? [])
+            warned.Add(CheckWarning.DeadException(DeadOperandRole.AllowException, exception, "host", operandHint));
 
         IReadOnlyList<Violation> red = emptySubjectHint is null
             ? SyntheticNodes.RuleErrors(violations)

@@ -389,6 +389,17 @@ public sealed class ExemplarResolutionTests
             .ShouldBe("types named `BookingRepository`");
     }
 
+    [Fact]
+    public void AnExceptionInsideTheExemplarThatRemovesNothing_WarnsWithoutTouchingTheVerdict()
+    {
+        RuleResult result = Checker.Run(Sources.LayeredModel,
+                WebRuleWithExemplar(arch => arch.Namespace("App.Domain.*").Except(arch.Types.Named("Ghost"))))
+            .Single();
+
+        result.ShouldHavePassed();
+        result.ShouldHaveWarnedDeadExemplarException("types in `App.Domain.*`", "types named `Ghost`");
+    }
+
     // The rule most rows here hang their exemplar on, a web ban the layered model keeps: the exemplar a row
     // passes is then the whole of what it varies.
     private static Action<Arch> WebRuleWithExemplar(Func<Arch, Selection> exemplar)

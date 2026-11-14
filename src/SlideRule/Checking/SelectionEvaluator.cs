@@ -212,6 +212,42 @@ internal sealed class SelectionEvaluator
     }
 
     /// <summary>
+    ///     What each of <paramref name="selection" />'s own <c>Except</c> adjectives subtracts from, by the
+    ///     adjective's index: what its noun or its parts name in <paramref name="position" />, narrowed by the
+    ///     adjectives written before that <c>Except</c>. Empty where the selection carries none.
+    /// </summary>
+    /// <remarks>
+    ///     Built from the same noun resolution and keepers <see cref="Evaluate" /> folds, so the set an exception is
+    ///     read against is the one the check subtracted it from.
+    /// </remarks>
+    internal IReadOnlyList<(int Index, HashSet<TypeNode> Host)> ExceptHosts(Selection selection, SelectionPosition position)
+    {
+        IReadOnlyList<SelectionAdjective> adjectives = selection.Adjectives;
+        if (!adjectives.Any(adjective => adjective is ExceptAdjective)) return [];
+
+        IEnumerable<TypeNode> current = Composite(selection) is { } parts
+            ? parts.SelectMany(part => Evaluate(part, position))
+            : ByNoun(selection.Noun!, position);
+        var hosts = new List<(int, HashSet<TypeNode>)>();
+        for (var j = 0; j < adjectives.Count; j++)
+        {
+            if (adjectives[j] is ExceptAdjective)
+            {
+                // The constructor says the pipeline so far becomes a set here, where a spread would leave it to
+                // the declared type.
+                // ReSharper disable once UseCollectionExpression
+                var held = new HashSet<TypeNode>(current);
+                hosts.Add((j, held));
+                current = held;
+            }
+
+            current = current.Where(KeeperFor(adjectives[j]));
+        }
+
+        return hosts;
+    }
+
+    /// <summary>
     ///     Whether <paramref name="noun" /> names <paramref name="type" /> in <paramref name="position" /> — the
     ///     noun half of <see cref="Evaluate" />, asked of one type.
     /// </summary>

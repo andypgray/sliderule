@@ -17,9 +17,10 @@ namespace SlideRule.Checking;
 ///     </para>
 ///     <para>
 ///         A one-entry list has no arm here, since its entry is dead exactly when the selection is. A list inside
-///         an <c>Except</c> payload is not read: it exempts, and a dead exemption narrows nothing. Nor is one inside
-///         a union's parts, a family's cells or behind a layer's definition, which fold before the selection's own
-///         list is read; a caller that wants them read reads each part itself.
+///         an <c>Except</c> payload is not read here: the payload is a selection of its own, which
+///         <see cref="DeadExceptions" /> reads against what it is meant to remove. Nor is one inside a union's
+///         parts, a family's cells or behind a layer's definition, which fold before the selection's own list is
+///         read; a caller that wants them read reads each part itself.
 ///     </para>
 /// </remarks>
 internal static class DeadNames
@@ -50,6 +51,21 @@ internal static class DeadNames
 
                     break;
             }
+    }
+
+    /// <summary>
+    ///     The parts a dead-piece walk opens below a live selection: a union's always, since any of them can be
+    ///     empty; a layer's definition only where it is compound itself or carries a list of its own, since otherwise
+    ///     it is dead exactly when the layer is. Null where there is nothing to open.
+    /// </summary>
+    internal static IReadOnlyList<Selection>? OpenedParts(Selection selection, SelectionEvaluator selections)
+    {
+        if (selection is UnionSelection union) return union.Parts;
+
+        return selection.Noun is LayerNoun { Definition: { } definition }
+               && (selections.Composite(definition) is not null || Possible(definition))
+            ? [definition]
+            : null;
     }
 
     /// <summary>Whether <paramref name="selection" /> carries a list of its own that an entry could be dead in.</summary>

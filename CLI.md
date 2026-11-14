@@ -667,7 +667,7 @@ A check warning never changes its rule's status or the check's exit code. It can
 | Kind | Raised when |
 |---|---|
 | `inertTarget` | a forbidden target matched no types |
-| `deadOperand` | a pattern in a rule's list matched no types |
+| `deadOperand` | a list pattern matched no types, or an `Except` removed nothing |
 | `deadExemplar` | a rule's exemplar matched no declared type |
 | `orphanedBaseline` | a ratchet with no baseline fails, and a section has an old ID |
 | `quarantinedScopeTouched` | a changed file declares a type in a quarantined scope |
@@ -676,6 +676,8 @@ A check warning never changes its rule's status or the check's exit code. It can
 `inertTarget` means a forbidden-set dependency verb's entire target matched no types, so the rule cannot fire. Check the target or confirm that the forbidden code does not exist yet. An absent `typeof` target raises no warning, and `MustOnly` verbs never raise this kind.
 
 `deadOperand` identifies a list pattern that matched no types. It can be a forbidden target among live targets, an allow-list pattern, a membership, a reside verb's glob or project name, or part of `among:`. The rule was not measured as written. Such a rule is never suggested for promotion, and `baseline init` skips it.
+
+`deadOperand` also identifies an `Except` that removes nothing from the selection it is written on, which the sentence still prints. It is raised for an exception that names a specific type, namespace, project, layer, exact name or folder. An exception that describes a kind, such as `arch.Types.ThatAreStatic()`, is raised only when the selection contains a package's type the kind cannot see. The message quotes both: ``This rule is stricter than written: its exception "types named `SqlException`" removes nothing from "types in `System.Data.SqlClient`".`` An exception from a subject or a forbidden target makes the rule stricter than written. One from an allow-list or a membership makes it partly inert, so `baseline accept-reductions` leaves its unmatched entries alone. `arch.Types` contains only the types the solution declares, so to except a package's type, name it with `typeof(...)` or `arch.Namespace(...).Named(...)`. [The grammar](https://github.com/andypgray/sliderule/blob/main/GRAMMAR.md#41-reference-universe-per-position) gives each position's register.
 
 `deadExemplar` means part of the exemplar matched no solution-declared type, or the exemplar could not be resolved. It affects neither verdict nor counts, and is suppressed on solution-filter runs.
 

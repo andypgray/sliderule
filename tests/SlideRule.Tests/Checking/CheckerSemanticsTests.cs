@@ -1,3 +1,4 @@
+using System.Text;
 using Shouldly;
 using SlideRule.Checking;
 using SlideRule.Tests.Checking.Targets;
@@ -320,10 +321,10 @@ public sealed class CheckerSemanticsTests
     }
 
     [Fact]
-    public void InertTarget_DeadNameInAnExceptList_IsSilent()
+    public void DeadNameInATargetException_WarnsTheNameAloneAsStricterThanWritten()
     {
-        // A name inside an Except exempts, and one that matches nothing exempts nothing: the ban is stricter
-        // for it, never quieter, so there is no clause gone missing to report.
+        // A name inside an Except that removes nothing spares nothing: the ban reaches what the sentence says it
+        // spares. The name that removed something is not named beside it.
         RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
                 arch.Rule("inert/except")
                     .Enforce(arch.Namespace("App.Web.*")
@@ -331,7 +332,206 @@ public sealed class CheckerSemanticsTests
                     .Because("b"))
             .Single();
 
-        result.ShouldHavePassedClean();
+        result.ShouldHavePassed();
+        result.ShouldHaveWarnedStricterException("types in `App.Domain.*`", "types named `Ghost`");
+    }
+
+    [Fact]
+    public void TargetException_OfAPackageTypeThroughArchTypes_KeepsTheViolationAndNamesTheSpellingsThatReachIt()
+    {
+        // arch.Types holds only solution-declared types, so the exception cannot reach StringBuilder, a type the
+        // solution only references: the edge it was meant to spare stays red, and the warning says why.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("text/no-builders")
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(arch.Namespace("System.Text").Except(arch.Types.Named("StringBuilder"))))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveFailedWithEdges(ViolationKind.Reference, ["App.Domain.Service -> System.Text.StringBuilder"]);
+        result.ShouldHaveWarnedStricterException("types in `System.Text`", "types named `StringBuilder`")
+            .Hint.ShouldBe(
+                "`arch.Types` holds only the types this solution declares, and a package's type carries no bases, "
+                + "interfaces, attributes or files here, so name a package's type with `typeof(...)` or "
+                + "`arch.Namespace(...).Named(...)`; an exception that removes nothing spares nothing, so what it was "
+                + "meant to spare is reported as a violation.");
+    }
+
+    [Fact]
+    public void TargetException_ByAHierarchyAdjectiveOverAPackageType_WarnsAsStricterThanWritten()
+    {
+        // A package's type carries no base list here, so DerivedFrom never matches it, whatever the noun.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("text/no-builders")
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(arch.Namespace("System.Text")
+                            .Except(arch.Namespace("System.Text").DerivedFrom(typeof(object)))))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveWarnedStricterException(
+                "types in `System.Text`", "types in `System.Text` derived from `Object`")
+            .Hint!.ShouldStartWith("`arch.Types` holds only the types this solution declares");
+    }
+
+    [Theory]
+    [InlineData("typeof")]
+    [InlineData("namespace")]
+    public void TargetException_OfAPackageTypeSpelledToReachIt_SparesItsEdgeSilently(string spelling)
+    {
+        // The two spellings the warning's hint gives: each removes StringBuilder, so only the Web edges stay red.
+        // The union keeps the target live once StringBuilder is removed, so no inert warning stands beside them.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("text/no-builders")
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(arch.AnyOf(arch.Namespace("App.Web.*"), arch.Namespace("System.Text"))
+                            .Except(spelling == "typeof"
+                                ? arch.Type(typeof(StringBuilder))
+                                : arch.Namespace("System.Text").Named("StringBuilder"))))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveFailedWithEdges(
+            ViolationKind.Reference,
+            [
+                "App.Domain.Apple -> App.Web.Controller",
+                "App.Domain.Service -> App.Web.Controller",
+                "App.Domain.Service -> App.Web.Helper",
+                "App.Domain.Zebra -> App.Web.Controller"
+            ]);
+        result.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void TargetException_ABareTypeofTheCodebaseNeverReferences_StaysSilent()
+    {
+        // Uri is a real type the layered source never references, so the model holds no node for it: there is
+        // nothing to remove until the code names it, as with a bare typeof target.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("layering/web")
+                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(arch.Namespace("App.Web.*").Except(typeof(Uri))))
+                    .Because("b"))
+            .Single();
+
+        result.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void TargetException_ABareTypeofTheCodebaseHoldsOutsideTheTarget_Warns()
+    {
+        // StringBuilder is in the model, but not among the Web types the exception is written on.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("layering/web")
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(arch.Namespace("App.Web.*").Except(typeof(StringBuilder))))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveWarnedStricterException("types in `App.Web.*`", "`StringBuilder`");
+    }
+
+    [Fact]
+    public void SubjectException_ByAKindNoTypeHasToday_StaysSilent()
+    {
+        // "except static types" states a policy: with no static type in the subject it removes nothing, and the
+        // sentence still holds, since no static type is reported.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("layering/domain")
+                    .Enforce(arch.Namespace("App.Domain.*").Except(arch.Types.ThatAreStatic())
+                        .MustNotReference(arch.Namespace("App.Web.*")))
+                    .Because("b"))
+            .Single();
+
+        result.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void TargetException_ByAKindOverAPackageType_WarnsSinceTheKindCannotSeeIt()
+    {
+        // StringBuilder is sealed, so "except sealed types" promises to spare it, but arch.Types holds no package
+        // type: the kind is blind to the very type the sentence names.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("text/no-builders")
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(arch.Namespace("System.Text").Except(arch.Types.ThatAreSealed())))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveWarnedStricterException("types in `System.Text`", "sealed types");
+    }
+
+    [Fact]
+    public void TargetException_WhollyDeadNamedList_IsWarnedOnceAsAWhole()
+    {
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("text/no-builders")
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(arch.Namespace("System.Text").Except(arch.Types.Named("StringBuilder", "Encoding"))))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveWarnedStricterException("types in `System.Text`", "types named `StringBuilder` or `Encoding`");
+    }
+
+    [Fact]
+    public void TargetException_InsideALayerDefinition_IsRead()
+    {
+        // A layer is transparent to its definition, so an Except written there is the target's own.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+            {
+                Layer web = arch.Layer("Web", arch.Namespace("App.Web.*").Except(arch.Types.Named("Ghost")));
+                arch.Rule("layering/web")
+                    .Enforce(arch.Namespace("App.Domain.*").MustNotReference(web))
+                    .Because("b");
+            })
+            .Single();
+
+        result.ShouldHaveWarnedStricterException("types in `App.Web.*`", "types named `Ghost`");
+    }
+
+    [Fact]
+    public void TargetException_OfASolutionTypeOutsideTheTarget_SaysItRemovesOnlyWhatTheTargetHolds()
+    {
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("layering/web")
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotReference(arch.Namespace("App.Web.*").Except(arch.Types.Named("Model"))))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveWarnedStricterException("types in `App.Web.*`", "types named `Model`")
+            .Hint!.ShouldStartWith("An exception removes only what the selection it is written on holds; ");
+    }
+
+    [Fact]
+    public void InjectionTargetException_ThatRemovesNothing_Warns()
+    {
+        // MustNotInject raises no inert warning of its own, since a registration absent is its win condition; an
+        // exception the sentence prints is a promise all the same.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("di/no-web")
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustNotInject(arch.Namespace("App.Web.*").Except(arch.Types.Named("Ghost"))))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveWarnedStricterException("types in `App.Web.*`", "types named `Ghost`");
+    }
+
+    [Fact]
+    public void TargetException_ThatRemovesNothing_IsSilentOnANarrowedRun()
+    {
+        // A run over part of the solution cannot tell a dead exception from one whose types sit in a project it
+        // never loaded.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                    arch.Rule("inert/except")
+                        .Enforce(arch.Namespace("App.Web.*")
+                            .MustNotReference(arch.Namespace("App.Domain.*").Except(arch.Types.Named("Ghost"))))
+                        .Because("b"),
+                narrowing: Checker.FilterNarrowing)
+            .Single();
+
+        result.Warnings.ShouldBeEmpty();
     }
 
     [Fact]

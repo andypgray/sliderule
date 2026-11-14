@@ -38,11 +38,11 @@ public abstract class ProjectSelection
     ///     The clone each concrete project selection returns carrying a new adjective list, so a refinement
     ///     never mutates the selection it refines.
     /// </summary>
-    private protected abstract ProjectSelection Rebuild(IReadOnlyList<ProjectAdjective> adjectives);
+    internal abstract ProjectSelection WithAdjectives(IReadOnlyList<ProjectAdjective> adjectives);
 
     internal ProjectSelection Refined(ProjectAdjective adjective)
     {
         var adjectives = new List<ProjectAdjective>(Adjectives) { adjective };
-        return Rebuild(adjectives);
+        return WithAdjectives(adjectives);
     }
 }

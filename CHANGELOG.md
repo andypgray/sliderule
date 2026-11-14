@@ -23,6 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a run that finds every entry present does not write the file. A solution or `--spec` passed to it is
   written into each command. When the hook would find no solution from that root, it exits 2 before writing
   the file. `init` now ends by naming this command in place of a link to the snippet.
+- `check` warns, as `deadOperand`, when an `Except` that names a specific type, namespace, project, layer, exact
+  name or folder removes nothing from the selection it is written on. An exception that describes a kind (a shape,
+  a name pattern, a predicate) warns only when that selection holds a package's type the kind cannot see. The
+  message quotes the exception and that selection. An exception from a subject or a forbidden target makes the
+  rule stricter than written, so `baseline init` skips it. One from an allow-list or a membership makes the rule
+  partly inert, so a type the sentence forbids no longer passes unremarked. Each name, glob and union part of a
+  live exception is read on its own, and the check covers type, member and project selections and exemplars. A
+  package's type is excepted by `typeof(...)` or `arch.Namespace(...).Named(...)`, since `arch.Types` holds only
+  the types the solution declares, and the hint says so.
 
 ### Changed
 

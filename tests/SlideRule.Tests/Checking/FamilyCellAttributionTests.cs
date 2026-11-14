@@ -232,6 +232,20 @@ public sealed class FamilyCellAttributionTests
     }
 
     [Fact]
+    public void ProjectCells_AnExceptionFromTheFamilysProjectsThatRemovesNothing_Warns()
+    {
+        // The cells come from a project selection the family resolves itself, so its exception is read there.
+        RuleResult result = Checker.Run(SharedShimCopiesModel, arch =>
+                arch.Rule("layering/independent")
+                    .Enforce(arch.Each(arch.Projects.Named("Json", "Testing").Except(arch.Projects.Named("Ghost")))
+                        .MustNotReferenceEachOther())
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveWarnedStricterException("projects `Json` or `Testing`", "project `Ghost`");
+    }
+
+    [Fact]
     public void AGlobLayer_HoldsEveryCopy_SoItOverlapsAProjectLayerAtThatProjectsCopy()
     {
         // A glob names a shared type at every project, so Shims holds both copies of the guard and Json holds one.

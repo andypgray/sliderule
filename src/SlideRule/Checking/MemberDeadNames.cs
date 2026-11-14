@@ -10,7 +10,8 @@ namespace SlideRule.Checking;
 /// <remarks>
 ///     The resolved member list is the whole test, on <see cref="DeadNames" />'s argument: <c>Named</c> keeps the
 ///     members carrying a listed name, and every other member adjective only filters further, one member at a
-///     time. As there, a one-name list and a <c>Named</c> inside an <c>Except</c> payload are not read. Nor is a
+///     time. As there, a one-name list is not read here, and a <c>Named</c> inside an <c>Except</c> payload is read by
+///     <see cref="DeadExceptions" /> against what it removes. Nor is a
 ///     <c>Named</c> on the source type selection, which the type-side gate has already read by the time the
 ///     members are resolved.
 /// </remarks>

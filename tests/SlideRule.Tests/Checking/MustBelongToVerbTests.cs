@@ -63,6 +63,16 @@ public sealed class MustBelongToVerbTests
     }
 
     [Fact]
+    public void MustBelongTo_ExceptionFromAMembershipThatRemovesNothing_WarnsPartlyInert()
+    {
+        // An exception from a membership that removes nothing forbids nothing: a type the sentence keeps out of the
+        // membership still belongs to it.
+        Checker.Verdict(SceneModel, arch => arch.Types.Except(arch.Namespace("Legacy.*"))
+                .MustBelongTo(arch.Namespace("Domain.*").Except(arch.Types.Named("Ghost")), arch.Namespace("Web.*")))
+            .ShouldHaveWarnedPartlyInertException("types in `Domain.*`", "types named `Ghost`");
+    }
+
+    [Fact]
     public void MustBelongTo_SingleMembership_IsPlainMembershipInThatSelection()
     {
         // One membership is the degenerate case and stays a membership test rather than becoming an identity

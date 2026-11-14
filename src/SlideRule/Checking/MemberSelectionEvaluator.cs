@@ -39,18 +39,57 @@ internal static class MemberSelectionEvaluator
         return members;
     }
 
-    // What an Except removes (GRAMMAR §5.7): every member any payload names. Each payload's source resolves
-    // where an exclusion stands, in target position, as a type-side Except payload does (GRAMMAR §4.1). Built
-    // eagerly, so a payload whose adjective cannot be evaluated throws during resolution exactly as the
-    // subject's own would. Subtraction is by node: a member is one MemberNode wherever a selection reaches it.
+    /// <summary>
+    ///     What each of <paramref name="selection" />'s own <c>Except</c> adjectives subtracts from, by the
+    ///     adjective's index: the members of <paramref name="sourceTypes" /> its kind keeps, narrowed by the
+    ///     adjectives written before that <c>Except</c>. Empty where the selection carries none.
+    /// </summary>
+    internal static IReadOnlyList<(int Index, HashSet<MemberNode> Host)> ExceptHosts(
+        MemberSelection selection, IEnumerable<TypeNode> sourceTypes, SelectionEvaluator selections)
+    {
+        IReadOnlyList<MemberAdjective> adjectives = selection.Adjectives;
+        if (!adjectives.Any(adjective => adjective is MemberExceptAdjective)) return [];
+
+        IEnumerable<MemberNode> members = sourceTypes.SelectMany(type => type.Members).Where(KindFilter(selection.Kind));
+        var hosts = new List<(int, HashSet<MemberNode>)>();
+        for (var j = 0; j < adjectives.Count; j++)
+        {
+            if (adjectives[j] is MemberExceptAdjective)
+            {
+                // The constructor says the pipeline so far becomes a set here, where a spread would leave it to
+                // the declared type.
+                // ReSharper disable once UseCollectionExpression
+                var held = new HashSet<MemberNode>(members);
+                hosts.Add((j, held));
+                members = held;
+            }
+
+            members = ApplyAdjective(members, adjectives[j], selections);
+        }
+
+        return hosts;
+    }
+
+    /// <summary>
+    ///     The members one <c>Except</c> payload names: its source resolved where an exclusion stands, in target
+    ///     position, as a type-side <c>Except</c> payload is (GRAMMAR §4.1).
+    /// </summary>
+    internal static HashSet<MemberNode> Removable(MemberSelection payload, SelectionEvaluator selections)
+    {
+        HashSet<TypeNode> sources = selections.Evaluate(payload.Source, SelectionPosition.Target);
+        // The constructor says the narrowed members become a set here, where a spread would leave it to the
+        // declared type.
+        // ReSharper disable once UseCollectionExpression
+        return new HashSet<MemberNode>(Narrowed(payload, sources, selections));
+    }
+
+    // What an Except removes (GRAMMAR §5.7): every member any payload names. Built eagerly, so a payload whose
+    // adjective cannot be evaluated throws during resolution exactly as the subject's own would. Subtraction is by
+    // node: a member is one MemberNode wherever a selection reaches it.
     private static HashSet<MemberNode> Excluded(IReadOnlyList<MemberSelection> payloads, SelectionEvaluator selections)
     {
         var excluded = new HashSet<MemberNode>();
-        foreach (MemberSelection payload in payloads)
-        {
-            HashSet<TypeNode> sources = selections.Evaluate(payload.Source, SelectionPosition.Target);
-            excluded.UnionWith(Narrowed(payload, sources, selections));
-        }
+        foreach (MemberSelection payload in payloads) excluded.UnionWith(Removable(payload, selections));
 
         return excluded;
     }

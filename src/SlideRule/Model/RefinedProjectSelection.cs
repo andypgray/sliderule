@@ -13,7 +13,7 @@ internal sealed class RefinedProjectSelection : ProjectSelection
     {
     }
 
-    private protected override ProjectSelection Rebuild(IReadOnlyList<ProjectAdjective> adjectives)
+    internal override ProjectSelection WithAdjectives(IReadOnlyList<ProjectAdjective> adjectives)
     {
         return new RefinedProjectSelection(Owner, adjectives);
     }

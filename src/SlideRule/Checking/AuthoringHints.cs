@@ -68,9 +68,14 @@ internal static class AuthoringHints
         "a project is named by its csproj file name, matched ordinally and case-sensitively, and an "
         + "AssemblyName property does not rename it";
 
+    // In subject position a typeof names only what the solution declares; at a target or in an exception it also
+    // reaches a type the solution only references.
     private const string TypeClause =
         "a typeof anchor reaches only a type this solution declares, never one supplied by a package or by "
         + "the spec project itself";
+
+    private const string TargetTypeClause =
+        "a typeof anchor reaches a package's type only where the solution references it";
 
     private const string NarrowingClause =
         "every term narrows, so the set is no wider than the last one applied";
@@ -128,11 +133,26 @@ internal static class AuthoringHints
     private const string ExemplarTail =
         "; the verdict never depends on it, so point it at a type the solution declares or remove it";
 
+    // An exception's own advice: where its types are outside the selection it is written on, no spelling of it is
+    // wrong, and where they are a package's, the spellings that can reach them.
+    private const string HeldClause = "an exception removes only what the selection it is written on holds";
+
+    private const string ExternalExceptionClause =
+        "`arch.Types` holds only the types this solution declares, and a package's type carries no bases, "
+        + "interfaces, attributes or files here, so name a package's type with `typeof(...)` or "
+        + "`arch.Namespace(...).Named(...)`";
+
+    private const string MemberExceptionClause =
+        "a member exception removes only members the selection it is written on holds, and a package's type "
+        + "declares none here";
+
+    private const string ExemplarExceptionTail = "; the verdict never depends on it, so fix the exception or remove it";
+
     /// <summary>What to change when <paramref name="subject" /> selected nothing.</summary>
     internal static string ForSubject(Selection subject, ModelCaveats caveats)
     {
         return caveats.EmptySelectionCure(caveats.Unsurveyed?.CureFor(subject), withNarrowing: false)
-               ?? Sentence(ShapeAdvice(subject) + SubjectTail);
+               ?? Sentence(ShapeAdvice(subject, target: false) + SubjectTail);
     }
 
     /// <summary>
@@ -181,7 +201,7 @@ internal static class AuthoringHints
             .Select(operand => caveats.Unsurveyed?.CureFor(operand))
             .FirstOrDefault(cure => cure is not null);
         return caveats.EmptySelectionCure(unsurveyedCure, withNarrowing: true)
-               ?? Sentence(ShapeAdvice(pattern) + InertTail);
+               ?? Sentence(ShapeAdvice(pattern, target: true) + InertTail);
     }
 
     /// <summary>
@@ -200,7 +220,10 @@ internal static class AuthoringHints
             DeadOperandRole.Among => AmongConsequence,
             _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Not a dead operand's role.")
         };
-        string advice = ShapeAdvice(piece);
+        // A membership and an among: part are evaluated in subject position (OperandRoles), so they take its
+        // typeof advice.
+        bool target = role is DeadOperandRole.Target or DeadOperandRole.AllowList;
+        string advice = ShapeAdvice(piece, target);
         string noun = advice == NamedClause ? "name" : "pattern";
         return caveats.EmptySelectionCure(caveats.Unsurveyed?.CureFor(piece), withNarrowing: true)
                ?? Sentence(advice + "; a " + noun + " that matches nothing " + consequence);
@@ -214,19 +237,79 @@ internal static class AuthoringHints
     internal static string ForExemplar(Selection part, ModelCaveats caveats)
     {
         return caveats.EmptySelectionCure(caveats.Unsurveyed?.CureFor(part), withNarrowing: false)
-               ?? Sentence(ShapeAdvice(part) + ExemplarTail);
+               ?? Sentence(ShapeAdvice(part, target: false) + ExemplarTail);
+    }
+
+    /// <summary>
+    ///     The shape advice on a type exception <paramref name="piece" /> that removes nothing:
+    ///     <paramref name="matchedElsewhere" /> where it named types the selection it is written on does not hold,
+    ///     and <paramref name="hostHoldsExternals" /> where that selection holds a type the solution only
+    ///     references.
+    /// </summary>
+    internal static string ForExceptionShape(Selection piece, bool matchedElsewhere, bool hostHoldsExternals)
+    {
+        if (matchedElsewhere) return HeldClause;
+
+        if (hostHoldsExternals && DeadExceptions.BlindToPackages(piece)) return ExternalExceptionClause;
+
+        return ShapeAdvice(piece, target: true);
+    }
+
+    /// <summary>The shape advice on a member exception that removes nothing.</summary>
+    internal static string ForMemberExceptionShape(MemberSelection piece)
+    {
+        return piece.Adjectives.Any(adjective => adjective is MemberNamedAdjective)
+            ? MemberNamedClause
+            : MemberExceptionClause;
+    }
+
+    /// <summary>
+    ///     The shape advice on a project exception that removes nothing: <paramref name="matchedElsewhere" /> where it
+    ///     named projects the selection it is written on does not hold.
+    /// </summary>
+    internal static string ForProjectExceptionShape(bool matchedElsewhere)
+    {
+        return matchedElsewhere ? HeldClause : ProjectClause;
+    }
+
+    /// <summary>
+    ///     What to change when an exception holding <paramref name="role" /> removed nothing:
+    ///     <paramref name="advice" />, one of the exception shape clauses, then what removing nothing costs in that
+    ///     role, or the partial model where there is one.
+    /// </summary>
+    internal static string ForDeadException(DeadOperandRole role, string advice, ModelCaveats caveats)
+    {
+        string consequence = role switch
+        {
+            DeadOperandRole.BanException =>
+                "an exception that removes nothing spares nothing, so what it was meant to spare is reported as a "
+                + "violation",
+            DeadOperandRole.AllowException =>
+                "an exception that removes nothing forbids nothing, so what it was meant to forbid passes",
+            DeadOperandRole.AmongException =>
+                "an exception that removes nothing keeps every counterpart it was meant to drop, which can add a "
+                + "violation or hide one",
+            _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Not a dead exception's role.")
+        };
+        return caveats.EmptySelectionCure(null, withNarrowing: false) ?? Sentence(advice + "; " + consequence);
+    }
+
+    /// <summary>What to change when an exception inside a rule's exemplar removed nothing.</summary>
+    internal static string ForExemplarException(string advice, ModelCaveats caveats)
+    {
+        return caveats.EmptySelectionCure(null, withNarrowing: false) ?? Sentence(advice + ExemplarExceptionTail);
     }
 
     // Null covers an operand list with no pattern in it; the narrowing clause is true of every selection,
     // which is what makes it the safe floor.
-    private static string ShapeAdvice(Selection? selection)
+    private static string ShapeAdvice(Selection? selection, bool target)
     {
         if (selection is null) return NarrowingClause;
 
         // A Named list says exactly which types it means, so a selection carrying one that matched nothing
         // failed on a name, whatever noun or region it was narrowed from: a Named after arch.Namespace(...)
         // is cured as a name, not as a glob. Only the selection's own list counts; one inside an Except
-        // payload exempts, and a dead exemption empties nothing.
+        // payload belongs to the exception, which is cured on its own.
         if (selection.Adjectives.Any(adjective => adjective is NamedAdjective)) return NamedClause;
 
         // An Under list says where the types are declared, so a selection carrying one that matched nothing failed
@@ -237,11 +320,11 @@ internal static class AuthoringHints
         {
             // A layer is transparent to what defines it, so its cure is its definition's. The glob form has
             // no definition to reach and is namespaces by construction.
-            LayerNoun { Definition: { } definition } => ShapeAdvice(definition),
+            LayerNoun { Definition: { } definition } => ShapeAdvice(definition, target),
             LayerNoun => NamespaceClause,
             NamespaceNoun => NamespaceClause,
             ProjectNoun => ProjectClause,
-            TypeNoun => TypeClause,
+            TypeNoun => target ? TargetTypeClause : TypeClause,
             // A union answers no noun at all, and RegionOf declines it; what is left that names a namespace
             // region is arch.Types narrowed by exactly one InNamespace.
             _ => LayerNoun.RegionOf(selection).Count > 0 ? NamespaceClause : NarrowingClause

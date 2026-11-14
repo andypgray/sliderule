@@ -129,9 +129,10 @@ public sealed class DeadSubjectNameTests
     }
 
     [Fact]
-    public void ADeadNameInAnExceptPayload_IsNotRead()
+    public void ADeadNameInAnExceptPayload_WarnsWithoutFailingTheSubject()
     {
-        // An exemption's dead name exempts nothing, which leaves the rule stricter, not unmeasured.
+        // An exemption's dead name exempts nothing, which leaves the rule stricter, not unmeasured: a warning, never
+        // the empty-subject failure a dead name of the subject's own list is.
         RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
                 arch.Rule("layering/named")
                     .Enforce(arch.Namespace("App.Domain.*")
@@ -143,6 +144,7 @@ public sealed class DeadSubjectNameTests
         result.ShouldHaveFailedWithEdgesIncluding(ViolationKind.Reference, "App.Domain.Service -> App.Web.Controller");
         result.Violations.Select(violation => violation.Kind)
             .ShouldNotContain(ViolationKind.EmptySubject);
+        result.ShouldHaveWarnedStricterException("types in `App.Domain.*`", "types named `Ghost`");
     }
 
     [Fact]

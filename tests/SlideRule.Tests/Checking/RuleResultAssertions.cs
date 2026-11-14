@@ -158,8 +158,48 @@ internal static class RuleResultAssertions
             .Warnings[0];
     }
 
-    // The per-part warnings (a dead target, allow-list, membership or among operand, a dead exemplar part) share
-    // one comparison, keyed on the part each names, and differ only in their kind and their message.
+    /// <summary>
+    ///     Asserts the rule carries exactly one dead-exception warning per entry of <paramref name="exceptions" />,
+    ///     in that order, and no warning of any other kind: each an exception from a subject or a ban that removed
+    ///     nothing from <paramref name="host" />, so the rule is stricter than written, named in the message and
+    ///     carried as <see cref="CheckWarning.Key" />, with a cure beside it. Returns the first.
+    /// </summary>
+    /// <remarks>Says nothing about status, for <see cref="ShouldHaveWarnedPartlyInertOnOperand" />'s reason.</remarks>
+    internal static CheckWarning ShouldHaveWarnedStricterException(
+        this RuleResult result, string host, params string[] exceptions)
+    {
+        return result.ShouldHaveWarnedPerPart(
+                exceptions, CheckWarningKind.DeadOperand, exception => ExceptionMessage("stricter than written", exception, host))
+            .Warnings[0];
+    }
+
+    /// <summary>
+    ///     Asserts as <see cref="ShouldHaveWarnedStricterException" /> does, for exceptions from an allow-list or a
+    ///     membership, which leave the rule partly inert.
+    /// </summary>
+    internal static CheckWarning ShouldHaveWarnedPartlyInertException(
+        this RuleResult result, string host, params string[] exceptions)
+    {
+        return result.ShouldHaveWarnedPerPart(
+                exceptions, CheckWarningKind.DeadOperand, exception => ExceptionMessage("partly inert", exception, host))
+            .Warnings[0];
+    }
+
+    /// <summary>
+    ///     Asserts as <see cref="ShouldHaveWarnedStricterException" /> does, for exceptions from an <c>among:</c>
+    ///     part, which leave the rule not measured as written.
+    /// </summary>
+    internal static CheckWarning ShouldHaveWarnedAmongException(
+        this RuleResult result, string host, params string[] exceptions)
+    {
+        return result.ShouldHaveWarnedPerPart(
+                exceptions, CheckWarningKind.DeadOperand,
+                exception => ExceptionMessage("not measured as written", exception, host))
+            .Warnings[0];
+    }
+
+    // The per-part warnings share one comparison, keyed on the part each names, and differ only in their kind and
+    // their message.
     private static RuleResult ShouldHaveWarnedPerPart(
         this RuleResult result, string[] references, CheckWarningKind kind, Func<string, string> messageOf)
     {
@@ -196,6 +236,12 @@ internal static class RuleResultAssertions
     private static string MembershipMessage(string membershipReference)
     {
         return $"This rule is stricter than written: its membership \"{membershipReference}\" matched no types.";
+    }
+
+    // The pinned dead-exception wording, spelled here for PartlyInertMessage's reason.
+    private static string ExceptionMessage(string register, string exception, string host)
+    {
+        return $"This rule is {register}: its exception \"{exception}\" removes nothing from \"{host}\".";
     }
 
     // The pinned among wording, spelled here for PartlyInertMessage's reason.
@@ -241,6 +287,20 @@ internal static class RuleResultAssertions
             .ShouldBe(fullNames, customMessage: Describe(result));
 
         return result;
+    }
+
+    /// <summary>
+    ///     Asserts the rule carries exactly one dead-exemplar warning per entry of <paramref name="exceptions" />, in
+    ///     that order, and no warning of any other kind: each an exception inside the exemplar that removed nothing
+    ///     from <paramref name="host" />, with a cure beside it. Returns the first.
+    /// </summary>
+    internal static CheckWarning ShouldHaveWarnedDeadExemplarException(
+        this RuleResult result, string host, params string[] exceptions)
+    {
+        return result.ShouldHaveWarnedPerPart(
+                exceptions, CheckWarningKind.DeadExemplar,
+                exception => $"This rule's exemplar exception \"{exception}\" removes nothing from \"{host}\".")
+            .Warnings[0];
     }
 
     // The pinned dead-exemplar wording, spelled here for PartlyInertMessage's reason.

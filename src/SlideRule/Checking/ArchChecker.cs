@@ -170,8 +170,11 @@ internal static class ArchChecker
                     memberSubject = OneProjectSubject.CutMembers(selections, subject, memberSubject);
             }
 
+            // A containment's subject ends on the Except its desugaring adds; its exceptions are read off the
+            // selection as written, before that Except.
+            Selection? exceptionSubject = rule.Scope is { Role: ScopeRole.Containment } scope ? scope.Scoped : null;
             (IReadOnlyList<Violation> violations, IReadOnlyList<CheckWarning> warnings, SubjectCoverage coverage) =
-                evaluator.Evaluate(rule.Constraint!, subject, memberSubject);
+                evaluator.Evaluate(rule.Constraint!, subject, memberSubject, exceptionSubject);
             // Ahead of the ratchet fork, because the question it answers — did this run have the subject in
             // view at all — is asked of the raw violations and is the same one for both branches. A subject
             // anchored on a project no run surveys is not skipped: a whole-solution run would fail it too.

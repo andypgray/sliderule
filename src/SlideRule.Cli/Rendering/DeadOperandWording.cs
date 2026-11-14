@@ -29,11 +29,32 @@ internal static class DeadOperandWording
     }
 
     /// <summary>
+    ///     What the dead patterns behind <paramref name="warnings" /> did, as one clause: each role's patterns named
+    ///     as <see cref="NamedOperands" /> names them, then <c>matched no types</c>, or <c>removed nothing</c> for
+    ///     exceptions, the groups in the order their first warning comes.
+    /// </summary>
+    internal static string Described(IReadOnlyList<CheckWarning> warnings)
+    {
+        IEnumerable<string> groups = warnings
+            .GroupBy(warning => warning.Role)
+            .Select(group =>
+            {
+                List<string> references = group.Select(warning => warning.Key!).Distinct(StringComparer.Ordinal).ToList();
+                string outcome = group.Key.IsException() ? "removed nothing" : "matched no types";
+                return $"{group.Key.NamedOperands(references)} {outcome}";
+            });
+        return string.Join(" and ", groups);
+    }
+
+    /// <summary>
     ///     What clears dead patterns in <paramref name="role" />, as the end of "until each dead operand …":
-    ///     <c>matches or moves to a rule of its own</c> for a target, <c>matches or is removed</c> otherwise.
+    ///     <c>matches or moves to a rule of its own</c> for a target, <c>removes something or is removed</c> for an
+    ///     exception, which can match a type and still remove nothing, and <c>matches or is removed</c> otherwise.
     /// </summary>
     internal static string UntilClause(this DeadOperandRole role)
     {
+        if (role.IsException()) return "removes something or is removed";
+
         return IsTarget(role) ? "matches or moves to a rule of its own" : "matches or is removed";
     }
 
@@ -54,7 +75,9 @@ internal static class DeadOperandWording
         return role switch
         {
             DeadOperandRole.Target => true,
-            DeadOperandRole.Among or DeadOperandRole.AllowList or DeadOperandRole.Membership => false,
+            DeadOperandRole.Among or DeadOperandRole.AllowList or DeadOperandRole.Membership
+                or DeadOperandRole.BanException or DeadOperandRole.AllowException
+                or DeadOperandRole.AmongException => false,
             _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Not a dead operand's role.")
         };
     }
@@ -67,6 +90,8 @@ internal static class DeadOperandWording
             DeadOperandRole.Among => "among operand",
             DeadOperandRole.AllowList => "allow-list operand",
             DeadOperandRole.Membership => "membership",
+            DeadOperandRole.BanException or DeadOperandRole.AllowException or DeadOperandRole.AmongException =>
+                "exception",
             _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Not a dead operand's role.")
         };
     }

@@ -206,6 +206,6 @@ The contract package's analyzer reports a malformed ID, pattern or prose argumen
 
 `sliderule explain <rule-id>` prints a rule as it renders, with its reason, fix, citation, exemplar and posture. `explain --type <name>` and `explain --path <file>` show which layers, rules and scopes claim a type, which rules name it as an operand, and why. Run one after adding a layer or rule to see whether its selection reaches the types you meant.
 
-`check` also reports, as [warnings](https://github.com/andypgray/sliderule/blob/main/CLI.md#warnings), what a verdict alone cannot show. Three point at the spec: a forbidden target that matched no types (`inertTarget`), a pattern in a rule's list that matched none (`deadOperand`), and an exemplar that matched no type (`deadExemplar`).
+`check` also reports, as [warnings](https://github.com/andypgray/sliderule/blob/main/CLI.md#warnings), what a verdict alone cannot show. Three point at the spec: a forbidden target that matched no types (`inertTarget`), a pattern in a rule's list that matched none or an `Except` that removed nothing (`deadOperand`), and an exemplar that matched no type (`deadExemplar`). An `Except` reaches a package's type only by `typeof(...)` or `arch.Namespace(...).Named(...)`, because `arch.Types` contains only the types your solution declares.
 
 `sliderule render` writes the rules into `AGENTS.md` and the cards. A render's diff shows the sentence each new rule renders and the directories that gain a card. Build the spec project first, because `render` and `check` run the spec from its last build.

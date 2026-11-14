@@ -26,6 +26,34 @@ internal static class ProjectSelectionEvaluator
         return current.ToList();
     }
 
+    /// <summary>
+    ///     What each of <paramref name="selection" />'s own <c>Except</c> adjectives subtracts from, by the
+    ///     adjective's index: <paramref name="projects" /> narrowed by the adjectives written before that
+    ///     <c>Except</c>. Empty where the selection carries none.
+    /// </summary>
+    internal static IReadOnlyList<(int Index, IReadOnlyList<ProjectNode> Host)> ExceptHosts(
+        ProjectSelection selection, IReadOnlyList<ProjectNode> projects)
+    {
+        IReadOnlyList<ProjectAdjective> adjectives = selection.Adjectives;
+        if (!adjectives.Any(adjective => adjective is ProjectExceptAdjective)) return [];
+
+        IEnumerable<ProjectNode> current = projects;
+        var hosts = new List<(int, IReadOnlyList<ProjectNode>)>();
+        for (var j = 0; j < adjectives.Count; j++)
+        {
+            if (adjectives[j] is ProjectExceptAdjective)
+            {
+                List<ProjectNode> held = current.ToList();
+                hosts.Add((j, held));
+                current = held;
+            }
+
+            current = ApplyAdjective(current, adjectives[j], projects);
+        }
+
+        return hosts;
+    }
+
     private static IEnumerable<ProjectNode> ApplyAdjective(
         IEnumerable<ProjectNode> current, ProjectAdjective adjective, IReadOnlyList<ProjectNode> projects)
     {

@@ -467,8 +467,8 @@ internal sealed class BaselineRunner(
             string refusal = result.SelectionMatchedNothing
                 ? $"{ruleId}: cannot capture — the rule's selection matched nothing, so this run measured no "
                   + "debt for it; skipped. Fix the rule's selection, then re-run."
-                : $"{ruleId}: cannot capture — {result.UntestedRole.NamedOperands(result.UntestedOperands)} "
-                  + "matched no types, so this run measured only part of the rule; skipped. "
+                : $"{ruleId}: cannot capture — {DeadOperandWording.Described(result.UntestedWarnings)}, "
+                  + "so this run measured only part of the rule; skipped. "
                   + $"{result.UntestedRole.ClearingInstruction()}, then re-run.";
             output.WriteLine(refusal);
             return false;
@@ -501,16 +501,17 @@ internal sealed class BaselineRunner(
     private static string StricterRefusal(string ruleId, RuleResult result)
     {
         DeadOperandRole role = result.StricterRole;
-        string named = role.NamedOperands(result.StricterOperands);
+        string named = DeadOperandWording.Described(result.StricterWarnings);
         string itWas = result.StricterOperands.Count == 1 ? "it was" : "they were";
         string reported = role switch
         {
             DeadOperandRole.AllowList => $"what {itWas} meant to allow is reported as violations",
             DeadOperandRole.Membership => $"the types {itWas} meant to hold are reported as violations",
+            DeadOperandRole.BanException => $"what {itWas} meant to spare is reported as violations",
             _ => throw new ArgumentOutOfRangeException(nameof(result), role, "Not a stricter role.")
         };
 
-        return $"{ruleId}: cannot capture — {named} matched no types, so {reported} and would be recorded as "
+        return $"{ruleId}: cannot capture — {named}, so {reported} and would be recorded as "
                + $"debt; skipped. {role.ClearingInstruction()}, then re-run.";
     }
 

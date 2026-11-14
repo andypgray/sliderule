@@ -71,17 +71,18 @@ internal static class StatusFormatter
             // entries are cannot be read off this run. Captured, that is the whole sentence; uncaptured, what the
             // reader will meet next is the capture the verb refuses, so the line says why and what clears it.
             diagnosis = DeadOperandLine(
-                "not measured", result.UntestedRole, result.UntestedOperands, result.BaselineCaptured,
+                "not measured", result.UntestedWarnings, result.BaselineCaptured,
                 ", so this rule's unmatched entries may be untested rather than fixed.");
             cure = OperandCure(result, stricter: false);
         }
         else
         {
-            // A rule with a dead allowed pattern or membership only gained violations, so its row's counts
-            // already say what they seem to; the sentence names the pattern behind the extra reds and,
-            // uncaptured, the capture the verb refuses because it would record them as debt.
+            // A rule with a dead allowed pattern, a dead membership or an exception from a subject or a ban that
+            // removes nothing only gained violations, so its row's counts already say what they seem to; the
+            // sentence names the pattern behind the extra reds and, uncaptured, the capture the verb refuses
+            // because it would record them as debt.
             diagnosis = DeadOperandLine(
-                "stricter than written", result.StricterRole, result.StricterOperands, result.BaselineCaptured, ".");
+                "stricter than written", result.StricterWarnings, result.BaselineCaptured, ".");
             cure = OperandCure(result, stricter: true);
         }
 
@@ -89,13 +90,13 @@ internal static class StatusFormatter
     }
 
     private static string DeadOperandLine(
-        string label, DeadOperandRole role, IReadOnlyList<string> operands, bool captured, string capturedTail)
+        string label, IReadOnlyList<CheckWarning> dead, bool captured, string capturedTail)
     {
-        var head = $"  {label}: {role.NamedOperands(operands)} matched no types";
+        var head = $"  {label}: {DeadOperandWording.Described(dead)}";
 
         return captured
             ? head + capturedTail
-            : $"{head}, so 'sliderule baseline init' skips this rule until each dead operand {role.UntilClause()}.";
+            : $"{head}, so 'sliderule baseline init' skips this rule until each dead operand {dead[0].Role.UntilClause()}.";
     }
 
     // The cure the signal already carries — the empty subject's first, since that shape fails the rule and a

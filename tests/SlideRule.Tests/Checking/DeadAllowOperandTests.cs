@@ -56,6 +56,52 @@ public sealed class DeadAllowOperandTests
     }
 
     [Fact]
+    public void MustOnlyReference_ExceptionThatRemovesNothing_WarnsPartlyInertAndLeavesTheEntriesUntested()
+    {
+        // An exception from an allow-list that removes nothing forbids nothing: the rule allows what its sentence
+        // says it forbids, so it errs quiet and its unmatched entries are no longer known to be fixed.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("only/except")
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustOnlyReference(arch.Namespace("App.Web.*").Except(arch.Types.Named("Ghost"))))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveWarnedPartlyInertException("types in `App.Web.*`", "types named `Ghost`");
+        result.ShouldSatisfyAllConditions(
+            () => result.UnmatchedEntriesTested.ShouldBeFalse(),
+            () => result.MeasuredInFull.ShouldBeFalse());
+    }
+
+    [Fact]
+    public void MustOnlyReference_ExceptionInsideAnException_ErrsTheOtherWay()
+    {
+        // The inner exception narrows what the outer one forbids, so removing nothing there forbids more: stricter.
+        RuleResult result = Checker.Run(Sources.LayeredModel, arch =>
+                arch.Rule("only/nested")
+                    .Enforce(arch.Namespace("App.Domain.*")
+                        .MustOnlyReference(arch.Namespace("App.Web.*")
+                            .Except(arch.Types.Named("Helper").Except(arch.Types.Named("Ghost")))))
+                    .Because("b"))
+            .Single();
+
+        result.ShouldHaveWarnedStricterException("types named `Helper`", "types named `Ghost`");
+        result.ShouldSatisfyAllConditions(
+            () => result.UnmatchedEntriesTested.ShouldBeTrue(),
+            () => result.MeasuredInFull.ShouldBeFalse());
+    }
+
+    [Fact]
+    public void Containment_ASanctionedSurfaceOutsideTheScope_RaisesNoExceptionWarning()
+    {
+        // The containment's subject is the scope minus its sanctioned surface, an exception the spec never wrote,
+        // and a surface outside the scope is lawful, so that exception is never read.
+        RuleResult result = Containment("User");
+
+        result.Warnings.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void MustOnlyReference_DeadNameInANamedList_WarnsNamingTheOneNameSpelling()
     {
         RuleResult result = Checker.Run(Sources.LayeredModel, arch =>

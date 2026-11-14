@@ -485,6 +485,48 @@ public sealed class BaselineRunnerCountTests : IDisposable
     }
 
     [Fact]
+    public void Init_RuleWithABansExceptionThatRemovesNothing_RefusesWithTheSpareText()
+    {
+        // The exception was meant to spare a type the ban does not reach, so it removes nothing, and a capture
+        // would record as debt what it was meant to spare.
+        CheckReport report = Check(
+            TwoSiteSource,
+            ModelOf(arch => arch.Namespace("App.Web.*")
+                .MustNotReference(arch.Namespace("App.Data.*").Except(arch.Types.Named("Ghost")))));
+
+        string echo = Init(report.Results);
+
+        echo.ShouldContain(
+            "data-access/ledger-behind-repository: cannot capture — the exception \"types named `Ghost`\" removed "
+            + "nothing, so what it was meant to spare is reported as violations and would be recorded as debt; "
+            + "skipped. Fix or remove each dead operand, then re-run.");
+        Directory.EnumerateFiles(_temp.Path, "*", SearchOption.AllDirectories)
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AcceptReductions_RuleWithAnAllowListsExceptionThatRemovesNothing_Refuses()
+    {
+        // An exception from an allow-list that removes nothing forbids nothing, so an unmatched entry may be one
+        // only it would have kept red: the rule is refused whole, as a dead target pattern's is.
+        CheckReport report = Check(
+            TwoSiteSource,
+            ModelOf(arch => arch.Namespace("App.Web.*")
+                .MustOnlyReference(arch.Namespace("App.Data.*").Except(arch.Types.Named("Ghost")))));
+        string path = WriteBaseline(BaselineComposer.Compose(RuleId, ExportPair.WithSiteCount(2)));
+        byte[] before = File.ReadAllBytes(path);
+
+        string echo = AcceptReductions(report.Results);
+
+        echo.ShouldContain(
+            "data-access/ledger-behind-repository: cannot capture — the exception \"types named `Ghost`\" removed "
+            + "nothing, so this run measured only part of the rule; skipped. Fix or remove each dead operand, then "
+            + "re-run.");
+        File.ReadAllBytes(path)
+            .ShouldBe(before);
+    }
+
+    [Fact]
     public void AcceptReductions_RuleWithADeadAmongPart_RefusesAndLeavesTheFileByteIdentical()
     {
         // A dead among part can pass a subject it would have made ambiguous, so an unmatched entry may be one

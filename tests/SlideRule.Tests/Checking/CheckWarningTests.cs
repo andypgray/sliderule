@@ -63,7 +63,11 @@ public sealed class CheckWarningTests
             $"DeadOperand(Among) {CheckWarning.DeadOperand(DeadOperandRole.Among, "op", hint: null).Role}",
             $"ScopeTouched {CheckWarning.ScopeTouched(caution: true, "f.cs", "s", "r").Role}",
             $"OrphanedBaseline {CheckWarning.OrphanedBaseline("r", OneEntry, offerInit: true).Role}",
+            $"DeadException(BanException) {CheckWarning.DeadException(DeadOperandRole.BanException, "ex", "host", hint: null).Role}",
+            $"DeadException(AllowException) {CheckWarning.DeadException(DeadOperandRole.AllowException, "ex", "host", hint: null).Role}",
+            $"DeadException(AmongException) {CheckWarning.DeadException(DeadOperandRole.AmongException, "ex", "host", hint: null).Role}",
             $"DeadExemplar {CheckWarning.DeadExemplar("ref", hint: null).Role}",
+            $"DeadExemplarException {CheckWarning.DeadExemplarException("ex", "host", hint: null).Role}",
             $"ExemplarFault {CheckWarning.ExemplarFault("ref", "fault").Role}"
         ];
 
@@ -76,18 +80,22 @@ public sealed class CheckWarningTests
             "DeadOperand(Among) Among",
             "ScopeTouched None",
             "OrphanedBaseline None",
+            "DeadException(BanException) BanException",
+            "DeadException(AllowException) AllowException",
+            "DeadException(AmongException) AmongException",
             "DeadExemplar None",
+            "DeadExemplarException None",
             "ExemplarFault None"
         ]);
     }
 
     [Fact]
-    public void DeadOperandRoles_OnlyAllowListAndMembershipAreStricter()
+    public void DeadOperandRoles_OnlyAllowListMembershipAndABansExceptionAreStricter()
     {
         IReadOnlyList<DeadOperandRole> stricter = Enum.GetValues<DeadOperandRole>()
             .Where(role => role.IsStricter())
             .ToList();
 
-        stricter.ShouldBe([DeadOperandRole.AllowList, DeadOperandRole.Membership]);
+        stricter.ShouldBe([DeadOperandRole.AllowList, DeadOperandRole.Membership, DeadOperandRole.BanException]);
     }
 }

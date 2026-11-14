@@ -56,7 +56,8 @@ internal sealed class CheckWarning
     ///     Gets what keeps two warnings of one kind on one rule apart: the pattern a
     ///     <see cref="CheckWarningKind.DeadOperand" /> warning is about, spelled exactly as <see cref="Message" />
     ///     quotes it (for example <c>the Legacy layer</c>, or <c>types named `B`</c> for one name of a <c>Named</c>
-    ///     list that matched nothing); the rule ID the section an <see cref="CheckWarningKind.OrphanedBaseline" />
+    ///     list that matched nothing), or the exception that removed nothing; the rule ID the section an
+    ///     <see cref="CheckWarningKind.OrphanedBaseline" />
     ///     warning names is filed under; or the exemplar part a <see cref="CheckWarningKind.DeadExemplar" />
     ///     warning is about, spelled as <see cref="Message" /> quotes it, or the whole exemplar's reference on a
     ///     warning that it could not be resolved. Null on every other kind. <c>check --json</c> does not carry it,
@@ -103,6 +104,24 @@ internal sealed class CheckWarning
     }
 
     /// <summary>
+    ///     A warning that the exception <paramref name="exception" /> removes nothing from <paramref name="host" />,
+    ///     the selection it is written on, in the position <paramref name="role" /> names. The key is the
+    ///     exception, as for a dead operand.
+    /// </summary>
+    internal static CheckWarning DeadException(DeadOperandRole role, string exception, string host, string? hint)
+    {
+        string register = role switch
+        {
+            DeadOperandRole.BanException => "stricter than written",
+            DeadOperandRole.AllowException => "partly inert",
+            DeadOperandRole.AmongException => "not measured as written",
+            _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Not a dead exception's role.")
+        };
+        var message = $"This rule is {register}: its exception \"{exception}\" removes nothing from \"{host}\".";
+        return new CheckWarning(CheckWarningKind.DeadOperand, message, file: null, hint: hint, key: exception, role: role);
+    }
+
+    /// <summary>
     ///     A warning that the changed <paramref name="file" /> declares a type inside the scope
     ///     <paramref name="scopeId" />, cautioned or, where <paramref name="caution" /> is false, quarantined, whose
     ///     tripwire is the rule <paramref name="ruleId" />.
@@ -146,6 +165,16 @@ internal sealed class CheckWarning
     {
         var message = $"This rule's exemplar \"{reference}\" matched no solution-declared types.";
         return new CheckWarning(CheckWarningKind.DeadExemplar, message, file: null, hint: hint, key: reference);
+    }
+
+    /// <summary>
+    ///     A warning that the exception <paramref name="exception" /> inside the exemplar removes nothing from
+    ///     <paramref name="host" />, the selection it is written on.
+    /// </summary>
+    internal static CheckWarning DeadExemplarException(string exception, string host, string? hint)
+    {
+        var message = $"This rule's exemplar exception \"{exception}\" removes nothing from \"{host}\".";
+        return new CheckWarning(CheckWarningKind.DeadExemplar, message, file: null, hint: hint, key: exception);
     }
 
     /// <summary>

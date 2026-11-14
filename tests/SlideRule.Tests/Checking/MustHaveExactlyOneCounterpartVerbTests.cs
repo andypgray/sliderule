@@ -131,6 +131,16 @@ public sealed class MustHaveExactlyOneCounterpartVerbTests
     }
 
     [Fact]
+    public void MustHaveExactlyOneCounterpart_ExceptionFromAmongThatRemovesNothing_WarnsNotMeasuredAsWritten()
+    {
+        // A counterpart the exception was meant to drop stays a candidate, which can add a violation or hide one.
+        Checker.Verdict(SceneModel, arch => arch.Types.WithNameMatching("Order")
+                .MustHaveExactlyOneCounterpart(
+                    among: arch.Types.OfKind(TypeKind.Interface).Except(arch.Types.Named("Ghost")), named: "I{Name}"))
+            .ShouldHaveWarnedAmongException("interfaces", "types named `Ghost`");
+    }
+
+    [Fact]
     public void MustHaveExactlyOneCounterpart_NoCounterpart_FailsAtTheSubjectsOwnDeclarationSite()
     {
         // The missing arm has no counterpart to point at, so the file:line an agent jumps to is where the

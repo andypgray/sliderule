@@ -189,7 +189,7 @@ The [`self-check` CI job](https://github.com/andypgray/sliderule/blob/main/.gith
 `sliderule graph` surveys projects, declared and observed references, namespace type counts and external references grouped by namespace root. It needs no spec and has no `--spec` option. It prints 28 project lines for this solution, one for every project the workspace load reaches. Fixture spec projects are included. Their project references also bring in `MyApp.Domain`, `MyApp.Legacy.Billing` and `MyApp.Web`, each marked `(not a solution member)`. The excerpt shows its 11 projects outside the tests, under `src/` and `arch/`:
 
 ```text
-  SlideRule — 397 types; targets netstandard2.0; references: (none); packages: (none); locks restore
+  SlideRule — 400 types; targets netstandard2.0; references: (none); packages: (none); locks restore
   SlideRule.Analyzers — 15 types; targets netstandard2.0; references: SlideRule, SlideRule.Extraction; packages: Microsoft.CodeAnalysis.Analyzers (private); locks restore
   SlideRule.Architecture — 1 type; targets net10.0; references: SlideRule, SlideRule.Packs.DotNet; packages: Microsoft.Build.Locator; does not pack
   SlideRule.Cli — 232 types (1 generated); targets net10.0; references: SlideRule, SlideRule.Extraction, SlideRule.Roslyn; packages: Microsoft.Extensions.Hosting, ModelContextProtocol, Serilog.Extensions.Hosting, Serilog.Sinks.File, SlideRule.Analyzers (private), System.CommandLine; locks restore

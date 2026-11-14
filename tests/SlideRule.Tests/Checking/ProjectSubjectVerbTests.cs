@@ -74,6 +74,34 @@ public sealed class ProjectSubjectVerbTests
     }
 
     [Fact]
+    public void Except_ADeadNameBesideALiveOne_WarnsTheNameAloneAsStricterThanWritten()
+    {
+        Checker.Verdict(Scene, arch => arch.Projects.Matching("Zphil.*")
+                .Except(arch.Projects.Named("Zphil.Internal", "Zphil.Ghost"))
+                .MustNotBePackable())
+            .ShouldHaveWarnedStricterException("projects matching `Zphil.*`", "project `Zphil.Ghost`");
+    }
+
+    [Fact]
+    public void Except_ADeadGlobBesideALiveOne_WarnsTheGlobAlone()
+    {
+        Checker.Verdict(Scene, arch => arch.Projects.Matching("Zphil.*")
+                .Except(arch.Projects.Matching("Zphil.Internal", "Missing.*"))
+                .MustNotBePackable())
+            .ShouldHaveWarnedStricterException("projects matching `Zphil.*`", "projects matching `Missing.*`");
+    }
+
+    [Fact]
+    public void Except_AProjectOutsideTheSubject_SaysItRemovesOnlyWhatTheSubjectHolds()
+    {
+        Checker.Verdict(Scene, arch => arch.Projects.Matching("Zphil.*")
+                .Except(arch.Projects.Named("Other.Tool"))
+                .MustNotBePackable())
+            .ShouldHaveWarnedStricterException("projects matching `Zphil.*`", "project `Other.Tool`")
+            .Hint!.ShouldStartWith("An exception removes only what the selection it is written on holds; ");
+    }
+
+    [Fact]
     public void Where_NarrowsByThePredicate()
     {
         // The selector-position hatch sees the same IProjectInfo the constraint-position one does, so a
