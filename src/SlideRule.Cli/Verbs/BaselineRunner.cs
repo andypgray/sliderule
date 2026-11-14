@@ -469,7 +469,7 @@ internal sealed class BaselineRunner(
                   + "debt for it; skipped. Fix the rule's selection, then re-run."
                 : $"{ruleId}: cannot capture — {DeadOperandWording.Described(result.UntestedWarnings)}, "
                   + "so this run measured only part of the rule; skipped. "
-                  + $"{result.UntestedRole.ClearingInstruction()}, then re-run.";
+                  + $"{DeadOperandWording.ClearingInstructions(result.UntestedWarnings)}, then re-run.";
             output.WriteLine(refusal);
             return false;
         }
@@ -500,19 +500,12 @@ internal sealed class BaselineRunner(
     // as debt.
     private static string StricterRefusal(string ruleId, RuleResult result)
     {
-        DeadOperandRole role = result.StricterRole;
-        string named = DeadOperandWording.Described(result.StricterWarnings);
-        string itWas = result.StricterOperands.Count == 1 ? "it was" : "they were";
-        string reported = role switch
-        {
-            DeadOperandRole.AllowList => $"what {itWas} meant to allow is reported as violations",
-            DeadOperandRole.Membership => $"the types {itWas} meant to hold are reported as violations",
-            DeadOperandRole.BanException => $"what {itWas} meant to spare is reported as violations",
-            _ => throw new ArgumentOutOfRangeException(nameof(result), role, "Not a stricter role.")
-        };
+        IReadOnlyList<CheckWarning> dead = result.StricterWarnings;
+        string named = DeadOperandWording.Described(dead);
+        string reported = DeadOperandWording.StricterConsequence(dead);
 
         return $"{ruleId}: cannot capture — {named}, so {reported} and would be recorded as "
-               + $"debt; skipped. {role.ClearingInstruction()}, then re-run.";
+               + $"debt; skipped. {DeadOperandWording.ClearingInstructions(dead)}, then re-run.";
     }
 
     // init: grandfather an uncaptured rule's current state (empty = zero debt); leave captured rules be.

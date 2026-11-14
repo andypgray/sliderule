@@ -485,6 +485,56 @@ public sealed class BaselineRunnerCountTests : IDisposable
     }
 
     [Fact]
+    public void Init_RuleWithADeadMembershipBesideADeadSubjectException_NamesWhatEachWasMeantFor()
+    {
+        // Each dead pattern only adds violations, each of a different kind, so the refusal names what each was
+        // meant for rather than borrowing the first one's words for both, and inflects each for its own count.
+        CheckReport report = Check(
+            TwoSiteSource,
+            ModelOf(arch => arch.Namespace("App.Web.*")
+                .Except(arch.Types.Named("Ghost"))
+                .MustBelongTo(arch.Namespace("App.Ghost.*"), arch.Namespace("App.Phantom.*"))));
+
+        string echo = Init(report.Results);
+
+        echo.ShouldContain(
+            "data-access/ledger-behind-repository: cannot capture — the memberships \"types in `App.Ghost.*`\" and "
+            + "\"types in `App.Phantom.*`\" matched no types and the exception \"types named `Ghost`\" removed "
+            + "nothing, so the types the memberships were meant to hold and what the exception was meant to spare "
+            + "are reported as violations and would be recorded as debt; skipped. Fix or remove each dead operand, "
+            + "then re-run.");
+        Directory.EnumerateFiles(_temp.Path, "*", SearchOption.AllDirectories)
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void AcceptReductions_RuleWithADeadTargetBesideAnAllowListsDeadException_GivesEachItsOwnCure()
+    {
+        // The second target's exception spares the controller, and the exception inside that one, which would
+        // forbid Ghost again, removes nothing. A target may move to a rule of its own while an exception may only
+        // be fixed or removed, so the refusal gives each its instruction.
+        CheckReport report = Check(
+            TwoSiteSource,
+            ModelOf(arch => arch.Namespace("App.Web.*")
+                .MustNotReference(
+                    arch.Namespace("App.Data.*"),
+                    arch.Namespace("App.Web.*").Except(arch.Types.Named("ReportController").Except(arch.Types.Named("Ghost"))))));
+        string path = WriteBaseline(BaselineComposer.Compose(RuleId, ExportPair.WithSiteCount(2)));
+        byte[] before = File.ReadAllBytes(path);
+
+        string echo = AcceptReductions(report.Results);
+
+        echo.ShouldContain(
+            "data-access/ledger-behind-repository: cannot capture — the target operand \"types in `App.Web.*`, "
+            + "except types named `ReportController`, except types named `Ghost`\" matched no types and the "
+            + "exception \"types named `Ghost`\" removed nothing, so this run measured only part of the rule; "
+            + "skipped. Fix each dead target operand or move it to a rule of its own, and fix or remove each dead "
+            + "exception, then re-run.");
+        File.ReadAllBytes(path)
+            .ShouldBe(before);
+    }
+
+    [Fact]
     public void Init_RuleWithABansExceptionThatRemovesNothing_RefusesWithTheSpareText()
     {
         // The exception was meant to spare a type the ban does not reach, so it removes nothing, and a capture
@@ -502,6 +552,24 @@ public sealed class BaselineRunnerCountTests : IDisposable
             + "skipped. Fix or remove each dead operand, then re-run.");
         Directory.EnumerateFiles(_temp.Path, "*", SearchOption.AllDirectories)
             .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Init_RuleWhoseSubjectAndTargetExceptTheSameAbsentType_CountsTheExceptionOnce()
+    {
+        // The refusal names the one exception once, so the pronoun after it is singular too.
+        CheckReport report = Check(
+            TwoSiteSource,
+            ModelOf(arch => arch.Namespace("App.Web.*")
+                .Except(arch.Types.Named("Ghost"))
+                .MustNotReference(arch.Namespace("App.Data.*").Except(arch.Types.Named("Ghost")))));
+
+        string echo = Init(report.Results);
+
+        echo.ShouldContain(
+            "data-access/ledger-behind-repository: cannot capture — the exception \"types named `Ghost`\" removed "
+            + "nothing, so what it was meant to spare is reported as violations and would be recorded as debt; "
+            + "skipped. Fix or remove each dead operand, then re-run.");
     }
 
     [Fact]

@@ -96,7 +96,7 @@ internal static class StatusFormatter
 
         return captured
             ? head + capturedTail
-            : $"{head}, so 'sliderule baseline init' skips this rule until each dead operand {dead[0].Role.UntilClause()}.";
+            : $"{head}, so 'sliderule baseline init' skips this rule until {DeadOperandWording.UntilClauses(dead)}.";
     }
 
     // The cure the signal already carries — the empty subject's first, since that shape fails the rule and a

@@ -103,6 +103,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   passes an array for the type argument the service is built over registers nothing either, so `Registered()`
   can hold fewer types than before. When only the implementation is built over that argument, the call
   registers the service with the implementation unnamed.
+- `status` and `baseline` now give each role its own cure when a rule's dead patterns hold more than one
+  role, such as a dead membership beside an exception that removes nothing. Both named every pattern and
+  then cured them all in the first one's words. `status` said `until each dead operand matches or is
+  removed`, though the exception has to remove something, and `baseline` said only what the membership was
+  meant to hold. A rule whose dead patterns all hold one role reads as before, except that `baseline`
+  counts a pattern the rule writes twice once, as the names before it do: `what it was meant to spare`, where
+  it said `what they were meant to spare` after naming one exception.
 
 ## [0.3.0] - 2026-11-04
 

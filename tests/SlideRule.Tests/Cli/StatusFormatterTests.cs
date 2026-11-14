@@ -718,6 +718,51 @@ public sealed class StatusFormatterTests
     }
 
     [Fact]
+    public void Migrate_ADeadTargetBesideAnAllowListsDeadExceptionAndUncaptured_GivesEachItsOwnCure()
+    {
+        // A target moves to a rule of its own and an exception must remove something, so one clause cannot cure both.
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Failed, 2,
+            inertOperands: ["the Legacy layer"], allowExceptions: ["types named `Ghost`"]));
+
+        lines[1]
+            .ShouldBe(
+                "  not measured: the target operand \"the Legacy layer\" matched no types and the exception "
+                + "\"types named `Ghost`\" removed nothing, so 'sliderule baseline init' skips this rule until each "
+                + "dead target operand matches or moves to a rule of its own and each dead exception removes "
+                + "something or is removed.");
+    }
+
+    [Fact]
+    public void Migrate_ADeadMembershipBesideADeadBansExceptionAndUncaptured_GivesEachItsOwnCure()
+    {
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Failed, 2,
+            memberships: ["types in `Ghost.*`"], banExceptions: ["types named `Model`"]));
+
+        lines[1]
+            .ShouldBe(
+                "  stricter than written: the membership \"types in `Ghost.*`\" matched no types and the exception "
+                + "\"types named `Model`\" removed nothing, so 'sliderule baseline init' skips this rule until each "
+                + "dead membership matches or is removed and each dead exception removes something or is removed.");
+    }
+
+    [Fact]
+    public void Migrate_ADeadAllowedPatternBesideADeadMembershipAndUncaptured_ShareOneCure()
+    {
+        // Both roles are cleared the same way, so the clause reads as a single role's does.
+        IReadOnlyList<string> lines = Lines(Result(
+            Model.Rule("layering/cuts-only-shared"), RuleStatus.Failed, 2,
+            allowedOperands: ["types in `App.Ghost.*`"], memberships: ["types in `Ghost.*`"]));
+
+        lines[1]
+            .ShouldBe(
+                "  stricter than written: the allow-list operand \"types in `App.Ghost.*`\" matched no types and the "
+                + "membership \"types in `Ghost.*`\" matched no types, so 'sliderule baseline init' skips this rule "
+                + "until each dead operand matches or is removed.");
+    }
+
+    [Fact]
     public void Migrate_DeadAmongPartAndUncaptured_ReadsNotMeasuredAndSaysWhyInitSkipsIt()
     {
         // A dead among part can pass a subject as readily as red one, so the rule's entries are in doubt and its

@@ -35,37 +35,120 @@ internal static class DeadOperandWording
     /// </summary>
     internal static string Described(IReadOnlyList<CheckWarning> warnings)
     {
-        IEnumerable<string> groups = warnings
-            .GroupBy(warning => warning.Role)
+        IEnumerable<string> groups = RoleGroups(warnings)
             .Select(group =>
             {
-                List<string> references = group.Select(warning => warning.Key!).Distinct(StringComparer.Ordinal).ToList();
-                string outcome = group.Key.IsException() ? "removed nothing" : "matched no types";
-                return $"{group.Key.NamedOperands(references)} {outcome}";
+                string outcome = group.Role.IsException() ? "removed nothing" : "matched no types";
+                return $"{group.Role.NamedOperands(group.References)} {outcome}";
             });
         return string.Join(" and ", groups);
     }
 
     /// <summary>
-    ///     What clears dead patterns in <paramref name="role" />, as the end of "until each dead operand …":
-    ///     <c>matches or moves to a rule of its own</c> for a target, <c>removes something or is removed</c> for an
-    ///     exception, which can match a type and still remove nothing, and <c>matches or is removed</c> otherwise.
+    ///     What clears the dead patterns behind <paramref name="warnings" />, as the end of "until …":
+    ///     <c>each dead operand</c> followed by the shared clause when every role takes the same clause; otherwise,
+    ///     each distinct clause preceded by <c>each dead</c> and its roles' nouns, joined with "and".
     /// </summary>
-    internal static string UntilClause(this DeadOperandRole role)
+    internal static string UntilClauses(IReadOnlyList<CheckWarning> warnings)
+    {
+        List<IGrouping<string, DeadOperandRole>> clauses = RoleGroups(warnings)
+            .Select(group => group.Role)
+            .GroupBy(UntilClause, StringComparer.Ordinal)
+            .ToList();
+        if (clauses.Count == 1) return $"each dead operand {clauses[0].Key}";
+
+        IEnumerable<string> parts = clauses.Select(clause => $"each dead {RoleNouns(clause)} {clause.Key}");
+        return string.Join(" and ", parts);
+    }
+
+    /// <summary>
+    ///     The instruction that clears the dead patterns behind <paramref name="warnings" />, ahead of
+    ///     ", then re-run.": <c>Fix each dead operand or move it to a rule of its own</c> for targets alone,
+    ///     <c>Fix or remove each dead operand</c> for every other role, and both, each naming its roles, for a mix.
+    /// </summary>
+    internal static string ClearingInstructions(IReadOnlyList<CheckWarning> warnings)
+    {
+        List<IGrouping<bool, DeadOperandRole>> instructions = RoleGroups(warnings)
+            .Select(group => group.Role)
+            .GroupBy(IsTarget)
+            .ToList();
+        IEnumerable<string> parts = instructions.Count == 1
+            ? [ClearingInstruction(instructions[0].Key, "operand")]
+            : instructions.Select(instruction => ClearingInstruction(instruction.Key, RoleNouns(instruction)));
+        return ProseFormat.Capitalize(string.Join(", and ", parts));
+    }
+
+    /// <summary>
+    ///     Why a capture of the stricter-than-written rule behind <paramref name="warnings" /> would be wrong, as
+    ///     the clause after "so": <c>what it was meant to allow is reported as violations</c> for one role, and
+    ///     for a mix each role's fragment naming the role in place of the pronoun
+    ///     (<c>the types the membership was meant to hold</c>), joined before <c>are reported as violations</c>.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException">A warning's role is not a stricter one.</exception>
+    internal static string StricterConsequence(IReadOnlyList<CheckWarning> warnings)
+    {
+        List<(DeadOperandRole Role, List<string> References)> groups = RoleGroups(warnings);
+        if (groups.Count == 1)
+        {
+            (DeadOperandRole role, List<string> references) = groups[0];
+            string pronoun = references.Count == 1 ? "it" : "they";
+            string meant = MeantFor(role, $"{pronoun} {Plurals.PastVerb(references.Count)}");
+            // "the types … are", "what … is".
+            string verb = role == DeadOperandRole.Membership ? "are" : "is";
+            return $"{meant} {verb} reported as violations";
+        }
+
+        List<string> fragments = groups
+            .Select(group =>
+            {
+                int count = group.References.Count;
+                var subject = $"the {Plurals.Noun(count, Noun(group.Role))} {Plurals.PastVerb(count)}";
+                return MeantFor(group.Role, subject);
+            })
+            .ToList();
+        return $"{ProseFormat.JoinReferencesAnd(fragments)} are reported as violations";
+    }
+
+    private static string MeantFor(DeadOperandRole role, string subject)
+    {
+        return role switch
+        {
+            DeadOperandRole.AllowList => $"what {subject} meant to allow",
+            DeadOperandRole.Membership => $"the types {subject} meant to hold",
+            DeadOperandRole.BanException => $"what {subject} meant to spare",
+            _ => throw new ArgumentOutOfRangeException(nameof(role), role, "Not a stricter role.")
+        };
+    }
+
+    // Exceptions, which can match a type and still remove nothing, are cleared by removing something.
+    private static string UntilClause(DeadOperandRole role)
     {
         if (role.IsException()) return "removes something or is removed";
 
         return IsTarget(role) ? "matches or moves to a rule of its own" : "matches or is removed";
     }
 
-    /// <summary>
-    ///     The instruction that clears dead patterns in <paramref name="role" />, ahead of ", then re-run.":
-    ///     <c>Fix each dead operand or move it to a rule of its own</c> for a target, and
-    ///     <c>Fix or remove each dead operand</c> otherwise.
-    /// </summary>
-    internal static string ClearingInstruction(this DeadOperandRole role)
+    private static string ClearingInstruction(bool target, string noun)
     {
-        return IsTarget(role) ? "Fix each dead operand or move it to a rule of its own" : "Fix or remove each dead operand";
+        return target ? $"fix each dead {noun} or move it to a rule of its own" : $"fix or remove each dead {noun}";
+    }
+
+    // Roles that share a noun, such as an allow-list's exception beside an among part's, name it once.
+    private static string RoleNouns(IEnumerable<DeadOperandRole> roles)
+    {
+        List<string> nouns = roles.Select(Noun)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        return string.Join(" or ", nouns);
+    }
+
+    // Each role's distinct references, the roles in the order their first warning comes.
+    private static List<(DeadOperandRole Role, List<string> References)> RoleGroups(IReadOnlyList<CheckWarning> warnings)
+    {
+        return warnings
+            .GroupBy(warning => warning.Role)
+            .Select(group => (group.Key, group.Select(warning => warning.Key!).Distinct(StringComparer.Ordinal).ToList()))
+            .ToList();
     }
 
     // A target pattern may move to a rule of its own, since the rest of the ban holds without it; every other

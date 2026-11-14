@@ -55,8 +55,6 @@ internal sealed class RuleResult
         StricterOperands = StricterWarnings
             .Select(warning => warning.Key!)
             .ToList();
-        UntestedRole = UntestedWarnings.Count > 0 ? UntestedWarnings[0].Role : DeadOperandRole.None;
-        StricterRole = StricterWarnings.Count > 0 ? StricterWarnings[0].Role : DeadOperandRole.None;
     }
 
     /// <summary>Gets the rule that was checked.</summary>
@@ -246,12 +244,6 @@ internal sealed class RuleResult
     ///     operand order; empty when none went dead.
     /// </summary>
     internal IReadOnlyList<string> StricterOperands { get; }
-
-    /// <summary>The role of the first pattern in <see cref="UntestedOperands" />; none when it is empty.</summary>
-    internal DeadOperandRole UntestedRole { get; }
-
-    /// <summary>The role of the first pattern in <see cref="StricterOperands" />; none when it is empty.</summary>
-    internal DeadOperandRole StricterRole { get; }
 
     /// <summary>
     ///     Whether the run tested every baseline entry it left unmatched, so each is debt since fixed: neither
