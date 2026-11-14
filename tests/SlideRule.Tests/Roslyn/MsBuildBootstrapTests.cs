@@ -96,15 +96,40 @@ public sealed class MsBuildBootstrapTests
     }
 
     [Theory]
-    [InlineData(null, "MSBuildLocator default (no Visual Studio install detected via vswhere)")]
+    [InlineData(null, "MSBuildLocator default (the .NET SDK's MSBuild)")]
     [InlineData("vswhere did not answer within 10 s",
         "MSBuildLocator default (no Visual Studio install detected via vswhere; vswhere did not answer within 10 s)")]
     public void DescribeDefaultFallback_CarriesVswheresReasonWhenThereIsOne(string? whyNone, string expected)
     {
-        // The bare form is what a host that never asks vswhere reports, and ci.yml matches it exactly there;
-        // on Windows the reason is what tells a missing vswhere from a wedged or failing one.
+        // The bare form is what a host that never asks vswhere reports, so it claims no probe, and ci.yml
+        // matches it exactly there; on Windows the reason is what tells a missing vswhere from a wedged or
+        // failing one.
         MsBuildBootstrap.DescribeDefaultFallback(whyNone)
             .ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("VS 2026 (18.10, via vswhere)", true,
+        @"MSBuild for this run: VS 2026 (18.10, via vswhere). Set SLIDERULE_VS_INSTALL_PATH to a Visual Studio install root (the parent of MSBuild\Current\Bin) to select a different MSBuild.")]
+    [InlineData("MSBuildLocator default (the .NET SDK's MSBuild)", false,
+        "MSBuild for this run: MSBuildLocator default (the .NET SDK's MSBuild).")]
+    [InlineData(null, false, "MSBuild for this run: not registered by this process.")]
+    public void ComposeSelectionNote_OffersTheVisualStudioOverrideOnlyWhereOneExists(
+        string? selection, bool offersVsOverride, string expected)
+    {
+        // A host with no Visual Studio has no install root to name, so a remedy there would send the reader
+        // to a layout that does not exist.
+        MsBuildBootstrap.ComposeSelectionNote(selection, offersVsOverride)
+            .ShouldBe(expected);
+    }
+
+    [Fact]
+    public void SelectionNote_OffersTheOverrideOnlyOnWindows()
+    {
+        string note = MsBuildBootstrap.SelectionNote();
+
+        note.Contains(SlideRuleEnvVars.VsInstallPath)
+            .ShouldBe(OperatingSystem.IsWindows(), customMessage: note);
     }
 
     [Fact]

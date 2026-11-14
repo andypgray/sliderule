@@ -166,17 +166,14 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     // ── The MSBuild selection rides both surfaces, but only when something failed ──────────────────────
 
     [Fact]
-    public async Task Check_WorkspaceLoadDiagnostic_NamesTheMsBuildSelectionAndTheOverrideVariable()
+    public async Task Check_WorkspaceLoadDiagnostic_PrintsTheMsBuildSelectionNote()
     {
         // "A project failed to load" is nearly always a question about which MSBuild opened it, so the
-        // selection and the override variable print beside the failure.
+        // selection, and on Windows the override variable, print beside the failure.
         CliResult result = await LoadDiagnosticHuman.Value;
 
         result.Err.ShouldContain(
-            $"warning: MSBuild for this run: {MsBuildBootstrap.LastSelection}.",
-            customMessage: result.Transcript());
-        result.Err.ShouldContain(
-            "Set SLIDERULE_VS_INSTALL_PATH to a Visual Studio install root", customMessage: result.Transcript());
+            "warning: " + MsBuildBootstrap.SelectionNote(), customMessage: result.Transcript());
     }
 
     [Fact]

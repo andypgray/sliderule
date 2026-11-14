@@ -12,7 +12,7 @@ namespace SlideRule.Tests.DocHygiene;
 /// </summary>
 /// <remarks>
 ///     The step learns which MSBuild a runner image selects from one line of graph's refusal, so it holds only while
-///     that refusal carries the line. The files, the solution graph is given and the sed expression that reads the line
+///     that refusal carries the line. The files, the solution graph is given and the grep and sed that read the line
 ///     all come from the step itself, so a change to the step or to the refusal fails here instead of on every image
 ///     after a push.
 /// </remarks>
@@ -28,7 +28,12 @@ public sealed class MsBuildSelectionStepTests
 
     private static readonly Regex GraphTarget = new("""\bgraph "\$root/(?<path>[^"]+)"(?=\s)""", RegexOptions.CultureInvariant);
 
-    private static readonly Regex SedSubstitution = new("""sed -n 's/(?<pattern>[^/]+)/\\1/p'""", RegexOptions.CultureInvariant);
+    // The step reads its line with a grep and its selection with a sed chain of empty substitutions over that line.
+    private static readonly Regex LineGrep = new("""grep -m1 '(?<pattern>[^']+)' "\$log"(?=\s)""", RegexOptions.CultureInvariant);
+
+    private static readonly Regex SelectionSed = new("""^selection="\$\(sed (?<edits>.+) <<<"\$line"\)"$""", RegexOptions.CultureInvariant);
+
+    private static readonly Regex SedEdit = new("""-e 's/(?<pattern>[^/]+)//'""", RegexOptions.CultureInvariant);
 
     [Fact]
     public async Task Graph_OverTheFilesTheStepWrites_RefusesWithTheLineItsSedReadsTheSelectionFrom()
@@ -43,21 +48,22 @@ public sealed class MsBuildSelectionStepTests
         string[] written = WriteFiles(run, root);
         string? solution = GraphTargetOf(script);
         Regex? selectionLine = SelectionLineOf(script);
+        Regex[] selectionEdits = SelectionEditsOf(run);
         written.ShouldNotBeEmpty($"The step '{StepName}' writes no file this test can read. Its run block:\n{script}");
         solution.ShouldNotBeNull($"The step '{StepName}' runs graph on no file under $root. Its run block:\n{script}");
-        selectionLine.ShouldNotBeNull($"The step '{StepName}' reads the selection with no sed expression this test can read. Its run block:\n{script}");
+        selectionLine.ShouldNotBeNull($"The step '{StepName}' reads the selection line with no grep this test can read. Its run block:\n{script}");
+        selectionEdits.ShouldNotBeEmpty($"The step '{StepName}' reads the selection with no sed chain this test can read. Its run block:\n{script}");
 
         // Act
         string solutionPath = root.PathOf(solution.Split('/'));
         CliResult graph = await CliRunner.InvokeColdAsync("graph", solutionPath, "--no-cache");
 
-        // Assert: one line the step's expression reads, naming the MSBuild this process selected.
-        string selection = graph.Err.Split('\n')
-            .Select(line => selectionLine.Match(line))
-            .Where(static match => match.Success)
-            .Select(static match => match.Groups[1].Value)
-            .ShouldHaveSingleItem($"graph should answer the step's files with one line its sed expression reads. Exit {graph.Exit}, stderr:\n{graph.Err}");
-        selection.ShouldBe(MsBuildBootstrap.LastSelection);
+        // Assert: one line the step's grep reads, from which its sed chain leaves the MSBuild this process selected.
+        string line = graph.Err.Split('\n')
+            .Where(candidate => selectionLine.IsMatch(candidate))
+            .ShouldHaveSingleItem($"graph should answer the step's files with one line its grep reads. Exit {graph.Exit}, stderr:\n{graph.Err}");
+        string selection = selectionEdits.Aggregate(line, static (text, edit) => edit.Replace(text, "", 1));
+        selection.ShouldBe(MsBuildBootstrap.LastSelection, customMessage: line);
     }
 
     // The run block's lines as bash receives them, with the YAML block's indentation removed.
@@ -116,16 +122,23 @@ public sealed class MsBuildSelectionStepTests
         return graph.Success ? graph.Groups["path"].Value : null;
     }
 
-    // The step's sed expression as a .NET pattern. A basic regular expression escapes a group's parentheses where .NET
-    // does not, and that is the one difference the step's expression meets.
+    // The step's grep and sed patterns are basic regular expressions written in the subset whose meaning .NET shares:
+    // anchors, escaped dots, starred atoms and literal text.
     private static Regex? SelectionLineOf(string script)
     {
-        Match sed = SedSubstitution.Match(script);
-        if (!sed.Success) return null;
+        Match grep = LineGrep.Match(script);
+        return grep.Success ? new Regex(grep.Groups["pattern"].Value, RegexOptions.CultureInvariant) : null;
+    }
 
-        string pattern = sed.Groups["pattern"].Value
-            .Replace(@"\(", "(")
-            .Replace(@"\)", ")");
-        return new Regex(pattern, RegexOptions.CultureInvariant);
+    // The sed chain's substitutions, in the order sed applies them. None carries the g flag, so each replaces only
+    // its first match.
+    private static Regex[] SelectionEditsOf(string[] run)
+    {
+        Match sed = run
+            .Select(static line => SelectionSed.Match(line))
+            .FirstOrDefault(static match => match.Success) ?? Match.Empty;
+        return SedEdit.Matches(sed.Groups["edits"].Value)
+            .Select(static edit => new Regex(edit.Groups["pattern"].Value, RegexOptions.CultureInvariant))
+            .ToArray();
     }
 }

@@ -44,13 +44,26 @@ internal static class MsBuildBootstrap
     /// <summary>
     ///     The MSBuild-selection line that rides along with workspace diagnostics: a project that fails to load
     ///     is nearly always a question about which MSBuild opened it. A null selection means nothing registered
-    ///     MSBuild at all, which for a caller that just opened a workspace is itself worth saying.
+    ///     MSBuild at all, which for a caller that just opened a workspace is itself worth saying. The override
+    ///     sentence rides only on Windows, the one host with a Visual Studio install root to name.
     /// </summary>
     internal static string SelectionNote()
     {
-        string selection = LastSelection ?? "not registered by this process";
-        return $"MSBuild for this run: {selection}. Set {SlideRuleEnvVars.VsInstallPath} to a Visual Studio "
-               + $"install root (the parent of {MsBuildBinLayout}) to select a different MSBuild.";
+        return ComposeSelectionNote(LastSelection, OperatingSystem.IsWindows());
+    }
+
+    /// <summary>
+    ///     The note <see cref="SelectionNote" /> prints, for a given selection and host.
+    /// </summary>
+    // A deliberate seam: pure, like DescribeDefaultFallback, so a test pins the Windows and non-Windows notes on
+    // any machine.
+    internal static string ComposeSelectionNote(string? selection, bool offersVsOverride)
+    {
+        var note = $"MSBuild for this run: {selection ?? "not registered by this process"}.";
+        if (!offersVsOverride) return note;
+
+        return $"{note} Set {SlideRuleEnvVars.VsInstallPath} to a Visual Studio install root (the parent of "
+               + $"{MsBuildBinLayout}) to select a different MSBuild.";
     }
 
     /// <summary>
@@ -149,12 +162,14 @@ internal static class MsBuildBootstrap
     ///     The selection reported when no Visual Studio was taken, carrying vswhere's reason when there is one.
     ///     Pure, like <see cref="DescribeSelection" />, so it can be pinned on any machine.
     /// </summary>
-    // The bare form is what every non-Windows host reports, where vswhere is never asked, and ci.yml's MSBuild
-    // assertion matches it exactly on those legs; only the Windows arm grows a reason.
+    // A null reason means vswhere was never asked, which is every non-Windows host: on Windows each answer that
+    // lists no instance carries a reason. ci.yml's MSBuild assertion matches the null form exactly on its
+    // non-Windows legs.
     internal static string DescribeDefaultFallback(string? whyNone)
     {
-        const string fallback = "MSBuildLocator default (no Visual Studio install detected via vswhere";
-        return whyNone is null ? fallback + ")" : $"{fallback}; {whyNone})";
+        return whyNone is null
+            ? "MSBuildLocator default (the .NET SDK's MSBuild)"
+            : $"MSBuildLocator default (no Visual Studio install detected via vswhere; {whyNone})";
     }
 
     private static MsBuildSelection RegisterFromOverride(string overridePath)

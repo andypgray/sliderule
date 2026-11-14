@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No changes yet.
+### Fixed
+
+- On Linux and macOS, the MSBuild note printed next to a load failure now reads
+  `MSBuild for this run: MSBuildLocator default (the .NET SDK's MSBuild).` It said vswhere had found no
+  Visual Studio and suggested `SLIDERULE_VS_INSTALL_PATH`, but vswhere runs only on Windows and the variable
+  works only there.
 
 ## [0.3.0] - 2026-11-04
 

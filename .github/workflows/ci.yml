@@ -115,7 +115,8 @@ jobs:
           dotnet run --no-build --project src/SlideRule.Cli -- graph "$root/Selection.slnx" --no-cache \
             > /dev/null 2> "$log" || true
 
-          selection="$(sed -n 's/^ *MSBuild for this run: \(.*\)\. Set SLIDERULE_VS_INSTALL_PATH.*$/\1/p' "$log")"
+          line="$(grep -m1 'MSBuild for this run: ' "$log" || true)"
+          selection="$(sed -e 's/^ *MSBuild for this run: //' -e 's/\. Set SLIDERULE_VS_INSTALL_PATH .*$//' -e 's/\.$//' <<<"$line")"
           echo "MSBuild on $IMAGE: ${selection:-<nothing reported>}"
 
           if [ -z "$selection" ]; then
@@ -124,14 +125,15 @@ jobs:
             exit 1
           fi
 
-          # ', via vswhere)' closes every Visual Studio pick and nothing else: the SDK fallback also says 'via
-          # vswhere', with a reason after it on Windows, so the comma is what tells the two apart. The envelope
+          # ', via vswhere)' closes every Visual Studio pick and nothing else: the Windows SDK fallback also says
+          # 'via vswhere', with its reason after it, so the comma is what tells the two apart. The envelope
           # tail is which side of the tested VS 16/17/18 envelope the image landed on, matched without its
           # leading em dash so the comparison stays ASCII, and must agree with MsBuildBootstrap's note. The
           # major, read from the '(<major>.' that opens the version, is which leg of the envelope this is.
           vs=', via vswhere)'
           outside='outside the tested VS 2019/2022/2026 envelope'
-          sdk='MSBuildLocator default (no Visual Studio install detected via vswhere)'
+          sdk="MSBuildLocator default (the .NET SDK's MSBuild)"
+          override='SLIDERULE_VS_INSTALL_PATH'
           bad=''
           case "$IMAGE" in
             windows-2022|windows-latest)
@@ -142,12 +144,19 @@ jobs:
                 bad='the selected Visual Studio is outside the tested envelope'
               elif ! grep -Fq "$major" <<<"$selection"; then
                 bad="the selected Visual Studio is not major ${major:1:2}, so this leg no longer tests the major the comment at the top of this job assigns it"
+              elif ! grep -Fq "Set $override" <<<"$line"; then
+                bad="the note no longer offers $override on a host with a Visual Studio install to name"
               fi
               ;;
             *)
               # No Visual Studio to find, so the SDK MSBuild is the whole answer — the other half of the
               # VS-or-SDK question, and the arm every non-Windows measurement in this repository rests on.
-              if [ "$selection" != "$sdk" ]; then bad="expected '$sdk'"; fi
+              # vswhere is never asked here and no install root exists, so the note claims neither.
+              if [ "$selection" != "$sdk" ]; then
+                bad="expected '$sdk'"
+              elif grep -Fq "$override" <<<"$line"; then
+                bad="the note offers $override on a host with no Visual Studio"
+              fi
               ;;
           esac
 
