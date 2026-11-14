@@ -13,7 +13,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sliderule hook examples/Meridian/Meridian.slnx",
+            "command": "sliderule",
+            "args": [
+              "hook",
+              "examples/Meridian/Meridian.slnx"
+            ],
             "timeout": 30
           }
         ]
@@ -24,7 +28,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sliderule hook examples/Meridian/Meridian.slnx",
+            "command": "sliderule",
+            "args": [
+              "hook",
+              "examples/Meridian/Meridian.slnx"
+            ],
             "timeout": 600
           }
         ]
@@ -35,7 +43,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sliderule hook examples/Meridian/Meridian.slnx",
+            "command": "sliderule",
+            "args": [
+              "hook",
+              "examples/Meridian/Meridian.slnx"
+            ],
             "timeout": 600
           }
         ]

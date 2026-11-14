@@ -156,12 +156,18 @@ public sealed class HookReadmeTests
                     .SequenceEqual(WiredEvents.Order(StringComparer.Ordinal)))
                 findings.Add($"{snippet} wires {string.Join(", ", wired)}; the verb's contract is {string.Join(", ", WiredEvents)}.");
 
+            // An entry with no args runs through a shell, whose environment a directly started server never matches,
+            // so a stop never reaches the warm server.
             foreach (JsonProperty entry in hooks.EnumerateObject())
-            foreach (string command in Commands(entry.Value))
-                if (!command.StartsWith(Verb, StringComparison.Ordinal))
-                    findings.Add($"{snippet} {entry.Name}: '{command}' does not run {Verb}.");
-                else if (FencedCommands.ParseErrors(command) is { Count: > 0 } errors)
-                    findings.Add($"{snippet} {entry.Name}: '{command}' does not parse: {string.Join(" ", errors)}");
+            foreach ((string command, IReadOnlyList<string>? args) in Commands(entry.Value))
+                if (args is null)
+                    findings.Add($"{snippet} {entry.Name}: '{command}' is in shell form; write it as command and args.");
+                else if (command != CommandFactory.ToolCommandName || args is not [CommandFactory.HookCommandName, ..])
+                    findings.Add($"{snippet} {entry.Name}: '{command}' with args [{string.Join(", ", args)}] does not run {Verb}.");
+                else if (FencedCommands.ParseErrors(CommandLine(command, args)) is { Count: > 0 } errors)
+                    findings.Add($"{snippet} {entry.Name}: '{CommandLine(command, args)}' does not parse: {string.Join(" ", errors)}");
+                else if (!InvokesTheVerbItself(args))
+                    findings.Add($"{snippet} {entry.Name}: '{CommandLine(command, args)}' runs an option of {Verb}, not the verb, so install-hook would not read it as the hook.");
         }
 
         // Assert
@@ -271,13 +277,24 @@ public sealed class HookReadmeTests
             .Single(command => command.Name == name);
     }
 
-    private static IEnumerable<string> Commands(JsonElement groups)
+    // Each hook entry's command, and its args where it has them.
+    private static IEnumerable<(string Command, IReadOnlyList<string>? Args)> Commands(JsonElement groups)
     {
         return groups.EnumerateArray()
             .SelectMany(static group => group.GetProperty("hooks")
                 .EnumerateArray())
-            .Select(static hook => hook.GetProperty("command")
-                .GetString() ?? "");
+            .Select(static hook => (
+                hook.GetProperty("command")
+                    .GetString() ?? "",
+                hook.TryGetProperty("args", out _)
+                    ? hook.Strings("args")
+                    : null));
+    }
+
+    // An exec-form entry as the one command line the parser reads, each argument quoted where a split would break it.
+    private static string CommandLine(string command, IReadOnlyList<string> args)
+    {
+        return string.Join(" ", [command, .. args.Select(CommandLineArgument.Quoted)]);
     }
 
     // Whether args, the tool's name left off, parse to the hook verb and invoke its own action rather than an

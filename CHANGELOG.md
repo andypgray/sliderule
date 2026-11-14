@@ -20,8 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sliderule install-hook` merges the hook entries and the `baseline` deny rules from
   `hooks/settings.snippet.json` into `.claude/settings.json` at the root of the git work tree. Other settings
   stay as they are, a group on the same event and matcher that already runs `sliderule hook` is left alone,
-  and a run that finds every entry present does not write the file. A solution or `--spec` passed to it is
-  written into each command. When the hook would find no solution from that root, it exits 2 before writing
+  and a run that finds every entry present does not write the file. Each entry gives `sliderule` and its
+  arguments separately, so Claude Code starts the hook without a shell, and a solution or `--spec` passed to the
+  installer is added to those arguments. When the hook would find no solution from that root, it exits 2 before writing
   the file. `init` now ends by naming this command in place of a link to the snippet.
 - `check` warns, as `deadOperand`, when an `Except` that names a specific type, namespace, project, layer, exact
   name or folder removes nothing from the selection it is written on. An exception that describes a kind (a shape,
@@ -36,8 +37,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   solution and spec, from the same build, with the same environment and `global.json`. The server reads every
   file the turn changed before it checks, and the report matches a check in the hook's own process byte for
   byte. Otherwise the hook checks in its own process, as before. Both processes first remove the shell's own
-  variables and list each `PATH` directory once. On Windows a server the client starts directly still sees a
-  different `PATH` from a hook run through Git's bash, so it never serves a stop. On this repository, whose server
+  variables and list each `PATH` directory once. A hook entry `install-hook` writes starts without a shell, so
+  it matches a server the client starts directly. On Windows, an entry written as one command line runs through
+  Git's bash, and no directly started server serves its stops. On this repository, whose server
   starts through Git's `sh`, a stop after a one-line edit took about a fifth as long through the server as without it. `SLIDERULE_HOOK_TIMEOUT` gives the hook your
   client's timeout where it is not Claude Code's 600 seconds, and `SLIDERULE_DISABLE_WARM_HOOK` keeps every stop
   in the hook's own process.

@@ -32,7 +32,10 @@ public sealed class ClaudeSettingsMergeTests
                                             "hooks": [
                                               {
                                                 "type": "command",
-                                                "command": "sliderule hook",
+                                                "command": "sliderule",
+                                                "args": [
+                                                  "hook"
+                                                ],
                                                 "timeout": 600
                                               }
                                             ]
@@ -121,7 +124,10 @@ public sealed class ClaudeSettingsMergeTests
                                      "hooks": [
                                        {
                                          "type": "command",
-                                         "command": "sliderule hook",
+                                         "command": "sliderule",
+                                         "args": [
+                                           "hook"
+                                         ],
                                          "timeout": 600
                                        }
                                      ]
@@ -202,14 +208,39 @@ public sealed class ClaudeSettingsMergeTests
         // Assert
         result.Lines.ShouldBe(["added Stop: sliderule hook"]);
         StopCommands(result.Text)
-            .ShouldBe([command, "sliderule hook"]);
+            .ShouldBe([[command], ["sliderule", "hook"]]);
+    }
+
+    [Theory]
+    [InlineData("""["hook"]""", true)]
+    [InlineData("""["hook", "src/App.sln", "--max-rounds", "5"]""", true)]
+    // Exec form passes each element as one argument, so a path with a space needs no quotes.
+    [InlineData("""["hook", "My App/App.sln"]""", true)]
+    // A word that names a command elsewhere in the tree is the verb's solution here.
+    [InlineData("""["hook", "install"]""", true)]
+    [InlineData("""["install-hook"]""", false)]
+    [InlineData("""["hook --help"]""", false)]
+    [InlineData("""["hook", 5]""", false)]
+    [InlineData("""{"0": "hook"}""", false)]
+    public void Merge_AnExecFormEntry_IsReadAsItsArgumentVector(string args, bool kept)
+    {
+        // Arrange
+        string existing = Settings("Stop", null, "sliderule", denied: true, args);
+
+        // Act
+        ClaudeSettingsMerge.Result result = Merge(existing, Template);
+
+        // Assert
+        result.Changed.ShouldBe(!kept, string.Join("\n", result.Lines));
+        result.Lines.ShouldHaveSingleItem()
+            .ShouldStartWith(kept ? "kept Stop: sliderule hook" : "added Stop: sliderule hook");
     }
 
     [Fact]
     public void Merge_ARunnerOnAnotherMatcher_DoesNotStandInForTheTemplatesGroup()
     {
         // Arrange
-        string template = Settings("PreToolUse", "Write", "sliderule hook", denied: false);
+        string template = Settings("PreToolUse", "Write", "sliderule", denied: false, args: """["hook"]""");
         string existing = Settings("PreToolUse", "Edit", "sliderule hook", denied: false);
 
         // Act
@@ -223,7 +254,7 @@ public sealed class ClaudeSettingsMergeTests
     public void Merge_ARunnerOnTheSameMatcher_IsKept()
     {
         // Arrange
-        string template = Settings("PreToolUse", "Write", "sliderule hook", denied: false);
+        string template = Settings("PreToolUse", "Write", "sliderule", denied: false, args: """["hook"]""");
 
         // Act
         ClaudeSettingsMerge.Result result = Merge(template, template);
@@ -295,44 +326,62 @@ public sealed class ClaudeSettingsMergeTests
     }
 
     [Theory]
-    [InlineData("src/App.sln", null, "sliderule hook src/App.sln")]
-    [InlineData(null, "arch/Spec/Spec.csproj", "sliderule hook --spec arch/Spec/Spec.csproj")]
-    [InlineData("src/App.sln", "arch/Spec.dll", "sliderule hook src/App.sln --spec arch/Spec.dll")]
-    // The subcommand's name, which the parser would read as the subcommand.
-    [InlineData("install", null, "sliderule hook ./install")]
-    [InlineData("src/App.sln", "install", "sliderule hook src/App.sln --spec ./install")]
+    [InlineData("src/App.sln", null, "src/App.sln")]
+    [InlineData(null, "arch/Spec/Spec.csproj", "--spec|arch/Spec/Spec.csproj")]
+    [InlineData("src/App.sln", "arch/Spec.dll", "src/App.sln|--spec|arch/Spec.dll")]
+    // Only a leading dash takes ./, so a word that names a command elsewhere in the tree is written as it is.
+    [InlineData("install", null, "install")]
+    [InlineData("src/App.sln", "install", "src/App.sln|--spec|install")]
     // A leading dash, which the parser would read as an option.
-    [InlineData("-name", null, "sliderule hook ./-name")]
-    [InlineData("My App/App.sln", null, "sliderule hook \"My App/App.sln\"")]
-    [InlineData("src/App(1).sln", null, "sliderule hook \"src/App(1).sln\"")]
-    public void Merge_TheSolutionAndSpec_AreAppendedInAFormThatRunsTheHook(
+    [InlineData("-name", null, "./-name")]
+    // No shell reads an exec-form argument, so none of these is quoted or refused.
+    [InlineData("My App/App.sln", null, "My App/App.sln")]
+    [InlineData("src/App(1).sln", null, "src/App(1).sln")]
+    [InlineData("a$b/App.sln", null, "a$b/App.sln")]
+    [InlineData("a\"b/App.sln", null, "a\"b/App.sln")]
+    [InlineData("a`b/App.sln", null, "a`b/App.sln")]
+    public void Merge_TheSolutionAndSpec_AreAppendedAsArgumentsThatRunTheHook(
         string? solution, string? spec, string expected)
     {
+        // Arrange
+        string[] arguments = expected.Split('|');
+
         // Act
         ClaudeSettingsMerge.Result result = ClaudeSettingsMerge.Merge(null, Template, solution, spec, Tree, FilePath);
 
-        // Assert
+        // Assert: the entry carries the arguments one element each, and a second merge reads it as the hook runner.
         StopCommands(result.Text)
-            .ShouldBe([expected]);
-        ClaudeSettingsMerge.RunsHookRunner(Tree, expected)
-            .ShouldBeTrue($"'{expected}' does not parse to the hook verb");
+            .ShouldBe([["sliderule", "hook", .. arguments]]);
+        ClaudeSettingsMerge.Result again = Merge(result.Text, Template);
+        again.Changed.ShouldBeFalse(string.Join("\n", again.Lines));
     }
 
     [Theory]
-    [InlineData("a$b/App.sln")]
-    [InlineData("a\"b/App.sln")]
-    [InlineData("a`b/App.sln")]
-    // A line break ends the command a shell runs.
-    [InlineData("a\nb/App.sln")]
-    [InlineData("a\rb/App.sln")]
-    public void Merge_APathAShellReadsInsideQuotes_IsRefusedNamingIt(string solution)
+    [InlineData("${CLAUDE_PROJECT_DIR}/App.sln", null)]
+    [InlineData("src/App.sln", "${CLAUDE_PLUGIN_ROOT}/Spec.dll")]
+    public void Merge_APathHoldingAPlaceholder_IsRefusedNamingIt(string solution, string? spec)
     {
         // Act
         var refusal = Should.Throw<UserErrorException>(() =>
-            ClaudeSettingsMerge.Merge(null, Template, solution, null, Tree, FilePath));
+            ClaudeSettingsMerge.Merge(null, Template, solution, spec, Tree, FilePath));
 
         // Assert
-        refusal.Message.ShouldStartWith($"Cannot write '{solution}' into a hook command: ");
+        refusal.Message.ShouldStartWith($"Cannot write '{spec ?? solution}' into a hook entry: ");
+    }
+
+    [Theory]
+    [InlineData("""{"type": "command", "command": "sliderule hook"}""")]
+    [InlineData("""{"type": "command", "command": "sliderule", "args": "hook"}""")]
+    public void Merge_ATemplateEntryWithNoArgsArray_Throws(string entry)
+    {
+        // Arrange
+        string template = """{"hooks": {"Stop": [{"hooks": [""" + entry + "]}]}}";
+
+        // Act
+        var thrown = Should.Throw<InvalidOperationException>(() => Merge(null, template));
+
+        // Assert
+        thrown.Message.ShouldBe("A hook entry of the settings template has no args array.");
     }
 
     [Theory]
@@ -344,13 +393,17 @@ public sealed class ClaudeSettingsMergeTests
     [InlineData("sliderule hook -h", false)]
     [InlineData("sliderule check", false)]
     [InlineData("dotnet sliderule hook", false)]
-    public void RunsHookRunner_ReadsTheCommandLineThroughTheCommandTree(string command, bool expected)
+    public void Merge_AShellFormEntry_IsReadThroughTheCommandTree(string command, bool kept)
     {
+        // Arrange
+        string existing = Settings("Stop", null, command, denied: true);
+
         // Act
-        bool runs = ClaudeSettingsMerge.RunsHookRunner(Tree, command);
+        ClaudeSettingsMerge.Result result = Merge(existing, Template);
 
         // Assert
-        runs.ShouldBe(expected, command);
+        result.Lines.ShouldHaveSingleItem()
+            .ShouldBe(kept ? $"kept Stop: {command}" : "added Stop: sliderule hook");
     }
 
     private static ClaudeSettingsMerge.Result Merge(string? existing, string template)
@@ -358,14 +411,15 @@ public sealed class ClaudeSettingsMergeTests
         return ClaudeSettingsMerge.Merge(existing, template, null, null, Tree, FilePath);
     }
 
-    // A settings file holding one group on eventName, with matcher when given, running command, and the template's
-    // deny rule when denied is set, in the form the merge writes.
-    private static string Settings(string eventName, string? matcher, string command, bool denied)
+    // A settings file holding one group on eventName, with matcher when given, running command (with args, a JSON
+    // value, when given), and the template's deny rule when denied is set, in the form the merge writes.
+    private static string Settings(string eventName, string? matcher, string command, bool denied, string? args = null)
     {
         string[] deny = denied
             ? ["  \"permissions\": {", "    \"deny\": [", "      \"Bash(sliderule baseline*)\"", "    ]", "  },"]
             : [];
         string[] matcherLine = matcher is null ? [] : [$"        \"matcher\": \"{matcher}\","];
+        string[] argsLine = args is null ? [] : [$"            \"args\": {args},"];
         string[] lines =
         [
             "{",
@@ -378,6 +432,7 @@ public sealed class ClaudeSettingsMergeTests
             "          {",
             "            \"type\": \"command\",",
             $"            \"command\": \"{command}\",",
+            .. argsLine,
             "            \"timeout\": 900",
             "          }",
             "        ]",
@@ -391,7 +446,8 @@ public sealed class ClaudeSettingsMergeTests
         return string.Join("\n", lines);
     }
 
-    private static IReadOnlyList<string> StopCommands(string text)
+    // Each Stop entry as its command followed by its args, one string each.
+    private static IReadOnlyList<IReadOnlyList<string>> StopCommands(string text)
     {
         using JsonDocument document = JsonDocument.Parse(text);
         return document.RootElement.GetProperty("hooks")
@@ -399,8 +455,14 @@ public sealed class ClaudeSettingsMergeTests
             .EnumerateArray()
             .SelectMany(static group => group.GetProperty("hooks")
                 .EnumerateArray())
-            .Select(static hook => hook.GetProperty("command")
-                .GetString() ?? "")
+            .Select(static hook => (IReadOnlyList<string>)
+            [
+                hook.GetProperty("command")
+                    .GetString() ?? "",
+                .. hook.TryGetProperty("args", out _)
+                    ? hook.Strings("args")
+                    : []
+            ])
             .ToList();
     }
 }

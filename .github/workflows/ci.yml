@@ -1126,8 +1126,8 @@ jobs:
           settings="$plain/.claude/settings.json"
           snippet=hooks/settings.snippet.json
           for event in $(jq -r '.hooks | keys[]' "$snippet"); do
-            jq -e --arg event "$event" 'any(.hooks[$event][]?.hooks[]?; .command == "sliderule hook")' "$settings" > /dev/null || {
-              echo "::error::sliderule hook install wrote no $event entry running sliderule hook"
+            jq -e --arg event "$event" 'any(.hooks[$event][]?.hooks[]?; .command == "sliderule" and .args == ["hook"])' "$settings" > /dev/null || {
+              echo "::error::sliderule install-hook wrote no $event entry running sliderule hook in exec form"
               cat "$settings"
               exit 1
             }
@@ -1654,8 +1654,8 @@ jobs:
             echo "::error::GETTING-STARTED.md's sliderule install-hook failed beside the sliderule.json init wrote"
             exit 1
           }
-          jq -e 'any(.hooks.Stop[]?.hooks[]?; .command == "sliderule hook")' .claude/settings.json > /dev/null || {
-            echo "::error::GETTING-STARTED.md's sliderule hook install wrote no Stop entry running sliderule hook"
+          jq -e 'any(.hooks.Stop[]?.hooks[]?; .command == "sliderule" and .args == ["hook"])' .claude/settings.json > /dev/null || {
+            echo "::error::GETTING-STARTED.md's sliderule install-hook wrote no Stop entry running sliderule hook in exec form"
             cat .claude/settings.json || true
             exit 1
           }

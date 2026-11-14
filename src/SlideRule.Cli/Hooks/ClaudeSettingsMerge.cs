@@ -14,9 +14,10 @@ namespace SlideRule.Cli.Hooks;
 /// </summary>
 /// <remarks>
 ///     A template matcher group is present when the target's event holds a group with the same matcher, an absent
-///     one counting as its own value, and one of that group's commands runs the <c>hook</c> verb. A present group is
-///     kept as the user has it. A deny rule is present when an ordinal-equal string stands in the target's list.
-///     Nothing is reordered or removed, and a container is created only where it is absent.
+///     one counting as its own value, and one of that group's commands runs the <c>hook</c> verb, in exec form
+///     (<c>command</c> plus <c>args</c>) or shell form (one <c>command</c> string). A present group is kept as the
+///     user has it. A deny rule is present when an ordinal-equal string stands in the target's list. Nothing is
+///     reordered or removed, and a container is created only where it is absent.
 /// </remarks>
 internal static class ClaudeSettingsMerge
 {
@@ -25,22 +26,26 @@ internal static class ClaudeSettingsMerge
     private const string DenyKey = "deny";
     private const string MatcherKey = "matcher";
     private const string CommandKey = "command";
+    private const string ArgsKey = "args";
 
     /// <summary>
     ///     <paramref name="existing" /> (null when there is no file) with whatever of <paramref name="template" /> it
-    ///     lacks. <paramref name="solution" /> and <paramref name="spec" />, relative to the root the hook runs from and
-    ///     each null to leave it out, are appended to every command an added entry carries.
+    ///     lacks; every hook entry of the template is in exec form. <paramref name="solution" /> and
+    ///     <paramref name="spec" />, relative to the root the hook runs from and each null to leave it out, are appended
+    ///     to the <c>args</c> of every entry an added group carries.
     ///     <paramref name="commandTree" /> is the CLI's command tree, which an existing command line is parsed against.
     ///     <paramref name="filePath" /> names the file in a refusal.
     /// </summary>
     /// <exception cref="UserErrorException">
     ///     The file is not JSON, holds something other than an object where the merge must write, or a path cannot be
-    ///     written into a command.
+    ///     written into a hook entry.
     /// </exception>
+    /// <exception cref="InvalidOperationException">A hook entry of the template has no <c>args</c> array.</exception>
     public static Result Merge(
         string? existing, string template, string? solution, string? spec, Command commandTree, string filePath)
     {
-        string suffix = string.Concat(CommandArguments(solution, spec).Select(static word => " " + word));
+        string[] suffix = CommandArguments(solution, spec)
+            .ToArray();
         JsonObject target = Parse(existing, filePath);
         var snippet = (JsonObject)JsonNode.Parse(template)!;
 
@@ -56,15 +61,10 @@ internal static class ClaudeSettingsMerge
         return new Result(text, [.. hooked, .. denied], added > 0);
     }
 
-    /// <summary>
-    ///     Whether <paramref name="command" /> runs the <c>hook</c> verb: split as System.CommandLine splits a command
-    ///     line, the tool's name and then arguments that parse to that verb itself, not to a subcommand of it, and
-    ///     invoke the verb's own action rather than an option's, such as help.
-    /// </summary>
-    public static bool RunsHookRunner(Command commandTree, string command)
+    // Whether an entry's argument vector runs the hook verb: the tool's name, then arguments that parse to that verb
+    // and invoke its own action rather than an option's, such as help.
+    private static bool RunsHookRunner(Command commandTree, string[] tokens)
     {
-        string[] tokens = CommandLineParser.SplitCommandLine(command)
-            .ToArray();
         if (tokens is not [CommandFactory.ToolCommandName, .. var arguments]) return false;
 
         ParseResult parsed = commandTree.Parse(arguments);
@@ -123,7 +123,7 @@ internal static class ClaudeSettingsMerge
     }
 
     private static int MergeHooks(
-        JsonObject target, JsonObject templateHooks, string suffix, Command commandTree, List<string> lines,
+        JsonObject target, JsonObject templateHooks, string[] suffix, Command commandTree, List<string> lines,
         string filePath)
     {
         JsonObject hooks = ObjectAt(target, HooksKey, filePath);
@@ -145,7 +145,7 @@ internal static class ClaudeSettingsMerge
                 JsonObject group = WithSuffix(templateGroup, suffix);
                 groups.Add(group);
                 lines.AddRange(Commands(group)
-                    .Select(command => $"added {label}: {command}"));
+                    .Select(command => $"added {label}: {command.Shown}"));
                 added++;
             }
         }
@@ -161,7 +161,8 @@ internal static class ClaudeSettingsMerge
         return groups.OfType<JsonObject>()
             .Where(group => IsMatcher(group, matcher))
             .SelectMany(Commands)
-            .FirstOrDefault(command => RunsHookRunner(commandTree, command));
+            .FirstOrDefault(command => RunsHookRunner(commandTree, command.Tokens))
+            ?.Shown;
     }
 
     private static bool IsMatcher(JsonObject group, string? matcher)
@@ -183,20 +184,23 @@ internal static class ClaudeSettingsMerge
         return node is JsonValue value && value.TryGetValue(out string? text) ? text : null;
     }
 
-    private static IEnumerable<string> Commands(JsonObject group)
+    private static IEnumerable<HookCommand> Commands(JsonObject group)
     {
         return (group[HooksKey] as JsonArray ?? [])
             .OfType<JsonObject>()
-            .Select(static hook => hook[CommandKey] is JsonValue value && value.TryGetValue(out string? text) ? text : null)
-            .OfType<string>();
+            .Select(HookCommand.Of)
+            .OfType<HookCommand>();
     }
 
-    private static JsonObject WithSuffix(JsonObject templateGroup, string suffix)
+    private static JsonObject WithSuffix(JsonObject templateGroup, string[] suffix)
     {
         var group = (JsonObject)templateGroup.DeepClone();
         foreach (JsonObject hook in (group[HooksKey] as JsonArray ?? []).OfType<JsonObject>())
-            if (hook[CommandKey] is JsonValue value && value.TryGetValue(out string? command))
-                hook[CommandKey] = command + suffix;
+        {
+            JsonArray args = hook[ArgsKey] as JsonArray
+                             ?? throw new InvalidOperationException("A hook entry of the settings template has no args array.");
+            foreach (string word in suffix) args.Add(word);
+        }
 
         return group;
     }
@@ -233,6 +237,33 @@ internal static class ClaudeSettingsMerge
         return new UserErrorException(
             $"{filePath}: {path} is not {expected}, so the hook settings cannot be merged into it. Fix it, then run "
             + "this again.");
+    }
+
+    // An entry's command as Claude Code runs it. Tokens is the argument vector: exec form's command and args as
+    // written, or shell form's command line as the splitter reads it. Shown is the line a change reports. An entry of
+    // neither shape, or with an args element that is not a string, has none.
+    private sealed record HookCommand(string Shown, string[] Tokens)
+    {
+        public static HookCommand? Of(JsonObject hook)
+        {
+            if (StringOf(hook[CommandKey]) is not { } command) return null;
+
+            if (!hook.TryGetPropertyValue(ArgsKey, out JsonNode? node))
+                return new HookCommand(command, CommandLineParser.SplitCommandLine(command)
+                    .ToArray());
+
+            if (node is not JsonArray args) return null;
+
+            var tokens = new List<string> { command };
+            foreach (JsonNode? arg in args)
+            {
+                if (StringOf(arg) is not { } text) return null;
+
+                tokens.Add(text);
+            }
+
+            return new HookCommand(string.Join(" ", tokens.Select(CommandLineArgument.Quoted)), tokens.ToArray());
+        }
     }
 
     /// <summary>

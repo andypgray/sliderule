@@ -33,12 +33,6 @@ internal static class CommandFactory
     internal const string ToolCommandName = "sliderule";
 
     /// <summary>
-    ///     The name of <c>hook</c>'s one subcommand. It takes the word from the verb's solution argument, so a solution
-    ///     directory of that name is passed as <c>./install</c>.
-    /// </summary>
-    internal const string HookInstallCommandName = "install";
-
-    /// <summary>
     ///     The command tree. <paramref name="hostSource" /> serves any run that would otherwise open a fresh one-shot
     ///     workspace (<see cref="MsBuildGate" /> says what it displaces); <paramref name="input" /> is the stdin the
     ///     <c>hook</c> verb reads its payload from, or null when nothing was piped in, and is passed here because

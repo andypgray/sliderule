@@ -13,7 +13,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sliderule hook",
+            "command": "sliderule",
+            "args": [
+              "hook"
+            ],
             "timeout": 30
           }
         ]
@@ -24,7 +27,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sliderule hook",
+            "command": "sliderule",
+            "args": [
+              "hook"
+            ],
             "timeout": 600
           }
         ]
@@ -35,7 +41,10 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sliderule hook",
+            "command": "sliderule",
+            "args": [
+              "hook"
+            ],
             "timeout": 600
           }
         ]
