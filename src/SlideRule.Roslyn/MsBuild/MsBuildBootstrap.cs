@@ -17,6 +17,7 @@ namespace SlideRule.Roslyn.MsBuild;
 // workspace type: left until later, the runtime resolves MSBuild assemblies before anything has said which
 // ones to resolve. The two processes are pointed at MSBuild separately, and not at the same one: see
 // ApplyDevConsoleEnv for the BuildHost subprocess and RegisterEngineForThisProcess for this one.
+// ApplyVsToolsPath points both at the selected install's targets.
 internal static class MsBuildBootstrap
 {
     private const string DevConsoleVersion = "99.0";
@@ -25,6 +26,13 @@ internal static class MsBuildBootstrap
     // probed by TryRegisterFromVsRoot, so the directory a reader is sent to is the directory the code
     // probed. Windows separators: every VS install root is a Windows path.
     private const string MsBuildBinLayout = @"MSBuild\Current\Bin";
+
+    private const string VsTargetsLayout = @"MSBuild\Microsoft\VisualStudio";
+
+    // The variables the bootstrap sets process-wide for the build host, which a child dotnet must not inherit.
+    internal const string VsInstallDirVariable = "VSINSTALLDIR";
+    internal const string VsCmdVerVariable = "VSCMD_VER";
+    internal const string VsToolsPathVariable = "VSToolsPath";
 
     // The tail an instance taken outside the preferred VS 16/17/18 set carries in its description. The
     // preferred arm needs no counterpart: an ordinary pick is the unremarkable case, and a note on every
@@ -215,6 +223,7 @@ internal static class MsBuildBootstrap
         if (!File.Exists(msBuildExe)) return (msBuildBin, msBuildExe, false);
 
         ApplyDevConsoleEnv(vsRoot);
+        ApplyVsToolsPath(vsRoot);
         RegisterEngineForThisProcess(msBuildBin);
 
         return (msBuildBin, msBuildExe, true);
@@ -264,7 +273,42 @@ internal static class MsBuildBootstrap
     /// </remarks>
     private static void ApplyDevConsoleEnv(string vsRoot)
     {
-        Environment.SetEnvironmentVariable("VSINSTALLDIR", vsRoot);
-        Environment.SetEnvironmentVariable("VSCMD_VER", DevConsoleVersion);
+        Environment.SetEnvironmentVariable(VsInstallDirVariable, vsRoot);
+        Environment.SetEnvironmentVariable(VsCmdVerVariable, DevConsoleVersion);
+    }
+
+    // The .NET SDK's MSBuild evaluates projects that are not SDK-style too: the .NET build host does, as the
+    // ProjectReference of an SDK-style project's design-time build, and so does this process, for artifact facts.
+    // Its MSBuildExtensionsPath32 is the SDK directory, so the VSToolsPath default such a project writes there
+    // names no Visual Studio targets (MSB4019 for a web application), and a value in the environment pre-empts
+    // that default. The build host inherits it, so it names the selected install's targets; a value already in
+    // the environment is the user's and is kept.
+    private static void ApplyVsToolsPath(string vsRoot)
+    {
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable(VsToolsPathVariable))) return;
+
+        string? vsToolsPath = VsToolsPathUnder(vsRoot);
+        if (vsToolsPath is not null) Environment.SetEnvironmentVariable(VsToolsPathVariable, vsToolsPath);
+    }
+
+    // Visual Studio keeps its targets under MSBuild\Microsoft\VisualStudio\v<major>.0 of its install root, the
+    // directory its own MSBuild's VSToolsPath names; the highest version present is that install's own.
+    private static string? VsToolsPathUnder(string vsRoot)
+    {
+        string extensions = Path.Combine(vsRoot, VsTargetsLayout);
+        if (!Directory.Exists(extensions)) return null;
+
+        return Directory.EnumerateDirectories(extensions, "v*")
+            .Select(directory => (Directory: directory, Version: VersionOf(directory)))
+            .Where(candidate => candidate.Version is not null)
+            .OrderByDescending(candidate => candidate.Version)
+            .Select(candidate => candidate.Directory)
+            .FirstOrDefault();
+    }
+
+    private static Version? VersionOf(string directory)
+    {
+        string name = Path.GetFileName(directory);
+        return Version.TryParse(name.Substring(1), out Version? version) ? version : null;
     }
 }

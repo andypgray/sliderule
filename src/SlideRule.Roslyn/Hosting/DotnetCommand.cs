@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using SlideRule.Roslyn.MsBuild;
 
 namespace SlideRule.Roslyn.Hosting;
 
@@ -8,12 +9,14 @@ namespace SlideRule.Roslyn.Hosting;
 /// </summary>
 internal static class DotnetCommand
 {
-    // MsBuildBootstrap registers Visual Studio's MSBuild by setting these process-wide, and a child that inherits
-    // them resolves that MSBuild instead of its own SDK's and fails at once.
+    // Each names an MSBuild, or the targets it imports, other than the one a child's own SDK would resolve:
+    // MSBuildLocator's registration of this process's SDK sets the first three process-wide, MsBuildBootstrap sets
+    // the Visual Studio ones for the build host, and a Visual Studio developer prompt sets VisualStudioVersion. A
+    // child that inherits them builds against those instead of its own SDK.
     private static readonly string[] PoisonedVariables =
     [
-        "MSBUILD_EXE_PATH", "MSBuildExtensionsPath", "MSBuildSDKsPath", "VSINSTALLDIR", "VSCMD_VER",
-        "VisualStudioVersion"
+        "MSBUILD_EXE_PATH", "MSBuildExtensionsPath", "MSBuildSDKsPath", MsBuildBootstrap.VsInstallDirVariable,
+        MsBuildBootstrap.VsCmdVerVariable, MsBuildBootstrap.VsToolsPathVariable, "VisualStudioVersion"
     ];
 
     /// <summary>

@@ -51,9 +51,13 @@ public sealed class SdkStyleProjectTests
     // compare. The roots are not the whole repository; the class remarks say what is out and why.
     private static readonly string[] GroundTruth =
     [
-        // The one non-SDK-style project in the corpus: 2003 XML namespace, net48, and no assets file — the
-        // shape "absent ⇒ failed" would have refused wholesale.
+        // The non-SDK-style projects in the corpus: 2003 XML namespace, net48, and no assets file — the shape
+        // "absent ⇒ failed" would have refused wholesale.
         "Classic.Billing.csproj: legacy, no assets file",
+        "Classic.Web.csproj: legacy, no assets file",
+        // The SDK-style project beside the classic web project, in the temp-copy position:
+        // Legacy/ClassicWebProjectLoadTests restores it only inside the copy it makes.
+        "Classic.Web.Tests.csproj: SDK-style, no assets file",
         // The three beds left unrestored. SDK-style with no assets file is the state the restore gate exists to
         // catch. The temp-copy beds below read the same, because nothing restores them in the output tree.
         "BrokenApp.Core.csproj: SDK-style, no assets file",

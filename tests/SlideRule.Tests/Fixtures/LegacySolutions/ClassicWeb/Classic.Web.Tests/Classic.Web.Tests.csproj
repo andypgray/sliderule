@@ -1,0 +1,15 @@
+<!--
+  An SDK-style project referencing the classic web project. Its design-time build runs under the .NET SDK's
+  MSBuild and evaluates that reference there, which is the evaluation that has to find Visual Studio's web
+  targets.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <!-- Inert, and kept for the reason Classic.Billing.csproj gives. -->
+    <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Classic.Web\Classic.Web.csproj" />
+  </ItemGroup>
+</Project>

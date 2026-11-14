@@ -176,4 +176,55 @@ public sealed class MsBuildBootstrapTests
         var ex = act.ShouldThrow<InvalidOperationException>();
         ex.Message.ShouldContain("MSBuild.exe not found");
     }
+
+    // The VSToolsPath facts below read the environment the override arm leaves behind. The layout is Windows paths,
+    // as every Visual Studio install root is.
+    [Fact]
+    public void Initialize_OverrideRootWithVsTargets_PointsVsToolsPathAtTheHighestVersion()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "A Visual Studio install root is a Windows layout.");
+        using TempDirectory vsRoot = FakeVsRoot();
+        Directory.CreateDirectory(vsRoot.PathOf("MSBuild", "Microsoft", "VisualStudio", "v17.0"));
+        Directory.CreateDirectory(vsRoot.PathOf("MSBuild", "Microsoft", "VisualStudio", "v18.0"));
+        Directory.CreateDirectory(vsRoot.PathOf("MSBuild", "Microsoft", "VisualStudio", "Managed"));
+
+        string? vsToolsPath = ShouldRefuseTheOverrideArmsSecondRegistration(vsRoot);
+
+        vsToolsPath.ShouldBe(vsRoot.PathOf("MSBuild", "Microsoft", "VisualStudio", "v18.0"));
+    }
+
+    [Fact]
+    public void Initialize_OverrideRootWithoutVsTargets_LeavesVsToolsPathUnset()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "A Visual Studio install root is a Windows layout.");
+        using TempDirectory vsRoot = FakeVsRoot();
+
+        string? vsToolsPath = ShouldRefuseTheOverrideArmsSecondRegistration(vsRoot);
+
+        vsToolsPath.ShouldBeNull();
+    }
+
+    // Runs Initialize's override arm at vsRoot, which applies VSToolsPath and then fails registering a second
+    // engine in this process, and returns the VSToolsPath it left. Every variable the arm writes is scoped, so the
+    // process gets its own registration's values back; the refusal is the second registration's, not a probe of
+    // the targets directory.
+    private static string? ShouldRefuseTheOverrideArmsSecondRegistration(TempDirectory vsRoot)
+    {
+        using var vsInstall = new ScopedEnvironmentVariable(SlideRuleEnvVars.VsInstallPath, vsRoot.Path);
+        using var vsToolsPath = new ScopedEnvironmentVariable("VSToolsPath", null);
+        using var vsInstallDir = new ScopedEnvironmentVariable("VSINSTALLDIR", null);
+        using var vsCmdVer = new ScopedEnvironmentVariable("VSCMD_VER", null);
+
+        Should.Throw<InvalidOperationException>(() => MsBuildBootstrap.Initialize());
+
+        return Environment.GetEnvironmentVariable("VSToolsPath");
+    }
+
+    // An install root carrying the one file the override arm probes for.
+    private static TempDirectory FakeVsRoot()
+    {
+        TempDirectory vsRoot = TestTempRoot.Fresh("msbuild-bootstrap");
+        vsRoot.WriteFile(["MSBuild", "Current", "Bin", "MSBuild.exe"], "");
+        return vsRoot;
+    }
 }

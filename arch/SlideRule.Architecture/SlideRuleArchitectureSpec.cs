@@ -893,6 +893,9 @@ public sealed class SlideRuleArchitectureSpec : IArchitectureSpec
                      "through VSINSTALLDIR/VSCMD_VER=99.0. That preference is caution about a moving target, not " +
                      "a live workaround: the TypeInitializationException (XMakeElements) on legacy-namespace " +
                      "projects came from an early VS 18 preview and does not reproduce on a released VS 18. " +
+                     "VSToolsPath is set to the chosen install's targets unless already set, because the .NET " +
+                     "SDK's MSBuild also evaluates legacy projects (as an SDK-style project's reference, and for " +
+                     "artifact facts) and its own default names no VS targets. " +
                      "Where none of those majors is installed, the highest available is taken and " +
                      "MsBuildBootstrap.LastSelection " +
                      "says so — the CLI prints it beside any workspace-load diagnostic, and " +

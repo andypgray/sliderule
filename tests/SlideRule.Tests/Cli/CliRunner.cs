@@ -8,6 +8,7 @@ using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Pipeline;
 using SlideRule.Cli.Replay;
 using SlideRule.Roslyn;
+using SlideRule.Tests.Legacy;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -115,18 +116,45 @@ internal static class CliRunner
         Path.Combine(FixtureBeds.FixturesRoot, "LegacySolutions", "ClassicApp", "ClassicApp.sln");
 
     /// <summary>
-    ///     Skips the running test on a host that cannot load the bed at <paramref name="solution" />: the ClassicApp
-    ///     bed's non-SDK-style project loads only through the .NET Framework build host, which needs Windows. Every
-    ///     other bed loads on any host.
+    ///     The classic ASP.NET Web Application fixture solution, beside an SDK-style project that references it;
+    ///     unrestored as the test output holds it.
+    /// </summary>
+    public static string ClassicWebSolution =>
+        Path.Combine(FixtureBeds.FixturesRoot, "LegacySolutions", "ClassicWeb", "ClassicWeb.sln");
+
+    /// <summary>
+    ///     Skips the running test on a host that cannot load the bed at <paramref name="solution" />. The ClassicApp
+    ///     bed's non-SDK-style project loads only through the .NET Framework build host, which needs Windows; the
+    ///     ClassicWeb bed also needs the selected Visual Studio to carry the web application targets. Every other
+    ///     bed loads on any host.
     /// </summary>
     public static void SkipUnlessLoadable(string solution)
     {
-        if (!string.Equals(solution, ClassicAppSolution, StringComparison.Ordinal)) return;
+        bool classicApp = string.Equals(solution, ClassicAppSolution, StringComparison.Ordinal);
+        bool classicWeb = string.Equals(solution, ClassicWebSolution, StringComparison.Ordinal);
+        if (!classicApp && !classicWeb) return;
 
         Assert.SkipUnless(
             OperatingSystem.IsWindows(),
-            "The ClassicApp bed's non-SDK-style .NET Framework project loads through the net472 build host, "
-            + "which needs Windows.");
+            "The legacy beds' non-SDK-style .NET Framework projects load through the net472 build host, which "
+            + "needs Windows.");
+        if (classicApp) return;
+
+        Assert.SkipUnless(
+            SelectedVisualStudioCarriesWebTargets(),
+            "The ClassicWeb bed needs the selected Visual Studio to carry Microsoft.WebApplication.targets. "
+            + $"MSBuild for this process: {LegacyRunContext.MsBuildSelection}; "
+            + $"VSToolsPath: {Environment.GetEnvironmentVariable("VSToolsPath") ?? "(unset)"}.");
+    }
+
+    // The VSToolsPath MsBuildBootstrap put in this process's environment when the module initializer registered
+    // MSBuild, or the user's value, which it keeps: the directory the bed's import resolves under, read back
+    // rather than selected a second time.
+    private static bool SelectedVisualStudioCarriesWebTargets()
+    {
+        string? vsToolsPath = Environment.GetEnvironmentVariable("VSToolsPath");
+        return !string.IsNullOrEmpty(vsToolsPath)
+               && File.Exists(Path.Combine(vsToolsPath, "WebApplications", "Microsoft.WebApplication.targets"));
     }
 
     /// <summary>
