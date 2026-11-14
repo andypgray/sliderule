@@ -218,7 +218,7 @@ public sealed class CheckCacheE2ETests
     }
 
     [Fact]
-    public async Task GraphThenCheck_ShareOneStore_CheckHitsOnGraphsFragments()
+    public async Task GraphThenCheck_ShareOneStore_CheckRecordsItsSpecOnceThenHits()
     {
         using var cache = new TempCacheRoot("check-cache");
 
@@ -227,11 +227,18 @@ public sealed class CheckCacheE2ETests
             CliRunner.MyAppSolution, cache.Root, source: CountingSolutionSource.OverWarmPool());
         graph.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
-        // check reuses those very fragments: the external DLL spec resolves with no workspace, so it is a hit.
-        CacheRun check = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root);
-        check.Outcome.ShouldBe(CodebaseSourceOutcome.Hit);
-        check.AcquireCount.ShouldBe(0);
-        check.Result.ShouldSucceed();
+        // graph records no spec, and only a workspace says whether a DLL is a member's built output, so the
+        // first check loads one and records its DLL into the same store; the next check hits on it.
+        CacheRun first = await CacheRuns.CheckAsync(
+            CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root, source: CountingSolutionSource.OverWarmPool());
+        first.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
+        first.AcquireCount.ShouldBe(1);
+        first.Result.ShouldSucceed();
+
+        CacheRun second = await CacheRuns.CheckAsync(CliRunner.MyAppSolution, CliRunner.CleanSpecDll, cache.Root);
+        second.Outcome.ShouldBe(CodebaseSourceOutcome.Hit);
+        second.AcquireCount.ShouldBe(0);
+        second.Result.ShouldSucceed();
     }
 
     // ── spec replay on a hit: convention / csproj / explicit-DLL / sibling-config fallback ─────────────────
@@ -242,14 +249,47 @@ public sealed class CheckCacheE2ETests
     // project), so it is covered there.
 
     [Fact]
-    public void ResolveSpecOnHit_ExplicitDllPresent_ResolvesWithoutAnyRecord()
+    public void ResolveSpecOnHit_DllWithNoRecord_ReturnsNullForColdFallback()
     {
-        SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(CliRunner.CleanSpecDll, []);
+        // Whether the DLL is a member's built output is a question about the solution, which a hit does not
+        // load, so with no record the run goes cold rather than checking a member's spec as product code.
+        CodebaseSource.ResolveSpecOnHit(CliRunner.CleanSpecDll, [])
+            .ShouldBeNull();
+    }
+
+    [Fact]
+    public void ResolveSpecOnHit_DllRecordedAsNoMembersOutput_ResolvesTheBareDll()
+    {
+        string dll = Path.GetFullPath(CliRunner.CleanSpecDll);
+        var records = new[] { new SpecResolutionRecord(dll, null, [], [], null, null) };
+
+        SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(CliRunner.CleanSpecDll, records);
 
         resolution.ShouldNotBeNull();
-        resolution.DllPath.ShouldBe(Path.GetFullPath(CliRunner.CleanSpecDll));
-        resolution.SpecProjectName.ShouldBeNull(); // an external DLL excludes no solution project
+        resolution.DllPath.ShouldBe(dll);
+        resolution.SpecProjectName.ShouldBeNull();
         resolution.ExcludeProjectNames.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ResolveSpecOnHit_DllRecordedAsAMembersOutput_ReplaysTheMemberAndLoadsThePassedDll()
+    {
+        // The recorded outputs are the member's, and the ordinal-first of them is not the DLL the reader named;
+        // a hit must exclude the member as the cold run did and still load the named DLL.
+        using TempDirectory temp = TestTempRoot.Fresh("check-cache");
+        string modern = temp.WriteFile(["Arch", "bin", "Debug", "net10.0", "MyApp.Arch.dll"], "");
+        string legacy = temp.WriteFile(["Arch", "bin", "Debug", "net48", "MyApp.Arch.dll"], "");
+        var records = new[]
+        {
+            new SpecResolutionRecord(legacy, "MyApp.Arch", ["MyApp.Arch"], [modern, legacy], null, null)
+        };
+
+        SpecResolution? resolution = CodebaseSource.ResolveSpecOnHit(legacy, records);
+
+        resolution.ShouldNotBeNull();
+        resolution.DllPath.ShouldBe(legacy);
+        resolution.SpecProjectName.ShouldBe("MyApp.Arch");
+        resolution.ExcludeProjectNames.ShouldBe(["MyApp.Arch"]);
     }
 
     [Fact]

@@ -5,8 +5,8 @@ namespace SlideRule.Tests.TestSupport;
 /// <summary>
 ///     The output-layout fixture solution, and the one thing a caller must do to a copy of it before it
 ///     will build. It is the only fixture solution that <em>declares</em> a spec project, which makes it the
-///     bed for anything needing real spec resolution against a real workspace — a prebuilt DLL handed to
-///     <c>--spec</c> resolves before the workspace is touched and exercises none of the walk.
+///     bed for anything needing real spec resolution against a real workspace, its spec project's own built
+///     DLL handed to <c>--spec</c> included, which resolves as that member.
 /// </summary>
 /// <remarks>
 ///     <para>

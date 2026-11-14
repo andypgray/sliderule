@@ -114,7 +114,8 @@ internal abstract class CacheWiredRunner(
     ///     not null comes with a solution directory that is not null either.
     /// </summary>
     /// <remarks>
-    ///     A built-DLL spec resolves without ever opening the solution. The model still comes through the source,
+    ///     A built-DLL spec resolves without ever opening the solution, so this path never asks whether the DLL
+    ///     is a member's built output and reports no stale verdict for it. The model still comes through the source,
     ///     so a warm host serves its cached one rather than reloading the DLL per call. When the directory is
     ///     wanted the solution is discovered first, so a missing solution is the error reported before a bad DLL.
     ///     A convention or csproj spec is resolved through the shared acquisition seam, which replays a cached

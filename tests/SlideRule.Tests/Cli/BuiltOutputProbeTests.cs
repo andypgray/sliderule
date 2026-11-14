@@ -285,6 +285,22 @@ public sealed class BuiltOutputProbeTests
             ]);
     }
 
+    [Theory]
+    [InlineData(6, true)]
+    [InlineData(7, false)]
+    public void Find_AtTheDepthBound_ReturnsTheDeepestFileAndNothingBelow(int segments, bool found)
+    {
+        // The search descends a bounded number of directories below its anchor: a file at the bound is found,
+        // and one level deeper is not.
+        using TempDirectory temp = TestTempRoot.Fresh("built-output-probe");
+        string[] directories = ["bin", .. Enumerable.Range(0, segments - 1).Select(level => $"d{level}")];
+        string candidate = WriteAssembly(temp, [.. directories, Assembly]);
+        string evaluated = temp.PathOf("bin", "Debug", "net10.0", Assembly);
+
+        BuiltOutputProbe.Find(evaluated, null)
+            .ShouldBe(found ? candidate : null);
+    }
+
     // A zero-byte assembly at the given path, with its directory created.
     private static string WriteAssembly(TempDirectory temp, params string[] segments)
     {

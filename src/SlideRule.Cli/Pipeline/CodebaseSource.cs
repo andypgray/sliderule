@@ -122,7 +122,7 @@ internal sealed class CodebaseSource : IDisposable
 
     /// <summary>
     ///     The spec project's sources compared with the build this run loaded: null when they match, when the spec
-    ///     was passed as a DLL, and for the spec-less <c>graph</c> survey.
+    ///     was passed as a DLL that is no declared member's built output, and for the spec-less <c>graph</c> survey.
     /// </summary>
     /// <remarks>Compared once, on first read, so every surface of one run reports one verdict.</remarks>
     public StaleSpec? StaleSpec => staleSpec.Value;
@@ -458,16 +458,14 @@ internal sealed class CodebaseSource : IDisposable
     ///     carries one (<see cref="SolutionHandle.WarmSpecResolution" />) and cold where it does not.
     /// </summary>
     /// <remarks>
-    ///     A prebuilt-DLL <c>--spec</c> is answered first, before the memo is consulted at all — exactly as
-    ///     <see cref="ResolveSpecOnHit" /> answers it first. That branch needs no workspace and no walk, so
-    ///     there is nothing for a cache to spare; and replaying it would refuse in the built-output search's
-    ///     words, which name a spec project a DLL spec does not have.
+    ///     A DLL <c>--spec</c> that is missing is refused first, in the words of the argument as typed, before the
+    ///     memo is consulted, as <see cref="ResolveSpecOnHit" /> refuses it; a DLL that exists resolves through the
+    ///     memo like any other spec, since whether it is a member's built output takes the solution to answer.
     /// </remarks>
     private static SessionSpecResolution ResolveSpec(
         SolutionHandle handle, string solutionPath, string? spec, string normalizedSpec)
     {
-        if (SpecResolver.TryResolveWithoutSolution(spec) is { } dllResolution)
-            return new SessionSpecResolution(dllResolution, DeclaredMembersOf(handle, solutionPath));
+        SpecResolver.RefuseMissingDll(spec);
 
         return handle.WarmSpecResolution is { } warm
             ? warm(normalizedSpec, ResolveFully)
@@ -543,10 +541,11 @@ internal sealed class CodebaseSource : IDisposable
     }
 
     /// <summary>
-    ///     Resolves the spec on a cache hit without a workspace: an explicit DLL directly, a convention or csproj
-    ///     spec by replaying its recorded resolution, and null when no record matches, so the caller reloads the
-    ///     workspace. A missing DLL throws the same loud error a cold run would, and a replay re-runs the
-    ///     built-output check, so the search and its error text match cold.
+    ///     Resolves the spec on a cache hit without a workspace, by replaying the resolution recorded for the same
+    ///     argument, and null when no record matches, so the caller reloads the workspace. A DLL argument needs its
+    ///     record too, because only the cold run's workspace says whether it is a member's built output. A missing
+    ///     DLL throws the same loud error a cold run would, and a replay re-runs the built-output check, so the
+    ///     search and its error text match cold.
     /// </summary>
     /// <remarks>
     ///     The recorded intermediate assembly path is replayed rather than left null, because that is what
@@ -557,7 +556,7 @@ internal sealed class CodebaseSource : IDisposable
     /// </remarks>
     internal static SpecResolution? ResolveSpecOnHit(string? spec, IReadOnlyList<SpecResolutionRecord> records)
     {
-        if (SpecResolver.TryResolveWithoutSolution(spec) is { } dllResolution) return dllResolution;
+        SpecResolver.RefuseMissingDll(spec);
 
         string normalized = NormalizeSpecArgument(spec);
         SpecResolutionRecord? record = records.FirstOrDefault(r => string.Equals(r.NormalizedSpecArgument, normalized, StringComparison.Ordinal));
@@ -609,24 +608,23 @@ internal sealed class CodebaseSource : IDisposable
     }
 
     // The spec record to persist for this run, unioned onto the manifest's existing records (replacing any
-    // with the same normalized argument). Only a solution-member spec (convention/csproj — it names a spec
-    // project) is recorded, since that is the resolution a hit cannot replay without one; an explicit DLL
-    // resolves on a hit with no record, and graph has no spec at all. The whole excluded set rides along:
-    // the hit path has no workspace to re-walk the spec project's ProjectReference closure with.
+    // with the same normalized argument). Every resolved spec is recorded, a DLL that is no member's output
+    // included, because a hit cannot tell a member's DLL from any other without the record; graph has no spec
+    // at all. The whole excluded set rides along: the hit path has no workspace to re-walk the spec project's
+    // ProjectReference closure with.
     private IReadOnlyList<SpecResolutionRecord> BuildWriteSpecRecords()
     {
         IReadOnlyList<SpecResolutionRecord> existing = cacheRead.SpecResolutions;
-        if (resolution?.SpecProjectName is not { } specProjectName) return existing;
+        if (resolution is null) return existing;
 
         // The built-output inputs come off the resolution that consumed them rather than being re-derived
         // here. Re-deriving could only group the spec project's Roslyn projects by NAME, while resolution
         // groups them by canonicalized project file — the distinction that keeps two same-named csprojs from
-        // recording each other's outputs. Both slots are non-null on this branch: naming a spec project is
-        // exactly what the solution-member resolution does, and that is the branch that fills them.
+        // recording each other's outputs. A DLL that is no member's output has no project and so none.
         IReadOnlyList<string> outputFilePaths = resolution.OutputFilePaths ?? [];
 
         var record = new SpecResolutionRecord(
-            normalizedSpecArgument, specProjectName, [.. resolution.ExcludeProjectNames], outputFilePaths,
+            normalizedSpecArgument, resolution.SpecProjectName, [.. resolution.ExcludeProjectNames], outputFilePaths,
             resolution.IntermediateAssemblyPath, resolution.ProjectFilePath);
         return existing
             .Where(r => !string.Equals(r.NormalizedSpecArgument, normalizedSpecArgument, StringComparison.Ordinal))

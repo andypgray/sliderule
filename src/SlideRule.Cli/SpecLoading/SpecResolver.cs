@@ -32,14 +32,15 @@ internal sealed record SpecProjectCandidate(
 /// <summary>
 ///     The resolved spec: the DLL to load and, when the spec is a solution member, its project name plus the
 ///     projects to exclude from the checked universe — the spec project and its private plumbing
-///     (<see cref="SpecExclusion" />). Both are empty/null for a prebuilt DLL, which excludes nothing.
+///     (<see cref="SpecExclusion" />). Both are empty/null for a DLL that is no declared member's built output,
+///     which excludes nothing.
 /// </summary>
 /// <remarks>
 ///     <see cref="OutputFilePaths" /> are the evaluated output paths <see cref="DllPath" /> was chosen from, every
 ///     framework's, ordinal-sorted, and <see cref="IntermediateAssemblyPath" /> is the <c>obj</c>-side assembly the
-///     built-output search refused an intermediate result under; both are null for a prebuilt DLL, which was never
-///     searched for. <see cref="ProjectFilePath" /> is the spec project's <c>.csproj</c>, whose sources are compared
-///     with its build, and null for a prebuilt DLL.
+///     built-output search refused an intermediate result under; both are null for a DLL that is no member's output,
+///     which was never searched for. <see cref="ProjectFilePath" /> is the spec project's <c>.csproj</c>, whose
+///     sources are compared with its build, and null for such a DLL.
 /// </remarks>
 internal sealed record SpecResolution(
     string DllPath,
@@ -51,8 +52,9 @@ internal sealed record SpecResolution(
 
 /// <summary>
 ///     Resolves which spec DLL to load. The CLI
-///     never builds: <c>--spec</c> takes a prebuilt DLL or a solution-member csproj (resolved to its
-///     output DLL); with no <c>--spec</c>, the convention picks the unique <em>declared</em> solution project
+///     never builds: <c>--spec</c> takes a built DLL or a solution-member csproj (resolved to its
+///     output DLL), and a DLL that is a declared member's built output resolves as that member; with no <c>--spec</c>, the
+///     convention picks the unique <em>declared</em> solution project
 ///     that references <c>SlideRule.dll</c>. Every failure is a loud <see cref="UserErrorException" />;
 ///     a spec project that is a solution member is excluded from the codebase the checker sees, along with the
 ///     plumbing only it pulls in.
@@ -83,31 +85,49 @@ internal static class SpecResolver
     }
 
     /// <summary>
-    ///     The workspace-free half of resolution: a built-DLL <c>--spec</c> resolves directly, because that
-    ///     branch never touches the <see cref="Solution" />.
+    ///     A DLL <c>--spec</c> taken on its own, as a spec that belongs to no project: what a DLL that is no
+    ///     declared member's built output resolves to, and what a caller with no workspace loads. It never asks
+    ///     whether the DLL is a member's output, which takes the <see cref="Solution" />.
     /// </summary>
     /// <returns>
-    ///     The resolution, or <see langword="null" /> when resolution needs the workspace — the convention
-    ///     default (no <c>--spec</c>) and a solution-member csproj.
+    ///     The resolution, or <see langword="null" /> for the convention default (no <c>--spec</c>) and a csproj.
     /// </returns>
     /// <remarks>A DLL path that does not exist is still a loud error.</remarks>
     internal static SpecResolution? TryResolveWithoutSolution(string? specArgument)
     {
-        if (string.IsNullOrWhiteSpace(specArgument)) return null;
-        if (specArgument.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase)) return null;
+        if (!IsDllArgument(specArgument)) return null;
 
+        return new SpecResolution(RequireSpecDll(specArgument!), null, []);
+    }
+
+    /// <summary>Whether <paramref name="specArgument" /> names a DLL rather than a csproj or the convention.</summary>
+    internal static bool IsDllArgument(string? specArgument)
+    {
+        return !string.IsNullOrWhiteSpace(specArgument)
+               && !specArgument.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Refuses a DLL <paramref name="specArgument" /> that does not exist, in the words of the argument as typed.</summary>
+    internal static void RefuseMissingDll(string? specArgument)
+    {
+        if (IsDllArgument(specArgument)) RequireSpecDll(specArgument!);
+    }
+
+    /// <summary>The DLL argument made absolute, or the loud error a missing one gets on every path.</summary>
+    internal static string RequireSpecDll(string specArgument)
+    {
         string fullPath = Path.GetFullPath(specArgument);
         if (!File.Exists(fullPath))
             throw new UserErrorException($"--spec '{specArgument}' was not found. Pass a built spec DLL or a solution-member csproj.");
 
-        return new SpecResolution(fullPath, null, []);
+        return fullPath;
     }
 
     private static SpecResolution ResolveExplicit(
         Solution solution, CanonicalProjectFiles projectFiles, IReadOnlySet<string>? declaredMembers,
         string specArgument, WorkspaceDiagnostics diagnostics)
     {
-        if (specArgument.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
+        if (!IsDllArgument(specArgument))
         {
             string canonicalPath = PathCanonicalizer.Resolve(Path.GetFullPath(specArgument));
             List<CanonicalProject> projects = CanonicalProjectsOf(solution, projectFiles);
@@ -122,13 +142,118 @@ internal static class SpecResolver
                     $"--spec '{specArgument}' is not a project in the solution. " +
                     "Pass a built spec DLL or a csproj that is a member of the target solution.");
 
-            BuiltOutputInputs built = BuiltOutputsOf(sharingProjects);
-            Project chosen = sharingProjects[0].Project;
-            return MemberResolution(solution, projectFiles, declaredMembers, chosen.Name, chosen.FilePath, built);
+            return ResolveMember(solution, projectFiles, declaredMembers, sharingProjects, passedDll: null);
         }
 
-        // A DLL path — the branch that needs no solution.
-        return TryResolveWithoutSolution(specArgument)!;
+        SpecResolution bare = TryResolveWithoutSolution(specArgument)!;
+        List<CanonicalProject> allProjects = CanonicalProjectsOf(solution, projectFiles);
+        string? builder = MemberBuildingDll(allProjects, projectFiles, declaredMembers, bare.DllPath, specArgument);
+        return builder is null
+            ? bare
+            : ResolveMember(
+                solution, projectFiles, declaredMembers, ProjectsSharingFile(allProjects, builder), bare.DllPath);
+    }
+
+    // The csproj form's tail, which a member's DLL shares so the two resolve alike: every framework's evaluated
+    // output, the exclusion, the project file. passedDll is the DLL to load when the reader named one.
+    private static SpecResolution ResolveMember(
+        Solution solution,
+        CanonicalProjectFiles projectFiles,
+        IReadOnlySet<string>? declaredMembers,
+        IReadOnlyList<CanonicalProject> sharingProjects,
+        string? passedDll)
+    {
+        BuiltOutputInputs built = BuiltOutputsOf(sharingProjects);
+        Project chosen = sharingProjects[0].Project;
+        return MemberResolution(
+            solution, projectFiles, declaredMembers, chosen.Name, chosen.FilePath, built, passedDll);
+    }
+
+    /// <summary>
+    ///     The canonical project file of the one declared C# member whose built output <paramref name="dllPath" />
+    ///     is, or null. A member builds the DLL when it is the member's evaluated output path, or failing that, when it
+    ///     has that output's file name and sits at any depth under the member's output root: the nearest <c>bin</c>
+    ///     or <c>artifacts</c> ancestor of the evaluated output (<see cref="BuiltOutputProbe.OutputRootOf" />), or the
+    ///     project directory when there is none. Of several members that match, the ones whose output directory
+    ///     shares the longest prefix with the DLL's win. Two members still matching is a loud error, since either
+    ///     could be the spec.
+    /// </summary>
+    private static string? MemberBuildingDll(
+        IReadOnlyList<CanonicalProject> projects,
+        CanonicalProjectFiles projectFiles,
+        IReadOnlySet<string>? declaredMembers,
+        string dllPath,
+        string specArgument)
+    {
+        // One probe memo for every path below, which share their ancestors.
+        Dictionary<string, string?> linkTargets = new(StringComparer.Ordinal);
+        string canonicalDll = PathCanonicalizer.Resolve(dllPath, linkTargets);
+        string dllFileName = Path.GetFileName(canonicalDll);
+        string[] dllSegments = PathFormat.Segments(canonicalDll);
+
+        // The file-name test first, so only projects whose output shares the DLL's name are canonicalized.
+        List<(CanonicalProject Entry, string Output, string Root)> named =
+            projects
+                .Where(entry => entry.CanonicalFilePath is not null)
+                .Where(entry => ProjectLanguages.IsCSharp(entry.Project))
+                .Where(entry => entry.Project.OutputFilePath is { } output
+                                && string.Equals(Path.GetFileName(output), dllFileName, PathComparison.Comparison))
+                .Where(entry => SpecExclusion.IsDeclaredMember(declaredMembers, projectFiles, entry.Project))
+                .Select(entry =>
+                {
+                    string output = PathCanonicalizer.Resolve(entry.Project.OutputFilePath!, linkTargets);
+                    string root = BuiltOutputProbe.OutputRootOf(output)
+                                  ?? Path.GetDirectoryName(entry.CanonicalFilePath!)!;
+                    return (Entry: entry, Output: output, Root: root);
+                })
+                .ToList();
+
+        string? exact = SingleBuilder(
+            named
+                .Where(match => string.Equals(match.Output, canonicalDll, PathComparison.Comparison))
+                .Select(match => match.Entry),
+            specArgument);
+        if (exact is not null) return exact;
+
+        List<(CanonicalProject Entry, int SharedDepth)> covered = named
+            .Where(match => PathFormat.IsWithin(PathFormat.Segments(match.Root), dllSegments))
+            .Select(match => (match.Entry, SharedDepth: SharedDirectoryDepth(match.Output, canonicalDll)))
+            .ToList();
+        if (covered.Count == 0) return null;
+
+        int deepest = covered.Max(match => match.SharedDepth);
+        return SingleBuilder(
+            covered
+                .Where(match => match.SharedDepth == deepest)
+                .Select(match => match.Entry),
+            specArgument);
+    }
+
+    // How many leading directories two files' directories share.
+    private static int SharedDirectoryDepth(string first, string second)
+    {
+        string[] firstSegments = PathFormat.Segments(Path.GetDirectoryName(first)!);
+        string[] secondSegments = PathFormat.Segments(Path.GetDirectoryName(second)!);
+        int limit = Math.Min(firstSegments.Length, secondSegments.Length);
+        return PathFormat.CommonPrefixLength(firstSegments, secondSegments, limit);
+    }
+
+    // The one project file behind the matches, so a multi-target-framework member counts once.
+    private static string? SingleBuilder(IEnumerable<CanonicalProject> matches, string specArgument)
+    {
+        List<IGrouping<string, CanonicalProject>> byProjectFile = matches
+            .GroupBy(entry => PathComparison.Fold(entry.CanonicalFilePath!), StringComparer.Ordinal)
+            .ToList();
+        if (byProjectFile.Count == 0) return null;
+        if (byProjectFile.Count == 1) return byProjectFile[0].First().CanonicalFilePath;
+
+        IOrderedEnumerable<string> lines = byProjectFile
+            .Select(group => group.First().Project)
+            .Select(project => DisambiguationLine(project.Name, project.FilePath))
+            .OrderBy(line => line, StringComparer.Ordinal);
+        throw new UserErrorException(
+            $"--spec '{specArgument}' is the built output of more than one project in the solution; "
+            + "pass the spec project's csproj instead:\n  " + string.Join("\n  ", lines));
     }
 
     private static SpecResolution ResolveByConvention(
@@ -163,12 +288,13 @@ internal static class SpecResolver
         IReadOnlySet<string>? declaredMembers,
         string specProjectName,
         string? projectFilePath,
-        BuiltOutputInputs built)
+        BuiltOutputInputs built,
+        string? passedDll = null)
     {
         List<string> evaluatedPaths = NormalizeEvaluatedPaths(built.OutputFilePaths);
 
         return new SpecResolution(
-            RequireBuiltOutput(specProjectName, evaluatedPaths, built.IntermediateAssemblyPath),
+            passedDll ?? RequireBuiltOutput(specProjectName, evaluatedPaths, built.IntermediateAssemblyPath),
             specProjectName,
             SpecExclusion.Compute(solution, projectFiles, declaredMembers, specProjectName),
             evaluatedPaths,
@@ -282,7 +408,8 @@ internal static class SpecResolver
         if (groups.Count > 1)
         {
             IOrderedEnumerable<string> lines = groups
-                .Select(group => DisambiguationLine(group.First()))
+                .Select(group => group.First())
+                .Select(candidate => DisambiguationLine(candidate.Name, candidate.FilePath))
                 .OrderBy(line => line, StringComparer.Ordinal);
 
             throw new UserErrorException(
@@ -378,11 +505,11 @@ internal static class SpecResolver
 
     // One line of the ambiguity error. The project file is what the reader has to pass to --spec, so it is
     // named whenever it is known; a candidate with no project file renders as the bare name alone.
-    private static string DisambiguationLine(SpecProjectCandidate candidate)
+    private static string DisambiguationLine(string name, string? filePath)
     {
-        return string.IsNullOrEmpty(candidate.FilePath)
-            ? candidate.Name
-            : $"{candidate.Name}  ({candidate.FilePath})";
+        return string.IsNullOrEmpty(filePath)
+            ? name
+            : $"{name}  ({filePath})";
     }
 
     // Over the file name as a span: a large solution carries tens of thousands of metadata reference paths,
@@ -430,28 +557,29 @@ internal static class SpecResolver
     }
 
     /// <summary>
-    ///     Replays a recorded resolution: the candidate half is kept exactly as recorded, and only the built
-    ///     output is resolved again — live, against disk, through the same
-    ///     <see cref="RequireBuiltOutput" /> a cold run uses.
+    ///     Replays a recorded resolution: the candidate half is kept exactly as recorded, and only the DLL to load
+    ///     is resolved again, live, against disk, as a cold run resolves it: a DLL argument is that DLL, and any
+    ///     other argument goes through <see cref="RequireBuiltOutput" />.
     /// </summary>
     /// <remarks>
     ///     A replayed candidate half comes from a workspace its holder no longer has, so a spec output that has since
     ///     been rebuilt, moved or deleted answers in the cold run's words: the bounded search from the output root,
-    ///     what that search refuses, and its refusal text. <paramref name="fallbackProjectName" /> is what a refusal
-    ///     names when <paramref name="specProjectName" /> is null: the normalized <c>--spec</c> argument, the only
-    ///     spelling of the spec the reader ever typed.
+    ///     what that search refuses, and its refusal text. <paramref name="normalizedSpecArgument" /> is the
+    ///     <c>--spec</c> argument the record is keyed by, and what a refusal names when
+    ///     <paramref name="specProjectName" /> is null.
     /// </remarks>
     internal static SpecResolution Replay(
         string? specProjectName,
-        string fallbackProjectName,
+        string normalizedSpecArgument,
         IReadOnlyCollection<string> excludeProjectNames,
         IReadOnlyList<string>? outputFilePaths,
         string? intermediateAssemblyPath,
         string? projectFilePath)
     {
         IReadOnlyList<string> evaluatedPaths = outputFilePaths ?? [];
-        string dllPath = RequireBuiltOutput(
-            specProjectName ?? fallbackProjectName, evaluatedPaths, intermediateAssemblyPath);
+        string dllPath = IsDllArgument(normalizedSpecArgument)
+            ? RequireSpecDll(normalizedSpecArgument)
+            : RequireBuiltOutput(specProjectName ?? normalizedSpecArgument, evaluatedPaths, intermediateAssemblyPath);
 
         return new SpecResolution(
             dllPath, specProjectName, excludeProjectNames, evaluatedPaths, intermediateAssemblyPath, projectFilePath);

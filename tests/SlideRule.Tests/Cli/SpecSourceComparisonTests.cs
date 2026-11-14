@@ -208,7 +208,7 @@ public sealed class SpecSourceComparisonTests
     [Fact]
     public void Compare_ResolutionOfASpecPassedAsADll_ReportsNothing()
     {
-        // A built DLL names no project, so there are no sources to compare, even with an edited one beside it.
+        // A DLL that resolved to no project has no sources to compare, even with an edited one beside it.
         using var bed = SpecBed.Build(DebugInformationFormat.PortablePdb);
         File.WriteAllText(bed.Rules, EditedRulesSource);
 

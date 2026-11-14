@@ -1,17 +1,20 @@
+using Microsoft.CodeAnalysis;
 using Shouldly;
 using SlideRule.Cli.SpecLoading;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.MsBuild;
+using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Cli;
 
 /// <summary>
-///     The spec-resolution convention core over plain tuples — no workspace needed: the unique
+///     The spec-resolution convention core over plain tuples, no workspace needed: the unique
 ///     <em>declared</em> solution member referencing <c>SlideRule.dll</c> wins;
 ///     zero and many are loud errors; a missing built output is a loud error pointing at <c>dotnet build</c>.
+///     Over a hand-built solution, a <c>--spec</c> DLL resolves as the declared member that builds it.
 /// </summary>
 public sealed class SpecResolverTests
 {
@@ -543,6 +546,201 @@ public sealed class SpecResolverTests
             SpecResolver.RequireBuiltOutput("MyApp.Arch", [recordedIntermediate]));
 
         error.Message.ShouldContain("Build the solution first (dotnet build).");
+    }
+
+    [Fact]
+    public void Resolve_DllThatIsADeclaredMembersOutput_ResolvesExactlyAsItsCsprojDoes()
+    {
+        // The DLL form of a member must check what the csproj form checks: the spec project excluded, its
+        // sources compared with its build. Without the mapping the DLL resolves bare, naming no project.
+        using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
+        string csproj = temp.PathOf("Arch", "MyApp.Arch.csproj");
+        string dll = temp.WriteFile(["Arch", "bin", "Debug", "net10.0", "MyApp.Arch.dll"], "");
+        Solution solution = SolutionOf(Member("MyApp.Arch", csproj, dll), Member("MyApp.Web", temp.PathOf("Web", "MyApp.Web.csproj")));
+
+        SpecResolution fromDll = Resolve(solution, dll);
+        SpecResolution fromCsproj = Resolve(solution, csproj);
+
+        Shape(fromDll).ShouldBe(Shape(fromCsproj));
+        fromDll.SpecProjectName.ShouldBe("MyApp.Arch");
+    }
+
+    [Fact]
+    public void Resolve_MultiTargetMembersSecondFrameworkDll_LoadsTheDllPassed()
+    {
+        // Both frameworks are built and net10.0 sorts first, so a mapped resolution that picked its DLL the way
+        // the csproj form does would load net10.0's when the reader named net48's.
+        using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
+        string csproj = temp.PathOf("Arch", "MyApp.Arch.csproj");
+        string modern = temp.WriteFile(["Arch", "bin", "Debug", "net10.0", "MyApp.Arch.dll"], "");
+        string legacy = temp.WriteFile(["Arch", "bin", "Debug", "net48", "MyApp.Arch.dll"], "");
+        Solution solution = SolutionOf(Member("MyApp.Arch", csproj, modern), Member("MyApp.Arch", csproj, legacy));
+
+        SpecResolution resolved = Resolve(solution, legacy);
+
+        resolved.DllPath.ShouldBe(legacy);
+        resolved.SpecProjectName.ShouldBe("MyApp.Arch");
+    }
+
+    // One member, MyApp.Arch at Arch/MyApp.Arch.csproj, whose evaluated output is the first path; the reader passes a
+    // DLL built at the second, and it is the member's when it sits under the member's output root: the nearest bin or
+    // artifacts ancestor of the evaluated output, or the project directory when there is none.
+    [Theory]
+    // The workspace evaluated Debug and the reader built and passed Release, which sits under the same bin.
+    [InlineData("Arch/bin/Debug/net10.0/MyApp.Arch.dll", "Arch/bin/Release/net10.0/MyApp.Arch.dll", "MyApp.Arch")]
+    // A replayed project's evaluated output is its obj-side assembly, which sits under no output root, so the
+    // project directory is the root and the reader's bin build is under it.
+    [InlineData("Arch/obj/Debug/net10.0/MyApp.Arch.dll", "Arch/bin/Debug/net10.0/MyApp.Arch.dll", "MyApp.Arch")]
+    // Under replay an artifacts layout's obj-side assembly sits under the artifacts root, which holds the Release
+    // build the reader passed.
+    [InlineData("artifacts/obj/MyApp.Arch/release/MyApp.Arch.dll", "artifacts/bin/MyApp.Arch/release/MyApp.Arch.dll", "MyApp.Arch")]
+    // An output root of another name has no bin or artifacts ancestor, so the project directory is the root.
+    [InlineData("Arch/out/Debug/MyApp.Arch.dll", "Arch/bin/Release/MyApp.Arch.dll", "MyApp.Arch")]
+    // A reference-assembly copy and a publish copy are the member's: the DLL loaded is still the one passed.
+    [InlineData("Arch/bin/Debug/net10.0/MyApp.Arch.dll", "Arch/bin/Debug/net10.0/ref/MyApp.Arch.dll", "MyApp.Arch")]
+    [InlineData("Arch/bin/Debug/net10.0/MyApp.Arch.dll", "Arch/bin/Release/net10.0/publish/MyApp.Arch.dll", "MyApp.Arch")]
+    // An intermediate tree redirected under the output root is not refused: its copy is the member's.
+    [InlineData("Arch/bin/Debug/net10.0/MyApp.Arch.dll", "Arch/bin/obj/Debug/net10.0/MyApp.Arch.dll", "MyApp.Arch")]
+    // Membership has no depth bound below the root.
+    [InlineData("Arch/bin/Debug/net10.0/MyApp.Arch.dll", "Arch/bin/a/b/c/d/e/f/MyApp.Arch.dll", "MyApp.Arch")]
+    // The nearest bin is the root even though the project directory holds it, so an obj copy beside it is not the
+    // member's.
+    [InlineData("Arch/bin/Debug/net10.0/MyApp.Arch.dll", "Arch/obj/Debug/net10.0/MyApp.Arch.dll", null)]
+    // Same file name as the member's output, outside its bin: a copy, which the file name alone would claim.
+    [InlineData("Arch/bin/Debug/net10.0/MyApp.Arch.dll", "drop/MyApp.Arch.dll", null)]
+    // An evaluated output outside the project directory under no output root leaves the project directory as the
+    // root, so a sibling of that output is not the member's.
+    [InlineData("drop/Debug/MyApp.Arch.dll", "drop/Release/MyApp.Arch.dll", null)]
+    public void Resolve_OneMembersDll_IsTheMembersWhenItSitsUnderTheMembersOutputRoot(
+        string evaluated, string built, string? expectedProject)
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
+        string csproj = temp.PathOf("Arch", "MyApp.Arch.csproj");
+        string dll = temp.WriteFile(built.Split('/'), "");
+        Solution solution = SolutionOf(Member("MyApp.Arch", csproj, temp.PathOf(evaluated.Split('/'))));
+        string[] expectedExclusions = expectedProject is null ? [] : [expectedProject];
+
+        SpecResolution resolved = Resolve(solution, dll);
+
+        resolved.SpecProjectName.ShouldBe(expectedProject);
+        resolved.DllPath.ShouldBe(dll);
+        resolved.ExcludeProjectNames.ShouldBe(expectedExclusions);
+    }
+
+    [Fact]
+    public void Resolve_MemberAtAFilesystemRoot_ClaimsTheDllUnderThatRoot()
+    {
+        // A project directory that is a filesystem root already ends in a separator, so a containment test that
+        // appends another one matches nothing under it. The project file need not exist; the DLL must.
+        using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
+        string root = Path.GetPathRoot(temp.Path)!;
+        string csproj = Path.Combine(root, "MyApp.Arch.csproj");
+        string evaluated = Path.Combine(root, "sliderule-unbuilt", "Debug", "MyApp.Arch.dll");
+        string dll = temp.WriteFile(["Release", "MyApp.Arch.dll"], "");
+        Solution solution = SolutionOf(Member("MyApp.Arch", csproj, evaluated));
+
+        Resolve(solution, dll)
+            .SpecProjectName.ShouldBe("MyApp.Arch");
+    }
+
+    [Fact]
+    public void Resolve_DllInASharedArtifactsRoot_ResolvesAsTheProjectWhoseOutputItSitsBeside()
+    {
+        // Two projects with one assembly name under one artifacts root: both roots cover the DLL, and the one
+        // whose own output directory it shares more of is the project that built it, as the search's deepest
+        // anchor answers first.
+        using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
+        string first = temp.PathOf("A", "A.csproj");
+        string second = temp.PathOf("B", "B.csproj");
+        string built = temp.WriteFile(["artifacts", "bin", "A", "release", "Spec.dll"], "");
+        Solution solution = SolutionOf(
+            Member("A", first, temp.PathOf("artifacts", "bin", "A", "debug", "Spec.dll")),
+            Member("B", second, temp.PathOf("artifacts", "bin", "B", "debug", "Spec.dll")));
+
+        Resolve(solution, built)
+            .SpecProjectName.ShouldBe("A");
+    }
+
+    [Fact]
+    public void Resolve_DllOfAnUndeclaredPassenger_IsNotMapped()
+    {
+        // A passenger the workspace pulled in is not a spec project the reader chose, as the convention already
+        // holds, so its output stays a bare DLL.
+        using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
+        string csproj = temp.PathOf("Arch", "MyApp.Arch.csproj");
+        string dll = temp.WriteFile(["Arch", "bin", "Debug", "net10.0", "MyApp.Arch.dll"], "");
+        Solution solution = SolutionOf(Member("MyApp.Arch", csproj, dll));
+        IReadOnlySet<string> declared = SpecExclusion.CanonicalMemberSet([temp.PathOf("Web", "MyApp.Web.csproj")]);
+
+        Resolve(solution, dll, declared)
+            .SpecProjectName.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Resolve_DllTwoMembersBuild_RefusesNamingBothCsprojs()
+    {
+        // Two projects writing one path leave no way to tell which is the spec; picking one could exclude the
+        // wrong project, so the reader is sent to the csproj form.
+        using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
+        string shared = temp.WriteFile(["bin", "Debug", "MyApp.Arch.dll"], "");
+        string first = temp.PathOf("A", "A.csproj");
+        string second = temp.PathOf("B", "B.csproj");
+        Solution solution = SolutionOf(Member("A", first, shared), Member("B", second, shared));
+
+        var error = Should.Throw<UserErrorException>(() => Resolve(solution, shared));
+
+        error.Message.ShouldBe(
+            $"--spec '{shared}' is the built output of more than one project in the solution; "
+            + $"pass the spec project's csproj instead:\n  A  ({first})\n  B  ({second})");
+    }
+
+    [Fact]
+    public void Replay_DllArgument_ReturnsTheArgumentNotTheOrdinalFirstRecordedOutput()
+    {
+        // A hit and the warm memo both replay a mapped DLL through here: the recorded outputs are the member's,
+        // and the DLL to load is still the one the reader named.
+        using TempDirectory temp = TestTempRoot.Fresh("spec-resolver");
+        string modern = temp.WriteFile(["Arch", "bin", "Debug", "net10.0", "MyApp.Arch.dll"], "");
+        string legacy = temp.WriteFile(["Arch", "bin", "Debug", "net48", "MyApp.Arch.dll"], "");
+
+        SpecResolution replayed = SpecResolver.Replay(
+            "MyApp.Arch", legacy, ["MyApp.Arch"], [modern, legacy], null, temp.PathOf("Arch", "MyApp.Arch.csproj"));
+
+        replayed.DllPath.ShouldBe(legacy);
+    }
+
+    // One declared C# project per row, with its evaluated output when one is given.
+    private static ProjectInfo Member(string name, string csproj, string? output = null)
+    {
+        ProjectInfo project = AdhocSolution.Empty(name, csproj);
+        return output is null ? project : project.WithOutputFilePath(output);
+    }
+
+    private static Solution SolutionOf(params ProjectInfo[] projects)
+    {
+        using var workspace = new AdhocWorkspace();
+        return workspace.WithProjects(projects);
+    }
+
+    // Every project declared unless a set is given.
+    private static SpecResolution Resolve(Solution solution, string spec, IReadOnlySet<string>? declared = null)
+    {
+        IReadOnlySet<string> members = declared
+                                       ?? SpecExclusion.CanonicalMemberSet(solution.Projects.Select(project => project.FilePath!));
+        return SpecResolver.Resolve(solution, CanonicalProjectFiles.Of(solution), members, spec, WorkspaceDiagnostics.None);
+    }
+
+    // Every field of a resolution on one line, so a red shows both sides whole.
+    private static string Shape(SpecResolution resolution)
+    {
+        return string.Join(
+            " | ",
+            resolution.DllPath,
+            resolution.SpecProjectName ?? "<none>",
+            string.Join(",", resolution.ExcludeProjectNames),
+            string.Join(",", resolution.OutputFilePaths ?? []),
+            resolution.IntermediateAssemblyPath ?? "<none>",
+            resolution.ProjectFilePath ?? "<none>");
     }
 
     // The convention's refusal when its one candidate references no contract library, under whatever the load

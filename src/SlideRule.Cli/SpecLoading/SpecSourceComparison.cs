@@ -72,8 +72,8 @@ internal static class SpecSourceComparison
     private static readonly EnumerationOptions ProjectFileSearch = new() { AttributesToSkip = FileAttributes.None };
 
     /// <summary>
-    ///     The resolved spec's verdict: null when its sources match its build, and always null for a spec passed as a
-    ///     DLL, which names no project and so no sources to compare.
+    ///     The resolved spec's verdict: null when its sources match its build, and always null for a DLL that is no
+    ///     declared member's built output, which names no project and so no sources to compare.
     /// </summary>
     internal static StaleSpec? Compare(SpecResolution resolution)
     {

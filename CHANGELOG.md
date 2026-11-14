@@ -81,6 +81,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `--spec` given the DLL a declared project builds now checks the solution as `--spec` given that project's
+  `.csproj` does. The spec project is left out of the check and its sources are compared with its build, on a
+  cold run, a cache hit and in the MCP server. The DLL form used to check the spec project's own code against
+  its rules and never reported a stale spec. A DLL counts as a project's when it has the project's assembly name
+  and sits under the project's `bin` or `artifacts` output root, or under its project directory when its output
+  has neither. A DLL that two declared projects build is refused with both projects named.
 - Every command and MCP tool that loads the solution now refuses when a `global.json` pins an SDK the .NET
   host cannot resolve. The refusal names the pinned version and the file, quotes the host, and gives the
   ways out: the repository's own instruction when the pin supplies one, installing that SDK or

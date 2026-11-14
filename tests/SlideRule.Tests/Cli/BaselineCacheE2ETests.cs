@@ -8,7 +8,7 @@ namespace SlideRule.Tests.Cli;
 
 /// <summary>
 ///     End-to-end tests for the one place <c>baseline</c>'s persisted-cache policy is decided: the mode,
-///     not the flag. Over a cache slot a <c>graph</c> run has already populated, <c>init</c> and
+///     not the flag. Over a cache slot an earlier run has already populated, <c>init</c> and
 ///     <c>accept-reductions</c> extract cache-free and open a workspace even though the caller asked for
 ///     the cache, while <c>add</c> on the same slot answers from it with no workspace at all.
 /// </summary>
@@ -40,10 +40,10 @@ public sealed class BaselineCacheE2ETests
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("baseline-cache");
 
-        // Populate the slot: graph has no spec and no exclusion, so it writes every project's fragments —
-        // exactly the set a spec-ful hit merges from.
-        CacheRun populate = await CacheRuns.GraphAsync(
-            workspace.SolutionPath, cache.Root, source: CountingSolutionSource.OverWarmPool());
+        // Populate the slot with a check under the same spec: it writes every project's fragments and records
+        // the spec's resolution, which a hit needs to tell whether the DLL is a member's built output.
+        CacheRun populate = await CacheRuns.CheckAsync(
+            workspace.SolutionPath, CliRunner.ViolatedSpecDll, cache.Root, source: CountingSolutionSource.OverWarmPool());
         populate.Outcome.ShouldBe(CodebaseSourceOutcome.Miss);
 
         // add first, so the hit below cannot be an artefact of what the two write-happy modes leave on disk.

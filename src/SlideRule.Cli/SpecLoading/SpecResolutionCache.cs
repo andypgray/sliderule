@@ -27,8 +27,8 @@ internal readonly record struct SessionSpecResolution(
 ///     <para>
 ///         Only the candidate half is cached: a hit replays through <see cref="SpecResolver.Replay" />, so a spec
 ///         DLL that has since been rebuilt, moved or deleted answers in the cold run's words rather than with a
-///         path recorded before it went, at the cost of a per-call <c>File.Exists</c>. A prebuilt-DLL
-///         <c>--spec</c> never gets here; <c>CodebaseSource.ResolveSpec</c> answers it first and says why.
+///         path recorded before it went, at the cost of a per-call <c>File.Exists</c>. A DLL <c>--spec</c> is
+///         cached the same way, because whether it is a member's built output is a question about the solution.
 ///     </para>
 ///     <para>
 ///         Only successes are stored: a resolution that throws (no spec project, an ambiguous one, nothing

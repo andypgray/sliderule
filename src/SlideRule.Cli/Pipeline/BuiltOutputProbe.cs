@@ -95,6 +95,18 @@ internal static class BuiltOutputProbe
     }
 
     /// <summary>
+    ///     The nearest ancestor of <paramref name="evaluatedOutputPath" /> named <c>bin</c> or <c>artifacts</c>,
+    ///     the highest directory the search reads, decided from the path alone; <see langword="null" />
+    ///     for a blank or unrooted path or when no such ancestor exists.
+    /// </summary>
+    internal static string? OutputRootOf(string evaluatedOutputPath)
+    {
+        if (string.IsNullOrWhiteSpace(evaluatedOutputPath) || !Path.IsPathRooted(evaluatedOutputPath)) return null;
+
+        return WalkToOutputRoot(evaluatedOutputPath) is { } walk ? walk[^1] : null;
+    }
+
+    /// <summary>
     ///     Every directory the search may anchor at, deepest first: the existing directories on the walk from
     ///     <paramref name="evaluatedOutputPath" />'s own directory up to and including the nearest ancestor
     ///     named <c>bin</c> or <c>artifacts</c>. Empty when no such ancestor exists or when nothing on the
@@ -108,20 +120,29 @@ internal static class BuiltOutputProbe
     /// </remarks>
     internal static IReadOnlyList<string> AnchorChainFor(string evaluatedOutputPath)
     {
-        string? directory = Path.GetDirectoryName(evaluatedOutputPath);
-        if (string.IsNullOrEmpty(directory)) return [];
+        List<string>? walk = WalkToOutputRoot(evaluatedOutputPath);
+        if (walk is null) return [];
 
-        var chain = new List<string>();
-        for (string? current = directory; !string.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
+        return walk
+            .Where(Directory.Exists)
+            .ToList();
+    }
+
+    // The directories from the evaluated path's own up to and including the nearest ancestor named bin or
+    // artifacts, deepest first, read from the path with no disk access; null when there is no such ancestor.
+    // Its last entry is the root OutputRootOf returns.
+    private static List<string>? WalkToOutputRoot(string evaluatedOutputPath)
+    {
+        var walk = new List<string>();
+        for (string? current = Path.GetDirectoryName(evaluatedOutputPath);
+             !string.IsNullOrEmpty(current);
+             current = Path.GetDirectoryName(current))
         {
-            chain.Add(current);
-            if (IsOutputRootDirectory(current))
-                return chain
-                    .Where(Directory.Exists)
-                    .ToList();
+            walk.Add(current);
+            if (IsOutputRootDirectory(current)) return walk;
         }
 
-        return [];
+        return null;
     }
 
     private static bool IsOutputRootDirectory(string directory)

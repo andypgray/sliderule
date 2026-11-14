@@ -105,14 +105,14 @@ internal sealed record ForeignProjectEntry(
 ///     The normalized <c>--spec</c> value this record resolves (an absolute csproj/dll path, or the empty
 ///     string for the no-<c>--spec</c> convention default).
 /// </param>
-/// <param name="SpecProjectName">The solution-member spec project's name, or null for an explicit DLL.</param>
+/// <param name="SpecProjectName">The solution-member spec project's name, or null for a DLL that is no member's output.</param>
 /// <param name="ExcludeProjectNames">
 ///     Every project to drop from the checked universe: the spec project plus the private plumbing only it
 ///     references (<c>SpecExclusion</c>).
 /// </param>
 /// <param name="OutputFilePaths">
-///     Every Debug-evaluated output path of the spec project, one per framework, ordinal-sorted, or empty for an
-///     explicit DLL, so a hit loads the framework's DLL the cold run chose.
+///     Every Debug-evaluated output path of the spec project, one per framework, ordinal-sorted, or empty for a
+///     DLL that is no member's output, so a hit loads the framework's DLL the cold run chose.
 /// </param>
 /// <param name="IntermediateAssemblyPath">
 ///     The spec project's intermediate (<c>obj</c>-side) assembly path, or null when the workspace did not

@@ -44,19 +44,26 @@ public sealed class StaleSpecE2ETests
         result.Err.ShouldContain(Warning);
     }
 
-    [Fact]
-    public async Task CheckJson_SpecSourceEditedAfterTheBuild_StampsTheDocumentOnAColdRunAndOnACacheHit()
+    [Theory]
+    [InlineData(false)] // the hit resolves the spec from the recorded project path, with no workspace
+    // The spec project's own built DLL is that member's spec, so its sources are compared as the csproj form
+    // compares them; the hit gets the project from the DLL's recorded resolution.
+    [InlineData(true)]
+    public async Task CheckJson_SpecSourceEditedAfterTheBuild_StampsTheDocumentOnAColdRunAndOnACacheHit(
+        bool specAsItsBuiltDll)
     {
         using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
         using var cache = new TempCacheRoot("stale-spec");
         using ScopedFile edit = LayoutAppFixture.EditSpecAfterBuild(workspace);
+        string[] spec = specAsItsBuiltDll ? ["--spec", LayoutAppFixture.BuiltSpecDll(workspace)] : [];
+        string[] check = ["check", workspace.SolutionPath, .. spec, "--json"];
 
-        CliResult cold = await RunColdAsync(cache.Root, "check", workspace.SolutionPath, "--json");
-        CliResult hit = await RunColdAsync(cache.Root, "check", workspace.SolutionPath, "--json");
+        CliResult cold = await RunColdAsync(cache.Root, check);
+        CliResult hit = await RunColdAsync(cache.Root, check);
 
         cold.Loads.ShouldBe(1);
         ShouldHaveStaleSpecStamp(cold).ShouldBe(ExpectedStamp);
-        hit.Loads.ShouldBe(0); // the hit resolves the spec from the recorded project path, with no workspace
+        hit.Loads.ShouldBe(0);
         ShouldHaveStaleSpecStamp(hit).ShouldBe(ExpectedStamp);
     }
 
@@ -104,22 +111,6 @@ public sealed class StaleSpecE2ETests
     }
 
     [Fact]
-    public async Task Check_SpecPassedAsItsDll_DoesNotCompareSources()
-    {
-        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
-        using var cache = new TempCacheRoot("stale-spec");
-        using ScopedFile edit = LayoutAppFixture.EditSpecAfterBuild(workspace);
-        string dll = LayoutAppFixture.BuiltSpecDll(workspace);
-
-        CliResult result = await RunAsync(cache.Root, "check", workspace.SolutionPath, "--spec", dll, "--json");
-
-        result.ShouldHaveJsonStdout()
-            .RootElement.TryGetProperty("staleSpec", out _)
-            .ShouldBeFalse("a spec passed as a DLL names no project, so there are no sources to compare");
-        result.Err.ShouldNotContain("differs from its last build");
-    }
-
-    [Fact]
     public async Task CheckForTheHook_CleanRunOverAStaleSpec_WritesTheWarningForTheAgent()
     {
         // A clean hook run writes nothing unless it has a warning to hand on; a stale spec is one, because the
@@ -156,6 +147,13 @@ public sealed class StaleSpecE2ETests
                           + $"{Environment.NewLine}stderr:{Environment.NewLine}{result.Err}");
         return stamp.EnumerateObject()
             .ToDictionary(property => property.Name, property => property.Value.GetString()!);
+    }
+
+    // A green check with the DLL as its spec, which records the DLL's resolution in the cache for a later run.
+    private static async Task ShouldRecordTheDllWithACheckAsync(string cacheRoot, TempFixtureWorkspace workspace, string dll)
+    {
+        CliResult recording = await RunAsync(cacheRoot, "check", workspace.SolutionPath, "--spec", dll);
+        recording.ShouldSucceed($"pass {LayoutAppFixture.RuleId}");
     }
 
     // The check the hook verb runs, in process, over the convention spec.

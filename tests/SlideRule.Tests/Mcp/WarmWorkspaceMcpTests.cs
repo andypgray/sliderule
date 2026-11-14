@@ -42,9 +42,9 @@ namespace SlideRule.Tests.Mcp;
 ///     </para>
 ///     <para>
 ///         The suite uses two fixtures, and they are not interchangeable. Most cases drive the MyApp copy
-///         with a prebuilt spec DLL, which is the cheap way to vary the checked universe. The two
-///         spec-resolution cases cannot: a <c>--spec &lt;dll&gt;</c> resolves before the workspace is touched,
-///         so it never reaches the walk they are about. They take
+///         with a prebuilt spec DLL, which is the cheap way to vary the checked universe. The spec-resolution
+///         cases cannot: MyApp declares no spec project, so no DLL there is a member's output and none reaches
+///         the member resolution they are about. They take
 ///         <see cref="LayoutAppFixture">the output-layout fixture</see> instead — the only fixture solution
 ///         that declares a spec project — and pay a real restore and build for it, once per class thanks to
 ///         the lease.
@@ -436,8 +436,7 @@ public sealed class WarmWorkspaceMcpTests
     {
         // Arrange — a warm server over the only fixture solution that DECLARES a spec project, bound by the
         // csproj that resolution has to walk the workspace to answer (the dogfooded shape: this repo's own
-        // .mcp.json binds --spec <csproj>). A --spec <dll> binding resolves with no workspace at all and
-        // would exercise none of this.
+        // .mcp.json binds --spec <csproj>).
         using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
         string specCsproj = workspace.PathOf(LayoutAppFixture.SpecProject, "LayoutApp.Spec.csproj");
         await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
@@ -476,6 +475,29 @@ public sealed class WarmWorkspaceMcpTests
 
         resolutions.FullResolveCount.ShouldBe(2);
         afterReload.ShouldHaveAnswered(harness.Logs);
+    }
+
+    [Fact]
+    public async Task ArchCheck_SpecBoundByItsBuiltDll_ResolvesOnceAndAnswersAsTheCsprojFormDoes()
+    {
+        // Whether the bound DLL is the spec project's own build takes the workspace to answer, so a DLL binding
+        // goes through the session's memo like a csproj one: one walk, then replays, each answering what the
+        // csproj form answers cold.
+        using TempFixtureWorkspace workspace = LayoutAppFixture.BuiltCopy();
+        string specCsproj = workspace.PathOf(LayoutAppFixture.SpecProject, "LayoutApp.Spec.csproj");
+        await using McpPipelineHarness harness = await McpPipelineHarness.StartAsync(
+            McpServerBindings.For(workspace.SolutionPath, LayoutAppFixture.BuiltSpecDll(workspace)), Ct);
+        var resolutions = harness.Services.GetRequiredService<SpecResolutionCache>();
+
+        string first = await ShouldAnswerArchCheckAsync(harness);
+        resolutions.FullResolveCount.ShouldBe(1);
+        string second = await ShouldAnswerArchCheckAsync(harness);
+        resolutions.FullResolveCount.ShouldBe(1);
+        CliResult coldCsproj = await CliRunner.InvokeColdAsync(
+            "check", workspace.SolutionPath, "--spec", specCsproj, "--no-cache", "--json");
+
+        first.ShouldBeTheSameTextAs(coldCsproj.Out);
+        second.ShouldBeTheSameTextAs(first);
     }
 
     [Fact]

@@ -5,7 +5,8 @@ using Xunit;
 namespace SlideRule.Tests.Cli;
 
 /// <summary>
-///     Spec resolution by convention against a real <c>MSBuildWorkspace</c> load, over the two output
+///     Spec resolution, by convention and through a <c>--spec</c> DLL, against a real <c>MSBuildWorkspace</c> load, over
+///     the two output
 ///     layouts field testing found refusing a fully built solution: a parent
 ///     <c>Directory.Build.props</c> carrying a flat <c>OutputPath</c>, and <c>UseArtifactsOutput</c>. One
 ///     fixture, one props overlay per arm, so the layout is the only variable.
@@ -111,8 +112,52 @@ public sealed class OutputLayoutSpecResolutionE2ETests
             + "emptiness is what the widening exists to see past.");
     }
 
-    // A private copy of the fixture, built for real under the requested layout.
-    private static TempFixtureWorkspace BuiltCopy(string[] layoutProperties)
+    [Fact]
+    public async Task Check_SpecPassedAsTheDllTheReleaseBuildWrote_GivesTheCsprojFormsVerdictLoadedOrReplayed()
+    {
+        // An interface without the prefix, declared in the spec project inside the namespace the fixture's one
+        // rule selects, fails that rule wherever the spec project is checked. The csproj form excludes the spec
+        // project; the DLL the Release build wrote is not the evaluated path under this layout, and under replay
+        // the evaluated path is the obj-side assembly, so only the mapping to the member that builds it excludes
+        // the project for the DLL form too. One build serves both, since the build is what each arm costs.
+        using TempFixtureWorkspace workspace =
+            BuiltCopy(HostilePropsLayout, PlantAnUnprefixedInterfaceInTheSpec, writeBinlog: true);
+        string binlog = BinlogOf(workspace);
+        string dll = workspace.PathOf(SpecProject, "bin", "Release", SpecAssembly);
+        string csproj = workspace.PathOf(SpecProject, SpecProject + ".csproj");
+
+        CliResult loadedCsproj = await CheckJsonAsync(workspace, "--spec", csproj);
+        CliResult loadedDll = await CheckJsonAsync(workspace, "--spec", dll);
+        CliResult replayedCsproj = await CheckJsonAsync(workspace, "--binlog", binlog, "--spec", csproj);
+        CliResult replayedDll = await CheckJsonAsync(workspace, "--binlog", binlog, "--spec", dll);
+
+        loadedCsproj.ShouldSucceed($"\"{RuleId}\"");
+        loadedDll.Out.ShouldBe(loadedCsproj.Out);
+        replayedCsproj.ShouldSucceed($"\"{RuleId}\"");
+        replayedDll.Out.ShouldBe(replayedCsproj.Out);
+    }
+
+    private static Task<CliResult> CheckJsonAsync(TempFixtureWorkspace workspace, params string[] specArguments)
+    {
+        return CliRunner.InvokeColdAsync(["check", workspace.SolutionPath, .. specArguments, "--no-cache", "--json"]);
+    }
+
+    private static void PlantAnUnprefixedInterfaceInTheSpec(TempFixtureWorkspace workspace)
+    {
+        string[] lines = ["namespace LayoutApp.Core.SpecSide", "{", "    public interface Leaky", "    {", "    }", "}"];
+        File.WriteAllLines(workspace.PathOf(SpecProject, "Leaky.cs"), lines);
+    }
+
+    // Inside the copy, so the copy owns it.
+    private static string BinlogOf(TempFixtureWorkspace workspace)
+    {
+        return workspace.PathOf("build.binlog");
+    }
+
+    // A private copy of the fixture, built for real under the requested layout, after beforeBuild has edited it,
+    // with the build's log at BinlogOf when writeBinlog asks for it.
+    private static TempFixtureWorkspace BuiltCopy(
+        string[] layoutProperties, Action<TempFixtureWorkspace>? beforeBuild = null, bool writeBinlog = false)
     {
         // Dedicated, not leased: the leased copy resets by pruning anything the fixture source does not
         // contain, which would delete the build output the arm exists to produce.
@@ -121,8 +166,10 @@ public sealed class OutputLayoutSpecResolutionE2ETests
         string workingDirectory = Path.GetDirectoryName(workspace.SolutionPath)!;
 
         LayoutAppFixture.WritePropsFile(workspace, layoutProperties);
+        beforeBuild?.Invoke(workspace);
 
-        DotnetCli.Run($"build \"{workspace.SolutionPath}\" -c Release", workingDirectory);
+        string binlogSwitch = writeBinlog ? $" -bl:\"{BinlogOf(workspace)}\"" : "";
+        DotnetCli.Run($"build \"{workspace.SolutionPath}\" -c Release{binlogSwitch}", workingDirectory);
 
         return workspace;
     }
