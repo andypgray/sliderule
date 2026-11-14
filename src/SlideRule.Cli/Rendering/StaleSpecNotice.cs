@@ -1,4 +1,5 @@
 using SlideRule.Cli.SpecLoading;
+using SlideRule.Cli.Verbs;
 using SlideRule.Rendering;
 using SlideRule.Roslyn.Diagnostics;
 
@@ -72,6 +73,6 @@ internal static class StaleSpecNotice
         };
 
         return $"the spec project '{stale.ProjectName}' differs from its last build ({change}); "
-               + $"this run used the rules that build holds. Rebuild it: dotnet build {project}";
+               + $"this run used the rules that build holds. Rebuild it: dotnet build {CommandLineArgument.Quoted(project)}";
     }
 }

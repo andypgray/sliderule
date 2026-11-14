@@ -217,7 +217,7 @@ internal sealed class InitRunner(
         return "Next:\n"
                + $"  Write the rules in {layout.Relative(layout.SpecFile)}, rebuild it, and run sliderule check.\n"
                + "  Register the MCP server for Claude Code: claude mcp add --scope project sliderule -- sliderule mcp "
-               + layout.Relative(solutionPath) + "\n"
+               + CommandLineArgument.Quoted(layout.Relative(solutionPath)) + "\n"
                + "  Wire the hook into every agent turn: sliderule install-hook";
     }
 
