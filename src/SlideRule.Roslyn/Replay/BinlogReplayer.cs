@@ -52,8 +52,8 @@ internal static class BinlogReplayer
     ///     <c>diagnosticLog</c> contract.
     /// </param>
     /// <param name="ct">
-    ///     Honoured on a best-effort basis around the synchronous <see cref="SolutionReader" /> calls, and in full by
-    ///     the compilations the cross-language check makes.
+    ///     Honoured on a best-effort basis around the synchronous binlog reads, and in full by the compilations the
+    ///     cross-language check makes.
     /// </param>
     /// <remarks>
     ///     Throws <see cref="ArgumentException" /> for a blank <paramref name="binlogPath" />,
@@ -77,13 +77,18 @@ internal static class BinlogReplayer
         var unsupportedProjects = new HashSet<string>(PathComparison.Comparer);
         var replayedProjects = new HashSet<string>(PathComparison.Comparer);
 
-        var reader = SolutionReader.Create(
-            binlogPath, BasicAnalyzerKind.OnDisk,
-            predicate: call => IsReplayableCall(call, replayedProjects, unsupportedProjects));
+        // The second full read of the binlog, run beside the reader's own so the two reads overlap.
+        Task<Dictionary<string, List<string>>> otherLanguageReferences = Task.Run(
+            () => OtherLanguageReferencesByProject(binlogPath, ct), CancellationToken.None);
 
+        SolutionReader? reader = null;
         AdhocWorkspace? workspace = null;
         try
         {
+            reader = SolutionReader.Create(
+                binlogPath, BasicAnalyzerKind.OnDisk,
+                predicate: call => IsReplayableCall(call, replayedProjects, unsupportedProjects));
+
             ct.ThrowIfCancellationRequested();
             string? solutionFile = solutionPath is { Length: > 0 }
                 ? SolutionProjectFileParser.SolutionFileOf(solutionPath)
@@ -104,7 +109,11 @@ internal static class BinlogReplayer
             });
 
             Solution solution = AlignWithMsBuildWorkspace(workspace.AddSolution(solutionInfo));
-            unsupportedProjects.UnionWith(ReferencedOtherLanguageProjects(binlogPath, replayedProjects, ct));
+            // Filtered only once both reads are done, because the reader fills replayedProjects as it walks the log.
+            Dictionary<string, List<string>> referencesByProject = await otherLanguageReferences.ConfigureAwait(false);
+            foreach (string project in replayedProjects)
+                if (referencesByProject.TryGetValue(project, out List<string>? referenced))
+                    unsupportedProjects.UnionWith(referenced);
             // No removal of the projects the default configuration does not build: one the binlog compiled is what
             // this build built, and one it did not compile is not here to remove.
             SettledSolution settled = LoadBoundary.Settle(
@@ -140,8 +149,12 @@ internal static class BinlogReplayer
         }
         catch
         {
+            // The second read never outlives the call: the capture store overwrites the binlog it reads, and the
+            // first exception is the one rethrown. The cast matters: Task<TResult>.ConfigureAwait rejects
+            // SuppressThrowing with an ArgumentOutOfRangeException that would replace it.
+            await ((Task)otherLanguageReferences).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             workspace?.Dispose();
-            reader.Dispose();
+            reader?.Dispose();
             throw;
         }
     }
@@ -229,28 +242,34 @@ internal static class BinlogReplayer
         return true;
     }
 
-    // The project files in another language that a replayed C# project references, read off the build's own
-    // evaluation of that project in the log. Such a project mints no compiler call to decline, and a replay opens no
-    // workspace that could fail on it, so without this a replay lists one project fewer than a load of the same
-    // tree. A ProjectReference that does not reference the output assembly is listed too, as a load lists it.
-    private static IReadOnlyList<string> ReferencedOtherLanguageProjects(
-        string binlogPath, IReadOnlySet<string> replayedProjects, CancellationToken ct)
+    // The project files in another language that each evaluated project references, keyed by the evaluated project
+    // and read off the build's own evaluations in the log. A replay keeps the entries of its replayed C# projects:
+    // such a referenced project mints no compiler call to decline, and a replay opens no workspace that could fail
+    // on it, so without them a replay lists one project fewer than a load of the same tree. A ProjectReference that
+    // does not reference the output assembly is listed too, as a load lists it. Each list is distinct and
+    // ordinal-sorted, so a capture manifest that records them reads the same on every ingest of one binlog.
+    private static Dictionary<string, List<string>> OtherLanguageReferencesByProject(
+        string binlogPath, CancellationToken ct)
     {
-        var found = new List<string>();
+        var found = new Dictionary<string, List<string>>(PathComparison.Comparer);
         var reader = new BinLogReader();
         reader.AnyEventRaised += (_, e) =>
         {
             if (e is not ProjectEvaluationFinishedEventArgs { ProjectFile: { } projectFile, Items: { } items }) return;
 
             string project = Path.GetFullPath(projectFile);
-            if (!replayedProjects.Contains(project)) return;
-
             string projectDirectory = Path.GetDirectoryName(project)!;
-            found.AddRange(items
+            IEnumerable<string> referenced = items
                 .OfType<DictionaryEntry>()
                 .Where(entry => entry is { Key: "ProjectReference", Value: ITaskItem })
                 .Select(entry => Path.GetFullPath(Path.Combine(projectDirectory, SpecOf(entry))))
-                .Where(UnsupportedEntryMessages.IsOtherLanguageProjectFile));
+                .Where(UnsupportedEntryMessages.IsOtherLanguageProjectFile);
+            foreach (string reference in referenced)
+            {
+                if (!found.TryGetValue(project, out List<string>? references))
+                    found[project] = references = [];
+                references.Add(reference);
+            }
         };
 
         // The reader takes no token, so the run is cancelled on either side of the one synchronous pass.

@@ -658,10 +658,14 @@ public sealed class SolutionEntriesE2ETests
     }
 
     // A project in another language that a C# project references: the targets a build of the referrer calls on a
-    // reference, each doing nothing, so the referrer builds and the build writes a binary log.
+    // reference, each doing nothing, so the referrer builds and the build writes a binary log. Its own reference to an
+    // F# project is in an evaluation the build logs and no replayed C# project references, so no path lists it.
     private const string ReferencedStub =
         """
         <Project>
+          <ItemGroup>
+            <ProjectReference Include="..\Lib\Lib.fsproj" />
+          </ItemGroup>
           <Target Name="Build" />
           <Target Name="GetTargetFrameworks" />
           <Target Name="GetTargetPath" />
