@@ -78,11 +78,12 @@ Create a small class library for the spec (convention: an `arch/` folder next to
              the repository manages package versions centrally. Without it, a repository carrying a
              Directory.Packages.props fails the restore with NU1008. -->
         <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
-        <!-- A spec project is never packed or documented. Without these, a Directory.Build.props that turns
-             on package validation fails the restore with NU1101 on this project's own id, and one that
-             generates documentation reports CS1591 on the spec class. -->
+        <!-- Without these, a Directory.Build.props that turns on package validation fails the restore with
+             NU1101 on this project's own id, and a build enforcing IDE0005 needs documentation
+             (EnableGenerateDocumentationFile); the spec class has none, so CS1591 is off. -->
         <IsPackable>false</IsPackable>
-        <GenerateDocumentationFile>false</GenerateDocumentationFile>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);CS1591</NoWarn>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="SlideRule" Version="..." />
@@ -96,7 +97,7 @@ The five SlideRule packages ship one version in lockstep: reference the version 
 
 **The spec files are this repository's code:** where its `.editorconfig` sets a `file_header_template`, start each with that header, and follow its other style settings.
 
-**Pick the TFM by one rule: the spec project must be able to reference the product projects it will `typeof()`.** On a `net48` estate the spec targets `net48`, which the `netstandard2.0` contract library allows. Several frameworks go in the same element, separated by semicolons. **Read `global.json` before keeping `net10.0`:** a pin below SDK 10 builds the spec project with that SDK, which cannot target `net10.0` (NETSDK1045), so target what the product projects target (`net9.0`, say) and leave the pin alone.
+**Pick the TFM by one rule: the spec project must be able to reference the product projects it will `typeof()`.** On a `net48` estate the spec targets `net48`, which the `netstandard2.0` contract library allows. **Read `global.json` before keeping `net10.0`:** a pin below SDK 10 builds the spec project with that SDK, which cannot target `net10.0` (NETSDK1045), so target what the product projects target (`net9.0`, say) and leave the pin alone.
 
 `typeof()` targets must also be **accessible** to the spec assembly: anchoring an `internal` type fails the spec build with CS0122. Every set-valued position has a spelling that needs no load and no reference, so reach for one first: a namespace pattern (`arch.Namespace("System.Data.*")`), `arch.Types.Named("BillingFacade")`, or the fully-qualified name as a string where `Implementing` / `DerivedFrom` / `AttributedWith` take a type. Only where the type must be reflected — an `arch.Member(typeof(X), nameof(X.M))` anchor — have the product grant `[InternalsVisibleTo("MyApp.Architecture")]` and rebuild. A strong-named product's grant must name the spec's public key (`, PublicKey=…`): sign the spec with the product's key.
 
@@ -124,7 +125,7 @@ Add it to the solution (`dotnet sln add arch/MyApp.Architecture/MyApp.Architectu
 Errors you may see, verbatim, and what they mean:
 
 - `error NU1008: The following PackageReference items cannot define a value for Version: SlideRule. Projects using Central Package Management must define a Version value on a PackageVersion item.` — NuGet's, not this tool's: the `<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>` line is missing from the spec csproj. Put it back rather than adding a `PackageVersion` entry to the central file: the spec's pin moves with the tool, not with the repository's own dependencies.
-- `error NU1101: Unable to find package MyApp.Architecture. No packages exist with this id in source(s): …`, naming the spec project's own id, or `error CS1591` or `NETSDK1005` on the spec project — each is a `Directory.Build.props` setting the csproj above opts out of. Put the missing line back.
+- `error NU1101: Unable to find package MyApp.Architecture. No packages exist with this id in source(s): …`, naming the spec project's own id, or `error CS1591`, `error EnableGenerateDocumentationFile` or `NETSDK1005` on the spec project — each is a `Directory.Build.props` setting the csproj above opts out of. Put the missing line back.
 - `error NU1100: Unable to resolve 'SlideRule (>= …)' for '…'. PackageSourceMapping is enabled, …` — the repository's `nuget.config` maps ids to sources and nothing maps SlideRule. Add `<package pattern="SlideRule" />` and `<package pattern="SlideRule.*" />` under the source that serves it; the prefix alone misses the bare id. A warm package cache hides this locally, so CI can fail first.
 - `error NU1101: Unable to find package SlideRule. …`, or `error NU1301` with a 401 on SlideRule — no source the repository configures serves it: its `nuget.config` clears nuget.org, or lists only a mirror or an authenticated feed. Add a `nuget.config` beside the spec csproj that adds nuget.org (`https://api.nuget.org/v3/index.json`) and clears nothing, so the repository's sources still serve the rest. Where the repository maps sources, map the two patterns above to nuget.org there (a specific pattern beats `*`); where it maps none, add none, or every other package goes unmapped (NU1100). Tell the human in the handoff that the spec restores SlideRule from nuget.org, which matters where the repository removed it on purpose.
 - `error NU1004: The package reference SlideRule version has changed from …` — the repository locks restores. Commit the `packages.lock.json` the spec's first build wrote, and after changing the SlideRule version run `dotnet restore --force-evaluate` on the spec project and commit the new one.

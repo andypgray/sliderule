@@ -414,16 +414,19 @@ public sealed class DeriveSpecPromptTests
 
     // Each opt-out keeps the scaffold valid under a repository-wide setting it would otherwise inherit. Central
     // package management makes the inline version NU1008. Package validation makes restore fetch every packable
-    // project's own id at the baseline version, which is NU1101 for a spec never published. Generated
-    // documentation reports CS1591 on the public spec class. An inherited TargetFrameworks list decides restore
-    // while a singular element decides the build (NETSDK1005); an inherited singular element beside the
-    // scaffold's plural list does the same unless the scaffold clears it. The prose quotes some of these elements too, so only the csproj fence, cut as
-    // CI cuts it, can tell an opt-out that left the scaffold from one still named in the prose. CI executes the
-    // same commitments against real central, props and editorconfig files.
+    // project's own id at the baseline version, which is NU1101 for a spec never published. Documentation stays
+    // on, because IDE0005 enforced in the build fails a project without it (EnableGenerateDocumentationFile),
+    // and CS1591 stays off, because the public spec class is undocumented. An inherited TargetFrameworks list
+    // decides restore while a singular element decides the build (NETSDK1005); an inherited singular element
+    // beside the scaffold's plural list does the same unless the scaffold clears it. The prose quotes some of
+    // these elements too, so only the csproj fence, cut as CI cuts it, can tell an opt-out that left the
+    // scaffold from one still named in the prose. CI executes the same commitments against real central, props
+    // and editorconfig files.
     [Theory]
     [InlineData("<ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>")]
     [InlineData("<IsPackable>false</IsPackable>")]
-    [InlineData("<GenerateDocumentationFile>false</GenerateDocumentationFile>")]
+    [InlineData("<GenerateDocumentationFile>true</GenerateDocumentationFile>")]
+    [InlineData("<NoWarn>$(NoWarn);CS1591</NoWarn>")]
     [InlineData("<TargetFrameworks>net10.0</TargetFrameworks>")]
     [InlineData("<TargetFramework></TargetFramework>")]
     public void DeriveSpec_ScaffoldCsproj_CarriesEachOptOut(string element)

@@ -76,6 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counts as a source, as the .NET SDK compiles it. The caches used to miss an add or an edit there, and the
   stale-spec warning missed an edit to one in the spec project. A nested project's own `bin` and `obj` still
   count as build output.
+- The spec project that `init` writes and the `derive_spec` recipe gives now builds in a repository that
+  enforces IDE0005 in the build. It turned documentation off to avoid CS1591, and the build fails a project
+  that enforces IDE0005 without documentation, with `EnableGenerateDocumentationFile`. It now sets
+  `GenerateDocumentationFile` to `true` and adds CS1591 to `NoWarn`, so IDE0005 also runs on the spec files.
 
 ## [0.3.0] - 2026-11-04
 

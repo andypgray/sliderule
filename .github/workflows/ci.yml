@@ -539,7 +539,7 @@ jobs:
       # error code, never a bare non-zero exit, which any unrelated failure would satisfy.
       #
       # D: warnings as errors with documentation and signing on. Generated documentation is CS1591 on the
-      #    public spec class, an opt-out. A signed .NET Framework spec reports CS8002 on any unsigned
+      #    public spec class, which the scaffold's NoWarn opts out of. A signed .NET Framework spec reports CS8002 on any unsigned
       #    reference, and the contract is strong-named, so the scaffold retargeted to net48 has to build
       #    signed with no opt-out at all (a .NET target never reports CS8002, and the leg's feed adds nuget.org
       #    behind the mapping for the net48 reference assemblies). TreatWarningsAsErrors itself stays the
@@ -550,6 +550,9 @@ jobs:
       #    repository's code, so the recipe has the agent write the header rather than opt out of the style.
       # E2: an expression-body style enforced at error, IDE0022 on a one-statement Define; the cure is the
       #    expression body the message asks for.
+      # E3: IDE0005 enforced in the build under warnings as errors. The build fails a project that enforces it
+      #    without generating documentation, with EnableGenerateDocumentationFile, so the scaffold keeps
+      #    documentation on, an opt-out; the second control shows IDE0005 then runs on the spec files.
       # F: a TargetFrameworks list in the root props without the spec's framework. Restore follows the list
       #    while a singular element decides the build, which is NETSDK1005; the plural element overrides both.
       #    The control needs a net9.0 reference pack, so this leg's feed adds nuget.org behind the mapping.
@@ -634,9 +637,9 @@ jobs:
           speccsproj="$wae/arch/MyApp.Architecture/MyApp.Architecture.csproj"
           cp "$speccsproj" "$RUNNER_TEMP/wae-csproj.orig"
 
-          sed -i '/<GenerateDocumentationFile>/d' "$speccsproj"
+          sed -i '/<NoWarn>/d' "$speccsproj"
           build_fails_with "$speccsproj" "$RUNNER_TEMP/wae-without-docs-opt-out.log" 'error CS1591.*ArchitectureSpec' \
-            "Removing GenerateDocumentationFile from the scaffold csproj did not produce CS1591 on ArchitectureSpec — that line is no longer what keeps the published scaffold building where the repository generates documentation, so the leg above proves nothing"
+            "Removing NoWarn from the scaffold csproj did not produce CS1591 on ArchitectureSpec — that line is no longer what keeps the published scaffold building where the repository generates documentation, so the leg above proves nothing"
 
           cp "$RUNNER_TEMP/wae-csproj.orig" "$speccsproj"
           sed -i 's|<TargetFrameworks>net10.0</TargetFrameworks>|<TargetFrameworks>net48</TargetFrameworks>|' "$speccsproj"
@@ -766,6 +769,58 @@ jobs:
             echo "::error::The expression-bodied spec built under enforced code style but was not discovered, or did not pass over conforming code"
             exit 1
           }
+
+          # ── Leg E3: unnecessary usings enforced in the build, under warnings as errors ───────────
+          usings="$RUNNER_TEMP/packageref-usings"
+          scaffold "$usings"
+          cat > "$usings/Directory.Build.props" <<'PROPS'
+          <Project>
+              <PropertyGroup>
+                  <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+                  <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+              </PropertyGroup>
+          </Project>
+          PROPS
+          # The product generates documentation so IDE0005 runs on its files too, and turns CS1591 off the way a
+          # repository's undocumented projects do.
+          cat > "$usings/src/Directory.Build.props" <<'PROPS'
+          <Project>
+              <Import Project="../Directory.Build.props" />
+              <PropertyGroup>
+                  <GenerateDocumentationFile>true</GenerateDocumentationFile>
+                  <NoWarn>$(NoWarn);CS1591</NoWarn>
+              </PropertyGroup>
+          </Project>
+          PROPS
+          cat > "$usings/.editorconfig" <<'EDITORCONFIG'
+          root = true
+
+          [*.cs]
+          dotnet_diagnostic.IDE0005.severity = warning
+          EDITORCONFIG
+
+          dotnet build "$usings/MyApp.slnx" || {
+            echo "::error::The scaffold csproj did not build where IDE0005 is enforced in the build under warnings as errors — the shape derive_spec publishes has to be valid there, and valid without the adopter editing that file"
+            exit 1
+          }
+          sliderule check "$usings/MyApp.slnx" || {
+            echo "::error::The scaffolded spec project built under enforced IDE0005 but was not discovered, or did not pass over conforming code"
+            exit 1
+          }
+
+          usingscsproj="$usings/arch/MyApp.Architecture/MyApp.Architecture.csproj"
+          cp "$usingscsproj" "$RUNNER_TEMP/usings-csproj.orig"
+          sed -i '/<GenerateDocumentationFile>/d' "$usingscsproj"
+          build_fails_with "$usingscsproj" "$RUNNER_TEMP/usings-without-docs.log" 'error EnableGenerateDocumentationFile' \
+            "Removing GenerateDocumentationFile from the scaffold csproj did not produce EnableGenerateDocumentationFile under enforced IDE0005 — that line is no longer what keeps the published scaffold building there, so the leg above proves nothing"
+          cp "$RUNNER_TEMP/usings-csproj.orig" "$usingscsproj"
+
+          usingsspec="$usings/arch/MyApp.Architecture/ArchitectureSpec.cs"
+          cp "$usingsspec" "$RUNNER_TEMP/usings-spec.orig"
+          sed -i '1i using System.Text;' "$usingsspec"
+          build_fails_with "$usingscsproj" "$RUNNER_TEMP/usings-unused.log" 'ArchitectureSpec\.cs\([0-9]+,[0-9]+\): error IDE0005' \
+            "An unused using in the recipe's spec class did not fail with IDE0005 where the build enforces it — with documentation on, the spec files come under the repository's IDE0005, and this one did not"
+          cp "$RUNNER_TEMP/usings-spec.orig" "$usingsspec"
 
           # ── Leg F: a TargetFrameworks list in the root props without the spec's framework ────────
           tfms="$RUNNER_TEMP/packageref-tfms"
