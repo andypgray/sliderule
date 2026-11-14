@@ -2031,6 +2031,26 @@ jobs:
         run: dotnet run --no-build --project src/SlideRule.Cli -- check examples/Meridian.Operations/Meridian.Operations.slnx
       - name: Check Meridian.Interchange (expect exit 0 on the committed baseline)
         run: dotnet run --no-build --project src/SlideRule.Cli -- check examples/Meridian.Interchange/Meridian.Interchange.slnx
+      # A check loads an example through a design-time build, and examples/Directory.Build.targets builds the
+      # analyzer from inside it. Were that inner build to inherit the design-time properties, it would record
+      # design-time compiler inputs for the analyzer, and the next real build would compile the analyzer and
+      # then every example project again. The first build settles whatever the CLI build above changed; the
+      # check skips the cache because a hit opens no workspace; any assembly the second build writes under
+      # an obj directory is a compile that should not have run.
+      - name: A check of Meridian.Quoting leaves its next build with nothing to compile
+        run: |
+          quoting=examples/Meridian.Quoting/Meridian.Quoting.slnx
+          dotnet build "$quoting" -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }}
+          marker="$RUNNER_TEMP/quoting-after-settle"
+          touch "$marker"
+          dotnet run --no-build --project src/SlideRule.Cli -- check "$quoting" --no-cache
+          dotnet build "$quoting" --no-restore -p:RestoreLockedMode=true -warnaserror:${{ env.SR_BUILD_TIER_IDS }}
+          recompiled=$(find examples/Meridian.Quoting src/SlideRule.Analyzers -path '*/obj/*' -name '*.dll' -newer "$marker" | sort)
+          if [ -n "$recompiled" ]; then
+            echo "::error::The build after a check of Meridian.Quoting compiled again; these assemblies were rewritten:"
+            echo "$recompiled"
+            exit 1
+          fi
       # No --no-build here: the adapter test project is not a member of any slnx, so nothing
       # above builds it. dotnet test restores and builds it (and the Xunit adapter it references) —
       # src/SlideRule.Xunit, which carries a lock file, hence the property here too.
