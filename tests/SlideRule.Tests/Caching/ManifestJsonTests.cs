@@ -230,6 +230,11 @@ public sealed class ManifestJsonTests
             ToolVersion: "0.0.0-manifest-json-test",
             StructuralStamps: [structuralStamp],
             Projects: [project],
+            ForeignProjects:
+            [
+                new ForeignProjectEntry(
+                    "C:/repo/src/Legacy/Legacy.vbproj", "C:/repo/src/Legacy", ".vb", ["C:/repo/src/Legacy/Ledger.vb"])
+            ],
             SpecResolutions: [specResolution],
             Diagnostics: ["MSB4181: the workspace said something"],
             FailedProjects: ["C:/repo/src/Broken/Broken.csproj"],
@@ -374,6 +379,15 @@ public sealed class ManifestJsonTests
             ToolVersion: "0.0.0-manifest-json-test",
             StructuralStamps: [structuralStamp],
             Projects: [project],
+            ForeignProjects:
+            [
+                new CaptureForeignProjectEntry(
+                    ProjectFilePath: "C:/repo/src/Legacy/Legacy.vbproj",
+                    ProjectDirectory: "C:/repo/src/Legacy",
+                    SourceSuffix: ".vb",
+                    DocumentPaths: ["C:/repo/src/Legacy/Ledger.vb"],
+                    ConeFiles: ["C:/repo/src/Legacy/Ledger.vb"])
+            ],
             BinlogCopyStamp: binlogCopyStamp);
     }
 }

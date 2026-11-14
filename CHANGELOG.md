@@ -13,6 +13,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `MSBuild for this run: MSBuildLocator default (the .NET SDK's MSBuild).` It said vswhere had found no
   Visual Studio and suggested `SLIDERULE_VS_INSTALL_PATH`, but vswhere runs only on Windows and the variable
   works only there.
+- A run that reads the extraction cache (`check`, `graph`, `status` and the rest), and a running MCP server,
+  now detect an edit to a Visual Basic project
+  that a C# project references. They used to keep the edges and the load warning from before the edit, and a
+  `.vb` file added to such a project went unseen. Any change to that project's files now costs one full run.
+- `--binlog` now replays a build in which a C# project references a Visual Basic project. The replay used to
+  stop with `The given key '0' was not present in the dictionary.`
+- A source file under a `bin` or `obj` directory with no project file beside it, such as `Sub/bin/X.cs`, now
+  counts as a source, as the .NET SDK compiles it. The caches used to miss an add or an edit there, and the
+  stale-spec warning missed an edit to one in the spec project. A nested project's own `bin` and `obj` still
+  count as build output.
 
 ## [0.3.0] - 2026-11-04
 

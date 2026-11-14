@@ -74,7 +74,7 @@ internal sealed class BinlogCaptureStore
 {
     // The manifest schema this store reads and writes. A manifest written under any other version degrades
     // to one UnreadableNotice and re-captures — acceptable for disposable derived data, never a wrong answer.
-    private const int CurrentSchemaVersion = 3;
+    private const int CurrentSchemaVersion = 4;
 
     /// <summary>The <see cref="CaptureState.Invalid" /> notice for a garbled/torn/missing-copy/schema case.</summary>
     internal const string UnreadableNotice =
@@ -194,13 +194,15 @@ internal sealed class BinlogCaptureStore
             throw new UserErrorException(SolutionFilterNotSupportedMessage(Path.GetFileName(solutionPath)));
 
         IReadOnlyList<ProjectInputs> inputs = CollectProjects(replayedSolution);
-        IReadOnlyList<string> structuralPaths = ProjectCone.SolutionStructuralPaths(solutionPath, inputs);
+        IReadOnlyList<ForeignProjectInputs> foreignInputs = SolutionProjects.CollectForeign(replayedSolution, static (_, _) => true);
+        IReadOnlyList<string> structuralPaths = ProjectCone.SolutionStructuralPaths(solutionPath, inputs, foreignInputs);
         List<CaptureProjectEntry> projects = inputs.Select(ToEntry).ToList();
+        List<CaptureForeignProjectEntry> foreignProjects = foreignInputs.Select(ToForeignEntry).ToList();
 
         RefuseIfStale(structuralPaths, binlogFullPath, binlogArgument, ct);
         RefuseIfCoverageMismatch(projects, binlogArgument);
 
-        return TryPersist(projects, structuralPaths, binlogFullPath, ct);
+        return TryPersist(projects, foreignProjects, structuralPaths, binlogFullPath, ct);
     }
 
     private static void RefuseIfStale(
@@ -265,8 +267,8 @@ internal sealed class BinlogCaptureStore
     }
 
     private bool TryPersist(
-        IReadOnlyList<CaptureProjectEntry> projects, IReadOnlyList<string> structuralPaths,
-        string binlogFullPath, CancellationToken ct)
+        IReadOnlyList<CaptureProjectEntry> projects, IReadOnlyList<CaptureForeignProjectEntry> foreignProjects,
+        IReadOnlyList<string> structuralPaths, string binlogFullPath, CancellationToken ct)
     {
         List<FileStamp> structuralStamps;
         try
@@ -285,7 +287,8 @@ internal sealed class BinlogCaptureStore
 
         ct.ThrowIfCancellationRequested();
         var manifest = new CaptureManifest(
-            CurrentSchemaVersion, FileStamping.CurrentToolVersion, structuralStamps, projects, FileStamping.StampOf(captureBinlogPath));
+            CurrentSchemaVersion, FileStamping.CurrentToolVersion, structuralStamps, projects, foreignProjects,
+            FileStamping.StampOf(captureBinlogPath));
         return TryWriteManifestAtomic(manifest);
     }
 
@@ -330,32 +333,38 @@ internal sealed class BinlogCaptureStore
             return CaptureValidation.Invalid(StaleNotice(changed!.Path));
 
         // Every recorded document (source and obj-generated) must still exist — a delete or clean is stale.
-        foreach (CaptureProjectEntry project in manifest.Projects)
-        foreach (string documentPath in project.DocumentPaths)
+        IEnumerable<string> documentPaths = manifest.Projects
+            .SelectMany(project => project.DocumentPaths)
+            .Concat(manifest.ForeignProjects.SelectMany(project => project.DocumentPaths));
+        foreach (string documentPath in documentPaths)
         {
             ct.ThrowIfCancellationRequested();
             if (!File.Exists(documentPath)) return CaptureValidation.Invalid(StaleNotice(documentPath));
         }
 
-        // Cone scan for a *.cs added outside bin/obj that the capture did not record — a membership change.
-        foreach (CaptureProjectEntry project in manifest.Projects)
+        // Cone scan for a source added outside build output that the capture did not record — a membership change.
+        IEnumerable<(string Directory, string? Suffix, IEnumerable<string> Known)> cones = manifest.Projects
+            .Select(project => (project.ProjectDirectory, (string?)ProjectLanguages.CSharpSourceSuffix,
+                project.DocumentPaths.Concat(project.ConeFiles)))
+            .Concat(manifest.ForeignProjects.Select(project => (project.ProjectDirectory, project.SourceSuffix,
+                project.DocumentPaths.Concat(project.ConeFiles))));
+        foreach ((string directory, string? suffix, IEnumerable<string> known) in cones)
         {
             ct.ThrowIfCancellationRequested();
-            if (FirstConeAdd(project) is { } added) return CaptureValidation.Invalid(StaleNotice(added));
+            if (suffix is not null && FirstConeAdd(directory, suffix, known) is { } added)
+                return CaptureValidation.Invalid(StaleNotice(added));
         }
 
         PromoteIfChanged(manifest, refreshedStructural);
         return CaptureValidation.Usable(captureBinlogPath);
     }
 
-    // The SDK-glob add a stat sweep cannot see: a *.cs in neither ConeFiles nor DocumentPaths. ProjectCone.FirstAdd
-    // stops at the first hit, because this asks whether the membership moved, not by how much.
-    private static string? FirstConeAdd(CaptureProjectEntry project)
+    // The SDK-glob add a stat sweep cannot see: a source in neither the cone files nor the documents recorded.
+    // ProjectCone.FirstAdd stops at the first hit, because this asks whether the membership moved, not by how much.
+    private static string? FirstConeAdd(string projectDirectory, string suffix, IEnumerable<string> known)
     {
-        var known = new HashSet<string>(project.DocumentPaths, PathComparison.Comparer);
-        known.UnionWith(project.ConeFiles);
-
-        return ProjectCone.FirstAdd(project.ProjectDirectory, known);
+        var knownSet = new HashSet<string>(known, PathComparison.Comparer);
+        return ProjectCone.FirstAdd(projectDirectory, suffix, knownSet);
     }
 
     private void PromoteIfChanged(CaptureManifest manifest, IReadOnlyList<FileStamp> refreshedStructural)
@@ -376,11 +385,18 @@ internal sealed class BinlogCaptureStore
         return SolutionProjects.Collect(solution, static (_, _) => true);
     }
 
+    private static CaptureForeignProjectEntry ToForeignEntry(ForeignProjectInputs project)
+    {
+        IReadOnlyList<string> coneFiles = ProjectCone.Sorted(project.ProjectDirectory, project.SourceSuffix);
+
+        return new CaptureForeignProjectEntry(
+            project.ProjectFilePath, project.ProjectDirectory, project.SourceSuffix, project.DocumentPaths, coneFiles);
+    }
+
     private static CaptureProjectEntry ToEntry(ProjectInputs project)
     {
-        List<string> coneFiles = ProjectCone.Enumerate(project.ProjectDirectory)
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToList();
+        IReadOnlyList<string> coneFiles =
+            ProjectCone.Sorted(project.ProjectDirectory, ProjectLanguages.CSharpSourceSuffix);
 
         return new CaptureProjectEntry(
             project.ProjectName,

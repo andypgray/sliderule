@@ -524,9 +524,10 @@ internal sealed class CodebaseSource : IDisposable
             // again; on a miss there are none and every input is stamped. A closure holds only some projects, so
             // it writes back only by carrying the rest.
             IReadOnlyList<ProjectInputs> inputs = SolutionCacheInputs.Collect(solution);
-            return handle!.IsClosure
-                ? store!.TryCaptureOverValidation(inputs, cacheRead.Validated, ct)
-                : store!.CaptureFingerprint(inputs, cacheRead.Validated, ct);
+            if (handle!.IsClosure) return store!.TryCaptureOverValidation(inputs, cacheRead.Validated, ct);
+
+            IReadOnlyList<ForeignProjectInputs> foreignInputs = SolutionCacheInputs.CollectForeign(solution);
+            return store!.CaptureFingerprint(inputs, foreignInputs, cacheRead.Validated, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

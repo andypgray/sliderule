@@ -19,9 +19,10 @@ namespace SlideRule.Roslyn;
 ///         Nothing is loaded until the first <see cref="GetCurrentAsync" />, which pays the whole solution load; later
 ///         calls pay only the reconcile. A structural change (the solution or filter file, the solution a filter
 ///         references, a project file, a restore assets file, or any of the
-///         <see cref="FileStamping.StructuralProbeFileNames" /> at or above a project) or a source file added or
-///         deleted reloads the solution wholesale. An edit to a file already in
-///         the solution is folded into a fresh snapshot, and an unchanged tree hands back the very snapshot
+///         <see cref="FileStamping.StructuralProbeFileNames" /> at or above a project), a source file added or
+///         deleted, or an edit to a source of a project in another language reloads the solution wholesale. An edit
+///         to any other file already in the solution is folded into a fresh snapshot, and an unchanged tree hands
+///         back the very snapshot
 ///         instance the previous call returned.
 ///     </para>
 ///     <para>
@@ -50,13 +51,18 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     // The one gate that serializes every sweep, reload, and edit against concurrent callers.
     private readonly SemaphoreSlim gate = new(1, 1);
 
-    // Every *.cs the cone scan finds under the loaded project directories, snapshotted at load. Only a file the
+    // Every source the cone scan finds under the loaded project directories, snapshotted at load. Only a file the
     // scan finds that is absent here is a newly added source file; a compiled document and an excluded stray
     // both live here, so neither trips it.
     private readonly HashSet<string> knownConeFiles = new(PathComparison.Comparer);
 
-    // Project directories (from the loaded solution) scanned for newly-added source files.
-    private readonly HashSet<string> projectDirectories = new(PathComparison.Comparer);
+    // Each loaded project's directory with its language's source suffix, scanned for newly-added source files.
+    private readonly HashSet<(string Directory, string Suffix)> coneRoots = new(ConeRootComparer.Instance);
+
+    // The documents of projects in other languages. The model holds nothing of theirs, but a C# project binds to
+    // their compilation, and the load warns when that compilation reaches it with no assembly; folding an edit in
+    // would leave the warning as the load found it, so an edit to one reloads.
+    private readonly HashSet<string> foreignDocuments = new(PathComparison.Comparer);
 
     // The live counters behind WorkspaceSnapshot.ProjectEditVersions; each snapshot takes an immutable copy.
     private readonly Dictionary<string, int> projectEditVersions = new(StringComparer.Ordinal);
@@ -181,7 +187,8 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         documentIds.Clear();
         structuralFingerprints.Clear();
         knownConeFiles.Clear();
-        projectDirectories.Clear();
+        coneRoots.Clear();
+        foreignDocuments.Clear();
         projectEditVersions.Clear();
 
         previous?.Dispose();
@@ -251,14 +258,14 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     }
 
     /// <summary>
-    ///     Whether any project directory's <see cref="Caching.ProjectCone">cone</see> holds a <c>*.cs</c> missing
-    ///     from <see cref="knownConeFiles" />: the add case an mtime sweep cannot see.
+    ///     Whether any project directory's <see cref="Caching.ProjectCone">cone</see> holds a source in its
+    ///     project's language missing from <see cref="knownConeFiles" />: the add case an mtime sweep cannot see.
     /// </summary>
     private bool ConeScanDetectsNewFile()
     {
-        foreach (string projectDirectory in projectDirectories)
+        foreach ((string projectDirectory, string suffix) in coneRoots)
         {
-            if (ProjectCone.FirstAdd(projectDirectory, knownConeFiles) is not { } file) continue;
+            if (ProjectCone.FirstAdd(projectDirectory, suffix, knownConeFiles) is not { } file) continue;
 
             diagnosticSink?.Invoke($"New source file detected, reloading: {file}");
             return true;
@@ -269,7 +276,8 @@ internal sealed class WorkspaceSession : IAsyncDisposable
 
     /// <summary>
     ///     Folds the edited documents into the snapshot chain, content-verifying only what a stat cannot vouch
-    ///     for, and returns true when a document has gone missing and the caller must reload wholesale.
+    ///     for, and returns true when the caller must reload wholesale instead: a document has gone missing, or one
+    ///     in a project of another language has new content.
     /// </summary>
     private async Task<bool> ReconcileDocumentsAsync(CancellationToken ct)
     {
@@ -314,6 +322,12 @@ internal sealed class WorkspaceSession : IAsyncDisposable
                 // Same bytes (an mtime-only touch): keep the snapshot, promote the fingerprint.
                 documentFingerprints[path] = beforeRead;
                 continue;
+            }
+
+            if (foreignDocuments.Contains(path))
+            {
+                diagnosticSink?.Invoke($"Edit to a source in another language detected, reloading: {path}");
+                return true;
             }
 
             Solution updated = current;
@@ -373,20 +387,24 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     ///     Records the load-time fingerprints, each document's being the stat taken before materialization read it.
     /// </summary>
     /// <remarks>
-    ///     The structural set follows the rule the persisted caches stamp theirs by,
-    ///     <see cref="Caching.ProjectCone.SolutionStructuralPaths(string, IEnumerable{Caching.ProjectInputs})" />,
-    ///     over every project with a file rather than only the C# ones those caches collect. It is taken per
-    ///     <see cref="Project" /> rather than per project directory, because where the restore assets file lands
-    ///     follows the project's own evaluated output paths and not its directory.
+    ///     The structural set follows the rule
+    ///     <see
+    ///         cref="Caching.ProjectCone.SolutionStructuralPaths(string, IEnumerable{Caching.ProjectInputs}, IEnumerable{Caching.ForeignProjectInputs})" />
+    ///     stamps the persisted caches by, over every project with a file, whatever its language. It is taken per
+    ///     <see cref="Project" /> rather than
+    ///     per project directory, because where the restore assets file lands follows the project's own evaluated
+    ///     output paths and not its directory.
     /// </remarks>
     private void RecordAllFingerprints(string solutionPath, Solution solution, IReadOnlyDictionary<string, FileFreshness> statsBeforeRead)
     {
-        foreach (Document document in solution.Projects.SelectMany(p => p.Documents))
+        foreach (Project project in solution.Projects)
+        foreach (Document document in project.Documents)
         {
             if (document.FilePath is null) continue;
 
             string full = Path.GetFullPath(document.FilePath);
             documentFingerprints[full] = statsBeforeRead[full];
+            if (!ProjectLanguages.IsCSharp(project)) foreignDocuments.Add(full);
             if (!documentIds.TryGetValue(full, out List<DocumentId>? ids))
             {
                 ids = [];
@@ -404,15 +422,15 @@ internal sealed class WorkspaceSession : IAsyncDisposable
 
             string projectFile = Path.GetFullPath(project.FilePath);
             string projectDirectory = Path.GetDirectoryName(projectFile)!;
-            projectDirectories.Add(projectDirectory);
+            if (ProjectLanguages.SourceSuffixOf(project) is { } suffix) coneRoots.Add((projectDirectory, suffix));
             projects.Add((projectFile, projectDirectory, project.OutputFilePath, project.CompilationOutputInfo.AssemblyPath));
         }
 
         foreach (string path in ProjectCone.SolutionStructuralPaths(solutionPath, projects))
             RecordStructural(path);
 
-        foreach (string projectDirectory in projectDirectories)
-        foreach (string coneFile in ProjectCone.Enumerate(projectDirectory))
+        foreach ((string projectDirectory, string suffix) in coneRoots)
+        foreach (string coneFile in ProjectCone.Enumerate(projectDirectory, suffix))
             knownConeFiles.Add(coneFile);
     }
 

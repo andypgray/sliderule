@@ -12,18 +12,21 @@ namespace SlideRule.Roslyn.Caching;
 /// <remarks>
 ///     The JSON shape is the cache's on-disk schema, versioned by <paramref name="SchemaVersion" />;
 ///     <paramref name="ToolVersion" /> is <see cref="FileStamping.CurrentToolVersion" /> at write time, and
-///     <paramref name="StructuralStamps" /> stamps every path
-///     <see cref="ProjectCone.SolutionStructuralPaths(string, IEnumerable{ProjectInputs})" /> yields, absent files
-///     included. <paramref name="Diagnostics" /> and the project lists after it are the
-///     recorded run's load verdict, field for field the <see cref="WorkspaceDiagnostics" /> its load reported,
-///     stored because a hit opens no workspace to recompute them from; each unsupported project's kind is stored
-///     rather than re-derived, so a cold run and a hit stay word-identical.
+///     <paramref name="StructuralStamps" /> stamps every path, absent files included, that
+///     <see
+///         cref="ProjectCone.SolutionStructuralPaths(string, IEnumerable{ProjectInputs}, IEnumerable{ForeignProjectInputs})" />
+///     yields, each <see cref="ForeignProjectInputs">foreign project</see>'s documents among them.
+///     <paramref name="Diagnostics" /> and the project lists after it are the recorded run's load verdict, field for
+///     field the <see cref="WorkspaceDiagnostics" /> its load reported, stored because a hit opens no workspace to
+///     recompute them from; each unsupported project's kind is stored rather than re-derived, so a cold run and a hit
+///     stay word-identical.
 /// </remarks>
 internal sealed record CacheManifest(
     int SchemaVersion,
     string ToolVersion,
     IReadOnlyList<FileStamp> StructuralStamps,
     IReadOnlyList<ProjectCacheEntry> Projects,
+    IReadOnlyList<ForeignProjectEntry> ForeignProjects,
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
     IReadOnlyList<string> Diagnostics,
     IReadOnlyList<string> FailedProjects,
@@ -80,6 +83,18 @@ internal sealed record ProjectCacheEntry(
     string ContentKey,
     string MerkleKey,
     string SurfaceKey);
+
+/// <summary>
+///     One <see cref="ForeignProjectInputs">foreign project</see>'s cone as capture found it: every file under
+///     <paramref name="ProjectDirectory" /> ending in <paramref name="SourceSuffix" />, absolute and ordinal-sorted.
+///     A cone file absent from <paramref name="ConeFiles" /> at validation is an add, and an add is a miss. Its
+///     project file and documents are structural stamps.
+/// </summary>
+internal sealed record ForeignProjectEntry(
+    string ProjectFilePath,
+    string ProjectDirectory,
+    string? SourceSuffix,
+    IReadOnlyList<string> ConeFiles);
 
 /// <summary>
 ///     A recorded spec resolution, keyed by the normalized <c>--spec</c> argument that produced it, so a cache hit

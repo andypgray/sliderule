@@ -192,7 +192,7 @@ internal static class MsBuildGate
         string solutionPath = ModelPipeline.DiscoverSolution(request.Solution, request.WorkingDirectory, environment);
 
         var diagnostics = new List<string>();
-        using ReplayedSolution replayed = ReplayOrThrow(binlogFullPath, solutionPath, binlog, diagnostics, ct);
+        using ReplayedSolution replayed = await ReplayOrThrowAsync(binlogFullPath, solutionPath, binlog, diagnostics, ct);
         if (!request.NoCache)
         {
             string? cacheRoot = environment.CacheRootOverride();
@@ -253,12 +253,12 @@ internal static class MsBuildGate
         if (AcquisitionOnThisFlow.Value is { } box) box.Value = acquisition;
     }
 
-    private static ReplayedSolution ReplayOrThrow(
+    private static async Task<ReplayedSolution> ReplayOrThrowAsync(
         string binlogFullPath, string solutionPath, string binlogArgument, List<string> diagnostics, CancellationToken ct)
     {
         try
         {
-            return BinlogReplayer.Replay(binlogFullPath, solutionPath, diagnostics.Add, ct);
+            return await BinlogReplayer.ReplayAsync(binlogFullPath, solutionPath, diagnostics.Add, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

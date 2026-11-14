@@ -57,7 +57,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(48);
+            .ShouldBe(49);
     }
 
     [Fact]
@@ -151,6 +151,103 @@ public sealed class ExtractionCacheStoreTests
 
         // Assert — a clean hit, not a perpetual Partial.
         result.Outcome.ShouldBe(CacheOutcome.Hit);
+    }
+
+    [Fact]
+    public void ReadAndValidate_ForeignProjectSourceEdited_ReturnsMiss()
+    {
+        // Arrange
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", ["Legacy"], ("A.cs", "class A {}"));
+        solution.AddForeignProject("Legacy", ("Ledger.vb", "Class Ledger\nEnd Class\n"));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.ShouldWrite(solution.Projects, TrivialExtraction(solution), solution.ForeignProjects);
+
+        // Act
+        RewriteBackdated(solution.PathOf("Legacy", "Ledger.vb"), "Class Ledger\n    Inherits Missing\nEnd Class\n");
+
+        // Assert
+        store.ReadAndValidate(Ct)
+            .Outcome.ShouldBe(CacheOutcome.Miss);
+    }
+
+    [Fact]
+    public void ReadAndValidate_ForeignProjectStrayUntouched_StillHits()
+    {
+        // Arrange — a .vb in the foreign project's cone that it does not compile, recorded at capture.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", ["Legacy"], ("A.cs", "class A {}"));
+        solution.AddForeignProject("Legacy", ("Ledger.vb", "Class Ledger\nEnd Class\n"));
+        solution.AddStrayFile("Legacy", "Excluded.vb", "Class Excluded\nEnd Class\n");
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.ShouldWrite(solution.Projects, TrivialExtraction(solution), solution.ForeignProjects);
+
+        // Act + Assert
+        store.ShouldValidateAsAPureStatHit();
+    }
+
+    [Fact]
+    public void ReadAndValidate_SourceAddedToAForeignProjectAfterAPartialWrite_ReturnsMiss()
+    {
+        // Arrange — a C# edit makes a partial, and the capture over it writes the cache back.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", ["Legacy"], ("A.cs", "class A {}"));
+        solution.AddForeignProject("Legacy", ("Ledger.vb", "Class Ledger\nEnd Class\n"));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.ShouldWrite(solution.Projects, TrivialExtraction(solution), solution.ForeignProjects);
+        RewriteBackdated(solution.PathOf("A", "A.cs"), "class A { int x; }");
+        CacheReadResult partial = store.ReadAndValidate(Ct);
+        partial.Outcome.ShouldBe(CacheOutcome.Partial);
+        CacheFingerprint carried = store.TryCaptureOverValidation(solution.Projects, partial.Validated, Ct)
+            .ShouldNotBeNull();
+        store.Write(carried, TrivialExtraction(solution), Ct)
+            .ShouldBeTrue();
+
+        // Act — the written manifest must still know the foreign project's cone.
+        solution.AddStrayFile("Legacy", "Other.vb", "Class Other\nEnd Class\n");
+
+        // Assert
+        store.ReadAndValidate(Ct)
+            .Outcome.ShouldBe(CacheOutcome.Miss);
+    }
+
+    [Fact]
+    public void ReadAndValidate_SourceAddedUnderABinWithNoProjectFileBesideIt_IsAnAdd()
+    {
+        // Arrange
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", "class A {}"));
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.ShouldWrite(solution.Projects, TrivialExtraction(solution));
+
+        // Act — the SDK compiles a bin below the project directory unless a project file sits beside it.
+        solution.AddStrayFile("A", Path.Combine("Sub", "bin", "Deep.cs"), "class Deep {}");
+
+        // Assert
+        store.ReadAndValidate(Ct)
+            .DirtyProjects.ShouldBe(["A"]);
+    }
+
+    [Fact]
+    public void ReadAndValidate_NestedProjectBuiltIntoANewObjDirectory_StillHits()
+    {
+        // Arrange — a project nested in A's directory, whose build writes generated sources under its own obj.
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", "class A {}"));
+        solution.AddStrayFile("A", Path.Combine("Nested", "Nested.csproj"), "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.ShouldWrite(solution.Projects, TrivialExtraction(solution));
+
+        // Act
+        solution.AddStrayFile("A", Path.Combine("Nested", "obj", "Release", "Nested.AssemblyInfo.cs"), "class Info {}");
+
+        // Assert
+        store.ShouldValidateAsAPureStatHit();
     }
 
     [Fact]
@@ -316,7 +413,7 @@ public sealed class ExtractionCacheStoreTests
         solution.AddProject("A", [], ("A.cs", "class A {}"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
-        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, null, Ct);
+        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, [], null, Ct);
 
         File.WriteAllText(solution.PathOf("A", "A.cs"), "class A { int y; }");
         File.SetLastWriteTimeUtc(solution.PathOf("A", "A.cs"), DateTime.UtcNow);
@@ -368,7 +465,7 @@ public sealed class ExtractionCacheStoreTests
 
         // Act
         long beforeCapture = store.CaptureStampCount;
-        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, partial.Validated, Ct);
+        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, [], partial.Validated, Ct);
 
         // Assert — only the edited document was read, B's stamps are the ones validation took, and the written
         // cache validates as a pure-stat hit, so capture and validation still agree on every key.
@@ -399,7 +496,7 @@ public sealed class ExtractionCacheStoreTests
 
         // Act
         long beforeCapture = store.CaptureStampCount;
-        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, partial.Validated, Ct);
+        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, [], partial.Validated, Ct);
 
         // Assert — the two unchanged documents rode in from validation.
         (store.CaptureStampCount - beforeCapture).ShouldBe(1);
@@ -426,7 +523,7 @@ public sealed class ExtractionCacheStoreTests
 
         // Act
         long beforeCapture = store.CaptureStampCount;
-        CacheFingerprint fingerprint = store.CaptureFingerprint(loaded, partial.Validated, Ct);
+        CacheFingerprint fingerprint = store.CaptureFingerprint(loaded, [], partial.Validated, Ct);
 
         // Assert — the added document is the one read, and it is in the written entry.
         (store.CaptureStampCount - beforeCapture).ShouldBe(1);
@@ -454,7 +551,7 @@ public sealed class ExtractionCacheStoreTests
 
         // Act
         long beforeCapture = store.CaptureStampCount;
-        CacheFingerprint fingerprint = store.CaptureFingerprint(loaded, partial.Validated, Ct);
+        CacheFingerprint fingerprint = store.CaptureFingerprint(loaded, [], partial.Validated, Ct);
 
         // Assert — nothing was read, and the deleted document is gone from the entry.
         (store.CaptureStampCount - beforeCapture).ShouldBe(0);
@@ -478,7 +575,7 @@ public sealed class ExtractionCacheStoreTests
         store.ShouldWrite(solution.Projects, TrivialExtraction(solution));
         RewriteBackdated(solution.PathOf("A", "A.cs"), ClassWithMethod("A", "return 2;"));
         CacheReadResult partial = store.ReadAndValidate(Ct);
-        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, partial.Validated, Ct);
+        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, [], partial.Validated, Ct);
 
         // Act — B changes after validation, before the write.
         File.WriteAllText(solution.PathOf("B", "B.cs"), ClassWithMethod("B", "return 2;"));
@@ -503,7 +600,7 @@ public sealed class ExtractionCacheStoreTests
         store.ShouldWrite(solution.Projects, TrivialExtraction(solution));
         RewriteBackdated(solution.PathOf("A", "A.cs"), ClassWithMethod("A", "return 2;"));
         CacheReadResult partial = store.ReadAndValidate(Ct);
-        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, partial.Validated, Ct);
+        CacheFingerprint fingerprint = store.CaptureFingerprint(solution.Projects, [], partial.Validated, Ct);
 
         // Act — it changes again before the write.
         File.WriteAllText(solution.PathOf("A", "A.cs"), ClassWithMethod("A", "return 3;"));
@@ -529,7 +626,7 @@ public sealed class ExtractionCacheStoreTests
         List<ProjectInputs> onlyB = solution.Projects.Where(project => project.ProjectName == "B").ToList();
 
         // Act
-        CacheFingerprint fingerprint = store.CaptureFingerprint(onlyB, partial.Validated, Ct);
+        CacheFingerprint fingerprint = store.CaptureFingerprint(onlyB, [], partial.Validated, Ct);
 
         // Assert — a validation that cannot account for a dirty project is not carried at all.
         fingerprint.FreshStamps.ShouldBeNull();
@@ -1079,6 +1176,8 @@ public sealed class ExtractionCacheStoreTests
     {
         private readonly List<ProjectInputs> projects = [];
 
+        private readonly List<ForeignProjectInputs> foreignProjects = [];
+
         private readonly TempDirectory temp = TestTempRoot.Fresh("cache-store");
 
         private readonly TempDirectory cache = TestTempRoot.Fresh("cache-store");
@@ -1100,6 +1199,8 @@ public sealed class ExtractionCacheStoreTests
 
         public IReadOnlyList<ProjectInputs> Projects => projects;
 
+        public IReadOnlyList<ForeignProjectInputs> ForeignProjects => foreignProjects;
+
         public void Dispose()
         {
             temp.Dispose();
@@ -1113,6 +1214,16 @@ public sealed class ExtractionCacheStoreTests
             List<string> documentPaths = WriteDocuments([name], documents);
 
             projects.Add(new ProjectInputs(name, csproj, temp.PathOf(name), references, documentPaths));
+        }
+
+        // A Visual Basic project beside the C# ones, which the cache stamps as structural.
+        public void AddForeignProject(string name, params (string File, string Content)[] documents)
+        {
+            string vbproj = temp.WriteFile([name, $"{name}.vbproj"], "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+            temp.WriteFile([name, "obj", "project.assets.json"], "{}\n");
+            List<string> documentPaths = WriteDocuments([name], documents);
+
+            foreignProjects.Add(new ForeignProjectInputs(vbproj, temp.PathOf(name), ".vb", documentPaths));
         }
 
         // Rewrites the solution file as a classic .sln declaring one C# project per name, whether or not its
@@ -1262,9 +1373,12 @@ file static class ExtractionCacheStoreAssertions
     // Captures the fingerprint of projects as they stand on disk and writes extraction under it; the write has
     // to take.
     internal static void ShouldWrite(
-        this ExtractionCacheStore store, IReadOnlyList<ProjectInputs> projects, ExtractionResult extraction)
+        this ExtractionCacheStore store,
+        IReadOnlyList<ProjectInputs> projects,
+        ExtractionResult extraction,
+        IReadOnlyList<ForeignProjectInputs>? foreignProjects = null)
     {
-        CacheFingerprint fingerprint = store.CaptureFingerprint(projects, null, Ct);
+        CacheFingerprint fingerprint = store.CaptureFingerprint(projects, foreignProjects ?? [], null, Ct);
         store.Write(fingerprint, extraction, Ct)
             .ShouldBeTrue();
     }

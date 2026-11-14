@@ -1,6 +1,11 @@
 using System.Text.Json;
 using Shouldly;
+using SlideRule.Cli.Replay;
+using SlideRule.Codebase;
+using SlideRule.Roslyn;
 using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Roslyn.Replay;
+using SlideRule.Tests.Extraction;
 using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.Replay;
 using SlideRule.Tests.TestSupport;
@@ -449,6 +454,168 @@ public sealed class SolutionEntriesE2ETests
         result.Err.ShouldContain(
             "warning: " + CrossLanguageReferences.Message(LegacyReference(bed)), customMessage: result.Transcript());
     }
+
+    [Fact]
+    public async Task Check_Cached_VisualBasicProjectBrokenAfterTheFirstRun_AnswersAsAColdCheckDoes()
+    {
+        // Arrange
+        using TempDirectory bed = TestTempRoot.Fresh("visual-basic-cached-edit");
+        using var cache = new TempCacheRoot("visual-basic-cached-edit");
+        (string solution, string spec) = WriteVisualBasicBed(bed);
+        await CacheRuns.CheckAsync(solution, spec, cache.Root);
+
+        // Act — no C# file moves, so only what the cache keys on the VB project can notice the edit.
+        FixtureEdits.EditOnDisk(bed.PathOf("Legacy", "Ledger.vb"), BreakLedger);
+        CacheRun cached = await CacheRuns.CheckAsync(solution, spec, cache.Root);
+        CacheRun cold = await CacheRuns.CheckAsync(solution, spec, cache.Root, noCache: true);
+
+        // Assert — the edge into the broken project is gone and the load warns why, as on the cold run.
+        cached.Result.ShouldMatchTheOutputOf(cold.Result);
+        cached.Result.Out.ShouldHavePassed("vb/app-off-legacy");
+        using JsonDocument document = cached.Result.ShouldHaveJsonStdout();
+        document.RootElement.Strings("workspaceDiagnostics")
+            .ShouldContain(CrossLanguageReferences.Message(LegacyReference(bed)), cached.Result.Transcript());
+    }
+
+    [Fact]
+    public async Task Check_Cached_VisualBasicFileAddedAfterTheFirstRun_AnswersAsAColdCheckDoes()
+    {
+        // Arrange — Widget names a VB type that does not exist yet, so the first run has no edge to it.
+        using TempDirectory bed = TestTempRoot.Fresh("visual-basic-cached-add");
+        using var cache = new TempCacheRoot("visual-basic-cached-add");
+        (string solution, string spec) = WriteVisualBasicBed(bed);
+        FixtureEdits.EditOnDisk(bed.PathOf("App", "Widget.cs"), ReferenceOther);
+        CacheRun first = await CacheRuns.CheckAsync(solution, spec, cache.Root);
+        first.Result.Out.ShouldHaveFailedWith("vb/app-off-legacy", "target", ["Legacy.Ledger"]);
+
+        // Act — the add is the only change: a C# edit would invalidate the cache on its own.
+        bed.WriteFile(["Legacy", "Other.vb"], OtherSource);
+        CacheRun cached = await CacheRuns.CheckAsync(solution, spec, cache.Root);
+        CacheRun cold = await CacheRuns.CheckAsync(solution, spec, cache.Root, noCache: true);
+
+        // Assert
+        cached.Result.ShouldMatchTheOutputOf(cold.Result);
+        cached.Result.Out.ShouldHaveFailedWith("vb/app-off-legacy", "target", ["Legacy.Ledger", "Legacy.Other"]);
+    }
+
+    [Fact]
+    public async Task Check_CachedBinlogReplay_VisualBasicProjectBrokenAfterTheBuild_AnswersAsAColdReplayDoes()
+    {
+        // Arrange — a replay compiles the VB project beside the C# one, from its sources on disk.
+        using TempDirectory bed = TestTempRoot.Fresh("visual-basic-binlog");
+        using var cache = new TempCacheRoot("visual-basic-binlog");
+        (string solution, string spec) = WriteVisualBasicBed(bed);
+        string binlog = BuildVisualBasicBedWithBinlog(bed);
+        FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cache.Root);
+        string[] check = ["check", solution, "--spec", spec, "--binlog", binlog, "--json"];
+        CliResult seeded = await CliRunner.InvokeColdAsync(environment, check);
+        seeded.Out.ShouldHaveSingleViolationOnEdge("vb/app-off-legacy", "reference", "App.Widget", "Legacy.Ledger");
+
+        // Act
+        FixtureEdits.EditOnDisk(bed.PathOf("Legacy", "Ledger.vb"), BreakLedger);
+        CliResult cached = await CliRunner.InvokeColdAsync(environment, check);
+        CliResult cold = await CliRunner.InvokeColdAsync(environment, [.. check, "--no-cache"]);
+
+        // Assert — the edge is gone and the replay warns why, as a load does.
+        cached.ShouldMatchTheOutputOf(cold);
+        cached.Out.ShouldHavePassed("vb/app-off-legacy");
+        using JsonDocument document = cached.ShouldHaveJsonStdout();
+        document.RootElement.Strings("workspaceDiagnostics")
+            .ShouldContain(CrossLanguageReferences.Message(LegacyReference(bed)), cached.Transcript());
+    }
+
+    [Fact]
+    public async Task Check_CaptureReplay_VisualBasicFileAddedAfterTheBuild_RunsADesignTimeBuildThatSeesIt()
+    {
+        // Arrange — the capture holds the build that wrote the binlog, which never compiled the added file.
+        using TempDirectory bed = TestTempRoot.Fresh("visual-basic-capture-add");
+        using var cache = new TempCacheRoot("visual-basic-capture-add");
+        (string solution, string spec) = WriteVisualBasicBed(bed);
+        string binlog = BuildVisualBasicBedWithBinlog(bed);
+        await CliRunner.InvokeColdAsync(
+            FakeEnvironment.WithCacheRoot(cache.Root), "check", solution, "--spec", spec, "--binlog", binlog, "--json");
+
+        // Act — the C# edit alone leaves the capture usable, since a replay reads a document's text from disk.
+        FixtureEdits.EditOnDisk(bed.PathOf("App", "Widget.cs"), ReferenceOther);
+        string added = bed.WriteFile(["Legacy", "Other.vb"], OtherSource);
+        CliResult run = await CliRunner.InvokeColdAsync(
+            FakeEnvironment.WithCacheRoot(cache.Root), "check", solution, "--spec", spec, "--json");
+
+        // Assert
+        run.Gate.ShouldBe(GateAcquisition.NoticeCold, run.Transcript());
+        run.Err.ShouldContain(BinlogCaptureStore.StaleNotice(Path.GetFullPath(added)), customMessage: run.Transcript());
+        run.Out.ShouldHaveFailedWith("vb/app-off-legacy", "target", ["Legacy.Ledger", "Legacy.Other"]);
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_VisualBasicProjectBrokenOnDisk_ReloadsAndWarnsThatItsTypesAreUnbound()
+    {
+        // Arrange
+        using TempDirectory bed = TestTempRoot.Fresh("visual-basic-warm-edit");
+        (string solution, _) = WriteVisualBasicBed(bed);
+        await using var session = new WorkspaceSession();
+        await session.GetCurrentAsync(solution, Ct);
+        long reloadsBefore = session.FullReloadCount;
+
+        // Act
+        FixtureEdits.EditOnDisk(bed.PathOf("Legacy", "Ledger.vb"), BreakLedger);
+        WorkspaceSnapshot after = await session.GetCurrentAsync(solution, Ct);
+
+        // Assert — the warning is computed at load, so only a reload can raise it.
+        (session.FullReloadCount - reloadsBefore).ShouldBe(1);
+        after.LoadDiagnostics.LoadFailures.ShouldContain(CrossLanguageReferences.Message(LegacyReference(bed)));
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(after.Solution, ct: Ct);
+        model.HasEdge("App.Widget", "Legacy.Ledger")
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_VisualBasicFileAddedOnDisk_ReloadsAndBindsTheAddedType()
+    {
+        // Arrange
+        using TempDirectory bed = TestTempRoot.Fresh("visual-basic-warm-add");
+        (string solution, _) = WriteVisualBasicBed(bed);
+        FixtureEdits.EditOnDisk(bed.PathOf("App", "Widget.cs"), ReferenceOther);
+        await using var session = new WorkspaceSession();
+        WorkspaceSnapshot before = await session.GetCurrentAsync(solution, Ct);
+        CodebaseModel beforeModel = await CodebaseExtractor.ExtractFromSolutionAsync(before.Solution, ct: Ct);
+        beforeModel.HasEdge("App.Widget", "Legacy.Other")
+            .ShouldBeFalse();
+        long reloadsBefore = session.FullReloadCount;
+
+        // Act
+        bed.WriteFile(["Legacy", "Other.vb"], OtherSource);
+        WorkspaceSnapshot after = await session.GetCurrentAsync(solution, Ct);
+
+        // Assert
+        (session.FullReloadCount - reloadsBefore).ShouldBe(1);
+        CodebaseModel model = await CodebaseExtractor.ExtractFromSolutionAsync(after.Solution, ct: Ct);
+        model.HasEdge("App.Widget", "Legacy.Other")
+            .ShouldBeTrue();
+    }
+
+    // Rebuilds the bed from scratch with a binary log beside its solution, so the log records every compiler call: an
+    // incremental build skips the calls whose outputs are current.
+    private static string BuildVisualBasicBedWithBinlog(TempDirectory bed)
+    {
+        string binlog = bed.PathOf("build.binlog");
+        DotnetCli.Run($"build App.slnx --no-incremental -bl:LogFile=\"{binlog}\"", bed.Path);
+        return binlog;
+    }
+
+    // Gives the bed's VB type a declaration error, so the workspace has no assembly to hand the C# compilation.
+    private static string BreakLedger(string source)
+    {
+        return source.Replace("Public Class Ledger\n", "Public Class Ledger\n        Inherits Missing\n", StringComparison.Ordinal);
+    }
+
+    // Has Widget name a second VB type, Legacy.Other, which the bed does not declare.
+    private static string ReferenceOther(string source)
+    {
+        return source.Replace("{\n", "{\n    public Legacy.Other? Other { get; }\n", StringComparison.Ordinal);
+    }
+
+    private const string OtherSource = "Namespace Legacy\n    Public Class Other\n    End Class\nEnd Namespace\n";
 
     // The bed's one cross-language reference, as the load names it.
     private static CrossLanguageReferences.Finding LegacyReference(TempDirectory bed)

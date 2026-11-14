@@ -29,7 +29,7 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
     }
 
     /// <inheritdoc />
-    public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
+    public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
         // The handle handed out does not own the replay, so a second replay could neither replace the first
         // (whose handle may still be reading through its reader) nor be released alongside it.
@@ -40,7 +40,7 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
         ReplayedSolution replayed;
         try
         {
-            replayed = BinlogReplayer.Replay(binlogCopyPath, solutionPath, diagnostics.Add, ct);
+            replayed = await BinlogReplayer.ReplayAsync(binlogCopyPath, solutionPath, diagnostics.Add, ct);
         }
         // Cancellation is the caller's, not a bad capture: let it propagate rather than be reported as a
         // replay failure that would send the gate off to re-run the whole thing cold.
@@ -53,6 +53,6 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
         var source = new ReplayedSolutionSource(
             replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), replayed.TargetFrameworks,
             replayed.ProjectFiles);
-        return source.AcquireAsync(solutionPath, ct);
+        return await source.AcquireAsync(solutionPath, ct);
     }
 }

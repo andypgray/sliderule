@@ -15,10 +15,10 @@ namespace SlideRule.Tests.Replay;
 public sealed class BinlogReplayerUnitTests
 {
     [Fact]
-    public void Replay_BlankPath_ThrowsArgumentExceptionBeforeAnyBuild()
+    public async Task Replay_BlankPath_ThrowsArgumentExceptionBeforeAnyBuild()
     {
         // ArgumentException.ThrowIfNullOrWhiteSpace is the very first statement — no SolutionReader, no MSBuild.
-        Should.Throw<ArgumentException>(() => BinlogReplayer.Replay("", solutionPath: null));
+        await Should.ThrowAsync<ArgumentException>(() => BinlogReplayer.ReplayAsync("", solutionPath: null));
     }
 
     [Theory]

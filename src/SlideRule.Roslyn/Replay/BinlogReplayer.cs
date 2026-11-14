@@ -27,16 +27,18 @@ namespace SlideRule.Roslyn.Replay;
 ///     </para>
 ///     <para>
 ///         Replaying analyzers/generators executes the build's own analyzer assemblies from their
-///         on-disk paths (see <see cref="Replay" /> for the analyzer-host choice) — the same trust
+///         on-disk paths (see <see cref="ReplayAsync" /> for the analyzer-host choice) — the same trust
 ///         boundary as building the solution in the first place.
 ///     </para>
 /// </remarks>
 internal static class BinlogReplayer
 {
     /// <summary>
-    ///     Replays <paramref name="binlogPath" /> into a <see cref="ReplayedSolution" /> of its regular C# compiler
+    ///     Replays <paramref name="binlogPath" /> into a <see cref="ReplayedSolution" /> of its regular compiler
     ///     invocations, settled through the same <see cref="LoadBoundary" /> as <see cref="WorkspaceLoader" />'s
-    ///     load so downstream behaviour is identical.
+    ///     load so downstream behaviour is identical. A Visual Basic project is replayed beside the C# ones, as the
+    ///     workspace loads it, so a C# project that references it binds to its types; it is still named as a project
+    ///     the run does not survey.
     /// </summary>
     /// <param name="binlogPath">Absolute path to the <c>.binlog</c> a real build of the current tree produced.</param>
     /// <param name="solutionPath">
@@ -49,17 +51,19 @@ internal static class BinlogReplayer
     ///     Optional sink for replay diagnostics that do not abort the load, on <see cref="WorkspaceLoader" />'s
     ///     <c>diagnosticLog</c> contract.
     /// </param>
-    /// <param name="ct">Honoured on a best-effort basis around the synchronous reader calls.</param>
+    /// <param name="ct">
+    ///     Honoured on a best-effort basis around the synchronous <see cref="SolutionReader" /> calls, and in full by
+    ///     the compilations the cross-language check makes.
+    /// </param>
     /// <remarks>
-    ///     Synchronous, because the underlying <see cref="SolutionReader" /> API is synchronous. Throws
-    ///     <see cref="ArgumentException" /> for a blank <paramref name="binlogPath" />,
+    ///     Throws <see cref="ArgumentException" /> for a blank <paramref name="binlogPath" />,
     ///     <see cref="FileNotFoundException" /> when no file is there, and <see cref="InvalidOperationException" />
     ///     when the binlog holds no replayable C# compiler invocation; whatever the reader raises for an
     ///     unreadable, corrupt or non-binlog file propagates unwrapped. The analyzer host is
     ///     <see cref="BasicAnalyzerKind.OnDisk" />, the shape the <c>MSBuildWorkspace</c> path itself produces;
     ///     the differential fidelity test gates that choice.
     /// </remarks>
-    public static ReplayedSolution Replay(
+    public static async Task<ReplayedSolution> ReplayAsync(
         string binlogPath, string? solutionPath, Action<string>? diagnosticSink = null, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogPath);
@@ -75,21 +79,21 @@ internal static class BinlogReplayer
 
         var reader = SolutionReader.Create(
             binlogPath, BasicAnalyzerKind.OnDisk,
-            predicate: call => IsReplayableCSharpCall(call, replayedProjects, unsupportedProjects));
+            predicate: call => IsReplayableCall(call, replayedProjects, unsupportedProjects));
 
         AdhocWorkspace? workspace = null;
         try
         {
-            if (reader.ProjectCount == 0)
-                throw new InvalidOperationException(
-                    $"The binlog '{binlogPath}' contains no C# compiler invocations to replay. SlideRule "
-                    + "replays C# projects only; a Visual Basic-only or empty binlog cannot produce a model.");
-
             ct.ThrowIfCancellationRequested();
             string? solutionFile = solutionPath is { Length: > 0 }
                 ? SolutionProjectFileParser.SolutionFileOf(solutionPath)
                 : null;
             SolutionInfo captured = reader.ReadSolutionInfo();
+            if (!captured.Projects.Any(project => project.Language == LanguageNames.CSharp))
+                throw new InvalidOperationException(
+                    $"The binlog '{binlogPath}' contains no C# compiler invocations to replay. SlideRule "
+                    + "replays C# projects only; a Visual Basic-only or empty binlog cannot produce a model.");
+
             var solutionInfo = SolutionInfo.Create(
                 captured.Id, captured.Version, solutionFile, captured.Projects, captured.AnalyzerReferences);
 
@@ -120,6 +124,16 @@ internal static class BinlogReplayer
 
             foreach (UnresolvedReferences.Finding found in UnresolvedReferences.Detect(settled.Solution, settled.Report.Failed))
                 diagnosticSink?.Invoke(UnresolvedReferences.Message(found.ProjectPath, found.Names));
+
+            // As WorkspaceLoader runs it, and only for a sink, since it compiles the C# projects it inspects.
+            if (diagnosticSink is not null)
+            {
+                IReadOnlyList<CrossLanguageReferences.Finding> dropped = await CrossLanguageReferences
+                    .DetectAsync(settled.Solution, settled.Report.Failed, ct)
+                    .ConfigureAwait(false);
+                foreach (CrossLanguageReferences.Finding found in dropped)
+                    diagnosticSink(CrossLanguageReferences.Message(found));
+            }
 
             return new ReplayedSolution(
                 workspace, reader, settled.Solution, settled.TargetFrameworks, settled.ProjectFiles, settled.Report);
@@ -198,25 +212,21 @@ internal static class BinlogReplayer
         return outputPath + extension;
     }
 
-    // The C#-only filter, layered onto SolutionReader's own default (regular compiler calls), so a mixed-language
-    // capture replays its C# projects and states the rest. The dropped paths are collected because nothing
-    // downstream could recover them: the solution file says what was declared, and only these invocations say
-    // what this build dropped.
-    private static bool IsReplayableCSharpCall(
-        CompilerCall call, ICollection<string> replayedProjects, ICollection<string> droppedProjects)
+    // SolutionReader's own default (regular compiler calls), which keeps a Visual Basic call too: the reader maps a
+    // C# call's reference to another call it built onto that call's project, and fails outright when a predicate has
+    // left that project out. The non-C# paths are collected because nothing downstream could recover them: the
+    // solution file says what was declared, and only these invocations say what this build compiled in another
+    // language.
+    private static bool IsReplayableCall(
+        CompilerCall call, ICollection<string> replayedProjects, ICollection<string> otherLanguageProjects)
     {
         if (call.Kind != CompilerCallKind.Regular) return false;
 
-        string? projectFilePath = call.ProjectFilePath is { Length: > 0 } path ? Path.GetFullPath(path) : null;
-        if (call.IsCSharp)
-        {
-            if (projectFilePath is not null) replayedProjects.Add(projectFilePath);
-            return true;
-        }
+        if (call.ProjectFilePath is not { Length: > 0 } path) return true;
 
-        if (projectFilePath is not null) droppedProjects.Add(projectFilePath);
-
-        return false;
+        ICollection<string> projects = call.IsCSharp ? replayedProjects : otherLanguageProjects;
+        projects.Add(Path.GetFullPath(path));
+        return true;
     }
 
     // The project files in another language that a replayed C# project references, read off the build's own

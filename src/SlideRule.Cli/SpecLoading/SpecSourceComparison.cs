@@ -3,6 +3,7 @@ using System.Reflection.PortableExecutable;
 using System.Security.Cryptography;
 using SlideRule.Internal;
 using SlideRule.Roslyn.Caching;
+using SlideRule.Roslyn.Diagnostics;
 
 namespace SlideRule.Cli.SpecLoading;
 
@@ -109,8 +110,9 @@ internal static class SpecSourceComparison
         IReadOnlyList<PdbDocument>? documents = ReadDocuments(dllPath);
         if (documents is null) return null;
 
+        var buildOutput = new BuildOutputDirectories();
         List<PdbDocument> compiled = documents
-            .Where(document => !BuildOutputDirectories.IsUnderBuildOutput(projectDirectory, document.Path))
+            .Where(document => !buildOutput.IsUnderBuildOutput(projectDirectory, document.Path))
             .ToList();
         return compiled.Any(document => File.Exists(document.Path)) ? compiled : null;
     }
@@ -203,7 +205,7 @@ internal static class SpecSourceComparison
     {
         var holdsProject = new Dictionary<string, bool>(PathComparison.Comparer);
 
-        return ProjectCone.Enumerate(projectDirectory, skipInaccessible: true)
+        return ProjectCone.Enumerate(projectDirectory, ProjectLanguages.CSharpSourceSuffix, skipInaccessible: true)
             .Where(path => !UnderNestedProject(path, projectDirectory, holdsProject))
             .ToList();
     }

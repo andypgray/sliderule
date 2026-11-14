@@ -75,14 +75,16 @@ internal sealed record CacheReadResult(
 /// </summary>
 /// <remarks>
 ///     A partial is never a structural change: any change to the solution, a project file, an assets file or a
-///     probe file is a miss. So the structural stamps, the project set and the reference graph a partial
-///     validated are the ones the capture would take again, and a clean project's documents, true content key
-///     and surface key are exactly what a full re-stamp would recompute. Both lists are in manifest order, and
-///     every project outside <paramref name="DirtyProjects" /> is carried whole.
+///     probe file is a miss, and so is any change to a <see cref="ForeignProjectInputs">foreign project</see>. So
+///     the structural stamps, the project set, the foreign projects and the reference graph a partial validated are
+///     the ones the capture would take again, and a clean project's documents, true content key and surface key are
+///     exactly what a full re-stamp would recompute. The lists are in manifest order, and every project outside
+///     <paramref name="DirtyProjects" /> is carried whole.
 /// </remarks>
 internal sealed record ValidatedStamps(
     IReadOnlyList<FileStamp> StructuralStamps,
     IReadOnlyList<ValidatedProject> Projects,
+    IReadOnlyList<ForeignProjectEntry> ForeignProjects,
     IReadOnlySet<string> DirtyProjects)
 {
     /// <summary>The project files of <see cref="DirtyProjects" />: what a run that re-extracts them must load.</summary>
@@ -123,6 +125,24 @@ internal sealed record ProjectInputs(
     string? IntermediateAssemblyPath = null);
 
 /// <summary>
+///     A loaded project in a language other than C#, as the caller knows it before any file is statted. The model
+///     holds nothing of its own from it, but a C# project that references it binds to its compilation, so the cache
+///     treats each of its inputs as structural: any change to one is a miss, and the next load computes the edges and
+///     the load warning afresh.
+/// </summary>
+/// <remarks>
+///     <paramref name="SourceSuffix" /> is the suffix its language's default compile glob matches, or null for a
+///     language whose sources are listed one by one, which has no cone to scan.
+/// </remarks>
+internal sealed record ForeignProjectInputs(
+    string ProjectFilePath,
+    string ProjectDirectory,
+    string? SourceSuffix,
+    IReadOnlyList<string> DocumentPaths,
+    string? EvaluatedOutputPath = null,
+    string? IntermediateAssemblyPath = null);
+
+/// <summary>
 ///     A pre-extraction fingerprint of the workspace's files: the structural stamps and per-project entries, as
 ///     the manifest will record them, taken before extraction started and handed back to
 ///     <see cref="ExtractionCacheStore.Write" />.
@@ -134,6 +154,7 @@ internal sealed record ProjectInputs(
 internal sealed record CacheFingerprint(
     IReadOnlyList<FileStamp> StructuralStamps,
     IReadOnlyList<ProjectCacheEntry> Projects,
+    IReadOnlyList<ForeignProjectEntry> ForeignProjects,
     IReadOnlyList<FileStamp>? FreshStamps = null);
 
 /// <summary>
@@ -178,7 +199,7 @@ internal sealed class ExtractionCacheStore
     // gains a slot, even one that deserializes to a harmless default, so a reader never reasons about which
     // slots a file predates. The suite cannot catch a missed bump — every run gets a fresh cache directory — so
     // the discipline is the only guard.
-    private const int CurrentSchemaVersion = 48;
+    private const int CurrentSchemaVersion = 49;
 
     private static readonly IReadOnlySet<string> NoDocuments = new HashSet<string>(PathComparison.Comparer);
 
@@ -220,13 +241,17 @@ internal sealed class ExtractionCacheStore
 
     /// <summary>
     ///     The fingerprint to hand to <see cref="Write" />: the one <see cref="TryCaptureOverValidation" /> builds
-    ///     from <paramref name="validated" /> where it can, and otherwise every input stamped now. Does not touch
-    ///     <see cref="ContentHashCount" /> (that counts validation reads only) and writes nothing.
+    ///     from <paramref name="validated" /> where it can, and otherwise every input stamped now, those of
+    ///     <paramref name="foreignProjects" /> included. Does not touch <see cref="ContentHashCount" /> (that counts
+    ///     validation reads only) and writes nothing.
     /// </summary>
     public CacheFingerprint CaptureFingerprint(
-        IReadOnlyList<ProjectInputs> projects, ValidatedStamps? validated, CancellationToken ct = default)
+        IReadOnlyList<ProjectInputs> projects,
+        IReadOnlyList<ForeignProjectInputs> foreignProjects,
+        ValidatedStamps? validated,
+        CancellationToken ct = default)
     {
-        return TryCaptureOverValidation(projects, validated, ct) ?? CaptureEverything(projects, ct);
+        return TryCaptureOverValidation(projects, validated, ct) ?? CaptureEverything(projects, foreignProjects, ct);
     }
 
     /// <summary>
@@ -234,7 +259,8 @@ internal sealed class ExtractionCacheStore
     ///     <paramref name="projects" /> holds a project the validation does not know or lacks a dirty one. A clean
     ///     project is taken whole from the validation; a dirty project keeps the stamps of the documents validation
     ///     found unchanged and stamps the rest from <paramref name="projects" />, which decide its document list
-    ///     and may be only the dirty projects' closure.
+    ///     and may be only the dirty projects' closure. The foreign projects are the validation's, since a partial
+    ///     never follows a change to one.
     /// </summary>
     /// <remarks>
     ///     A caller whose <paramref name="projects" /> are only a closure must not fall back to stamping them alone,
@@ -286,7 +312,11 @@ internal sealed class ExtractionCacheStore
 
         List<ProjectCacheEntry> entries = WithMerkleKeys(entryByIndex);
 
-        return new CacheFingerprint(validated.StructuralStamps, entries, freshByIndex.SelectMany(stamps => stamps).ToList());
+        return new CacheFingerprint(
+            validated.StructuralStamps,
+            entries,
+            validated.ForeignProjects,
+            freshByIndex.SelectMany(stamps => stamps).ToList());
     }
 
     // One dirty project's entry: the loaded document list, each document's validated stamp where its bytes were
@@ -352,15 +382,18 @@ internal sealed class ExtractionCacheStore
             IntermediateOutputTree.DefaultAssetsPathOf(projectDirectory));
 
         var knownDocuments = new HashSet<string>(documents.Select(d => d.Path), PathComparison.Comparer);
-        IReadOnlyList<string> adds = ProjectCone.Adds(Path.GetFullPath(projectDirectory), knownDocuments);
+        IReadOnlyList<string> adds = ProjectCone.Adds(
+            Path.GetFullPath(projectDirectory), ProjectLanguages.CSharpSourceSuffix, knownDocuments);
         return (csprojSha, assetsSha, adds);
     }
 
-    private CacheFingerprint CaptureEverything(IReadOnlyList<ProjectInputs> projects, CancellationToken ct)
+    private CacheFingerprint CaptureEverything(
+        IReadOnlyList<ProjectInputs> projects, IReadOnlyList<ForeignProjectInputs> foreignProjects, CancellationToken ct)
     {
-        List<FileStamp> structuralStamps = ProjectCone.SolutionStructuralPaths(solutionPath, projects)
+        List<FileStamp> structuralStamps = StructuralPathsOf(projects, foreignProjects)
             .Select(FileStamping.StampOf)
             .ToList();
+        List<ForeignProjectEntry> foreignEntries = foreignProjects.Select(ForeignEntryOf).ToList();
 
         Dictionary<string, string?> structuralShaByPath = BuildStructuralShaLookup(structuralStamps);
 
@@ -387,7 +420,42 @@ internal sealed class ExtractionCacheStore
                 surfaceKey);
         });
 
-        return new CacheFingerprint(structuralStamps, WithMerkleKeys(entryByIndex));
+        return new CacheFingerprint(structuralStamps, WithMerkleKeys(entryByIndex), foreignEntries);
+    }
+
+    // The solution's structural set over the C# projects and the foreign ones alike, then each foreign project's
+    // documents, which are structural too: a change to one changes what a C# project binds to.
+    private IEnumerable<string> StructuralPathsOf(
+        IReadOnlyList<ProjectInputs> projects, IReadOnlyList<ForeignProjectInputs> foreignProjects)
+    {
+        IReadOnlyList<string> solutionPaths = ProjectCone.SolutionStructuralPaths(solutionPath, projects, foreignProjects);
+        IEnumerable<string> foreignDocuments = foreignProjects
+            .SelectMany(project => project.DocumentPaths)
+            .Select(Path.GetFullPath);
+        return solutionPaths
+            .Concat(foreignDocuments)
+            .Distinct(PathComparison.Comparer);
+    }
+
+    private static ForeignProjectEntry ForeignEntryOf(ForeignProjectInputs project)
+    {
+        string directory = Path.GetFullPath(project.ProjectDirectory);
+        IReadOnlyList<string> cone = ProjectCone.Sorted(directory, project.SourceSuffix);
+        return new ForeignProjectEntry(Path.GetFullPath(project.ProjectFilePath), directory, project.SourceSuffix, cone);
+    }
+
+    // Whether a foreign project's cone holds a file capture did not see: a source the next load would compile.
+    private static bool ForeignConeGrew(IReadOnlyList<ForeignProjectEntry> foreignProjects)
+    {
+        foreach (ForeignProjectEntry project in foreignProjects)
+        {
+            if (project.SourceSuffix is not { } suffix) continue;
+
+            var known = new HashSet<string>(project.ConeFiles, PathComparison.Comparer);
+            if (ProjectCone.FirstAdd(project.ProjectDirectory, suffix, known) is not null) return true;
+        }
+
+        return false;
     }
 
     // The one Merkle pass every capture runs, setting each entry's Merkle key from the same kinds of key
@@ -415,7 +483,8 @@ internal sealed class ExtractionCacheStore
     /// <summary>
     ///     Commits <paramref name="extraction" /> to the cache, keyed to <paramref name="fingerprint" />.
     ///     Re-stats every input the capture took from disk first; if any changed since
-    ///     <see cref="CaptureFingerprint(IReadOnlyList{ProjectInputs}, ValidatedStamps, CancellationToken)" />
+    ///     <see
+    ///         cref="CaptureFingerprint(IReadOnlyList{ProjectInputs}, IReadOnlyList{ForeignProjectInputs}, ValidatedStamps, CancellationToken)" />
     ///     (a mid-run edit), skips the write and returns <c>false</c>. A best-effort I/O failure also returns
     ///     <c>false</c>. Otherwise writes atomically and returns <c>true</c>.
     /// </summary>
@@ -439,6 +508,7 @@ internal sealed class ExtractionCacheStore
             FileStamping.CurrentToolVersion,
             fingerprint.StructuralStamps,
             fingerprint.Projects,
+            fingerprint.ForeignProjects,
             extraction.SpecResolutions,
             extraction.LoadDiagnostics.LoadFailures,
             extraction.LoadDiagnostics.FailedProjects,
@@ -484,6 +554,10 @@ internal sealed class ExtractionCacheStore
                 manifest.StructuralStamps, () => Interlocked.Increment(ref contentHashCount), ct, out _)
             is not { } refreshedStructural)
             return CacheReadResult.Miss();
+
+        // A foreign project's edits were already swept as structural stamps; an add to its cone is the one change
+        // the sweep cannot see.
+        if (ForeignConeGrew(manifest.ForeignProjects)) return CacheReadResult.Miss();
 
         Dictionary<string, string?> structuralShaByPath = BuildStructuralShaLookup(refreshedStructural);
 
@@ -543,7 +617,7 @@ internal sealed class ExtractionCacheStore
         }
 
         List<CodebaseFragment> reusable = replayedFragments.Where(f => !dirtyProjects.Contains(f.ProjectName)).ToList();
-        ValidatedStamps validated = ValidatedStampsOf(manifest.Projects, checkedByIndex, refreshedStructural, dirtyProjects);
+        ValidatedStamps validated = ValidatedStampsOf(manifest, checkedByIndex, refreshedStructural, dirtyProjects);
         return CacheReadResult.Partial(reusable, dirtyProjects, manifest.SpecResolutions, loadDiagnostics, validated);
     }
 
@@ -558,11 +632,12 @@ internal sealed class ExtractionCacheStore
     ///     stamp of the same bytes, so it is stamped again.
     /// </remarks>
     private static ValidatedStamps ValidatedStampsOf(
-        IReadOnlyList<ProjectCacheEntry> projects,
+        CacheManifest manifest,
         IReadOnlyList<ProjectCheck> checkedByIndex,
         IReadOnlyList<FileStamp> refreshedStructural,
         IReadOnlySet<string> dirtyProjects)
     {
+        IReadOnlyList<ProjectCacheEntry> projects = manifest.Projects;
         var validated = new List<ValidatedProject>(projects.Count);
         for (var index = 0; index < projects.Count; index++)
         {
@@ -587,7 +662,7 @@ internal sealed class ExtractionCacheStore
             validated.Add(new ValidatedProject(entry, unchanged));
         }
 
-        return new ValidatedStamps(refreshedStructural, validated, dirtyProjects);
+        return new ValidatedStamps(refreshedStructural, validated, manifest.ForeignProjects, dirtyProjects);
     }
 
     /// <summary>

@@ -6,7 +6,7 @@ using Xunit;
 namespace SlideRule.Tests.Caching;
 
 /// <summary>
-///     The cone walk over hand-built directories: which <c>*.cs</c> it yields where a file name's case, a directory
+///     The cone walk over hand-built directories: which sources it yields where a file name's case, a directory
 ///     link or an unreadable directory decides, read through <see cref="ProjectCone.Adds" />, which sorts.
 /// </summary>
 public sealed class ProjectConeTests
@@ -18,7 +18,7 @@ public sealed class ProjectConeTests
         using TempDirectory temp = TestTempRoot.Fresh("project-cone");
         string upper = temp.WriteFile(["Upper.CS"], "class Upper { }");
 
-        ProjectCone.Adds(temp.Path, [])
+        ProjectCone.Adds(temp.Path, ".cs", [])
             .ShouldBe([upper]);
     }
 
@@ -31,7 +31,7 @@ public sealed class ProjectConeTests
         temp.WriteFile(["Outside", "Linked.cs"], "class Linked { }");
         SymlinkSupport.CreateDirectorySymlink(temp.PathOf("Project", "Linked"), temp.PathOf("Outside"));
 
-        ProjectCone.Adds(project, [])
+        ProjectCone.Adds(project, ".cs", [])
             .ShouldBe([temp.PathOf("Project", "Linked", "Linked.cs"), rules]);
     }
 
@@ -43,7 +43,7 @@ public sealed class ProjectConeTests
         string rules = temp.WriteFile(["Project", "Rules.cs"], "class Rules { }");
         SymlinkSupport.CreateDirectorySymlink(temp.PathOf("Project", "Loop"), project);
 
-        ProjectCone.Adds(project, [])
+        ProjectCone.Adds(project, ".cs", [])
             .ShouldBe([rules]);
     }
 
@@ -58,7 +58,7 @@ public sealed class ProjectConeTests
         SymlinkSupport.CreateDirectorySymlink(temp.PathOf("Project", "Out"), temp.PathOf("Outside"));
         SymlinkSupport.CreateDirectorySymlink(temp.PathOf("Outside", "Self"), temp.PathOf("Outside"));
 
-        ProjectCone.Adds(project, [])
+        ProjectCone.Adds(project, ".cs", [])
             .ShouldBe([temp.PathOf("Project", "Out", "Outer.cs"), rules]);
     }
 
@@ -72,7 +72,7 @@ public sealed class ProjectConeTests
         SymlinkSupport.CreateDirectorySymlink(temp.PathOf("Project", "A", "ToB"), temp.PathOf("Project", "B"));
         SymlinkSupport.CreateDirectorySymlink(temp.PathOf("Project", "B", "ToA"), temp.PathOf("Project", "A"));
 
-        ProjectCone.Adds(project, [])
+        ProjectCone.Adds(project, ".cs", [])
             .ShouldBe([a, temp.PathOf("Project", "A", "ToB", "B.cs"), b, temp.PathOf("Project", "B", "ToA", "A.cs")]);
     }
 
@@ -85,7 +85,7 @@ public sealed class ProjectConeTests
         temp.WriteFile(["Above.cs"], "class Above { }");
         SymlinkSupport.CreateDirectorySymlink(temp.PathOf("Project", "Up"), temp.Path);
 
-        ProjectCone.Adds(project, [])
+        ProjectCone.Adds(project, ".cs", [])
             .ShouldBe([rules]);
     }
 
@@ -99,8 +99,76 @@ public sealed class ProjectConeTests
         SymlinkSupport.CreateDirectorySymlink(temp.PathOf("Project", "A"), temp.PathOf("Project", "B"));
         SymlinkSupport.CreateDirectorySymlink(temp.PathOf("Project", "B"), temp.PathOf("Project", "A"));
 
-        ProjectCone.Adds(project, [])
+        ProjectCone.Adds(project, ".cs", [])
             .ShouldBe([rules]);
+    }
+
+    // Each source as the SDK's default compile glob reads it, in a project whose directory also holds a nested
+    // project: a bin or obj is build output only beside a project file, and its name matches ordinally.
+    public static TheoryData<string[], bool> BuildOutputRows => new()
+    {
+        { ["Rules.cs"], true },
+        { ["Sub", "bin", "DeepBin.cs"], true },
+        { ["Sub", "obj", "DeepObj.cs"], true },
+        { ["Bin", "InBin.cs"], true },
+        { ["bin", "RootBin.cs"], false },
+        { ["obj", "RootObj.cs"], false },
+        { ["Nested", "obj", "Gen.cs"], false }
+    };
+
+    [Theory]
+    [MemberData(nameof(BuildOutputRows))]
+    public void Adds_SourceUnderABinOrObj_IsYieldedOnlyWhenNoProjectFileSitsBesideIt(string[] segments, bool isSource)
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("project-cone");
+        temp.WriteFile(["Root.csproj"], "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+        temp.WriteFile(["Nested", "Nested.csproj"], "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+        string source = temp.WriteFile(segments, "class Probe { }");
+
+        ProjectCone.Adds(temp.Path, ".cs", [])
+            .Contains(source)
+            .ShouldBe(isSource, string.Join('/', segments));
+        new BuildOutputDirectories().IsUnderBuildOutput(temp.Path, source)
+            .ShouldBe(!isSource, string.Join('/', segments));
+    }
+
+    [Theory]
+    [InlineData(new[] { "artifacts", "obj", "App", "debug", "App.AssemblyInfo.cs" }, true)]
+    [InlineData(new[] { "Shared", "Shared.cs" }, false)]
+    public void IsUnderBuildOutput_DocumentOutsideTheProjectDirectory_IsBuildOutputOnAnyBinOrObjSegment(
+        string[] segments, bool isBuildOutput)
+    {
+        // No project file sits beside the artifacts layout's obj, which the cone never walks into.
+        using TempDirectory temp = TestTempRoot.Fresh("project-cone");
+        temp.WriteFile(["src", "App", "App.csproj"], "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+        string document = temp.WriteFile(segments, "class Probe { }");
+
+        new BuildOutputDirectories().IsUnderBuildOutput(temp.PathOf("src", "App"), document)
+            .ShouldBe(isBuildOutput, string.Join('/', segments));
+    }
+
+    [Fact]
+    public void IsUnderBuildOutput_BinUnderADirectoryDeletedSinceTheLoad_IsASource()
+    {
+        // Nothing says a project file sits beside the bin, so the document stays tracked, the side that can cost
+        // a cache miss and never a stale answer.
+        using TempDirectory temp = TestTempRoot.Fresh("project-cone");
+        temp.WriteFile(["Root.csproj"], "<Project Sdk=\"Microsoft.NET.Sdk\" />\n");
+        string document = temp.PathOf("Gone", "bin", "Deep.cs");
+
+        new BuildOutputDirectories().IsUnderBuildOutput(temp.Path, document)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Adds_VisualBasicSuffix_YieldsOnlyThatLanguagesSources()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("project-cone");
+        string ledger = temp.WriteFile(["Ledger.vb"], "Class Ledger\nEnd Class\n");
+        temp.WriteFile(["Widget.cs"], "class Widget { }");
+
+        ProjectCone.Adds(temp.Path, ".vb", [])
+            .ShouldBe([ledger]);
     }
 
     [Fact]
@@ -111,8 +179,8 @@ public sealed class ProjectConeTests
         temp.WriteFile(["Denied", "Unseen.cs"], "class Unseen { }");
         using ScopedDirectoryDenial denial = ScopedDirectoryDenial.Deny(temp.PathOf("Denied"));
 
-        Should.Throw<UnauthorizedAccessException>(() => ProjectCone.Enumerate(temp.Path).ToList());
-        ProjectCone.Enumerate(temp.Path, skipInaccessible: true)
+        Should.Throw<UnauthorizedAccessException>(() => ProjectCone.Enumerate(temp.Path, ".cs").ToList());
+        ProjectCone.Enumerate(temp.Path, ".cs", skipInaccessible: true)
             .ShouldBe([rules]);
     }
 }

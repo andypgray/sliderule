@@ -18,7 +18,21 @@ internal sealed record CaptureManifest(
     string ToolVersion,
     IReadOnlyList<FileStamp> StructuralStamps,
     IReadOnlyList<CaptureProjectEntry> Projects,
+    IReadOnlyList<CaptureForeignProjectEntry> ForeignProjects,
     FileStamp BinlogCopyStamp);
+
+/// <summary>
+///     One replayed project in a language other than C#, recorded as <see cref="CaptureProjectEntry" /> records a
+///     C# one, because a C# project's compilation binds to it: its documents are existence-checked, and a file in its
+///     cone (every file under <paramref name="ProjectDirectory" /> ending in <paramref name="SourceSuffix" />) that
+///     <paramref name="ConeFiles" /> lacks is an add. Its project file is a structural stamp.
+/// </summary>
+internal sealed record CaptureForeignProjectEntry(
+    string ProjectFilePath,
+    string ProjectDirectory,
+    string? SourceSuffix,
+    IReadOnlyList<string> DocumentPaths,
+    IReadOnlyList<string> ConeFiles);
 
 /// <summary>
 ///     One replayed project's identity and its full csc source-file list, as the capture records it, with
@@ -30,8 +44,8 @@ internal sealed record CaptureManifest(
 ///         included, existence-checked and never hashed at validation.
 ///     </para>
 ///     <para>
-///         <paramref name="ConeFiles" /> is the project cone's <c>*.cs</c> (bin/obj excluded) as it stood at
-///         ingest. The cone is a superset of <paramref name="DocumentPaths" />: a <c>&lt;Compile Remove&gt;</c>'d
+///         <paramref name="ConeFiles" /> is the project cone's <c>*.cs</c>, build-output directories excluded, as it
+///         stood at ingest. The cone is a superset of <paramref name="DocumentPaths" />: a <c>&lt;Compile Remove&gt;</c>'d
 ///         or <c>None</c>-typed <c>*.cs</c> is in the cone but not compiled, so without this snapshot the cone scan
 ///         would read it as a perpetual add and invalidate the capture on every run.
 ///     </para>

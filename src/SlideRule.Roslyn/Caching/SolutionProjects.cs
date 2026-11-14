@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis;
+using SlideRule.Internal;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Solutions;
 
@@ -57,13 +58,7 @@ internal static class SolutionProjects
                 byName[project.Name] = accumulator;
             }
 
-            foreach (Document document in project.Documents)
-            {
-                if (document.FilePath is null) continue;
-
-                string documentPath = Path.GetFullPath(document.FilePath);
-                if (includeDocument(projectDirectory, documentPath)) accumulator.Documents.Add(documentPath);
-            }
+            AddDocuments(project, projectDirectory, includeDocument, accumulator.Documents);
 
             foreach (string referenceName in solution.ReferencedProjectNames(project))
                 accumulator.References.Add(referenceName);
@@ -73,6 +68,56 @@ internal static class SolutionProjects
             .OrderBy(accumulator => accumulator.ProjectName, StringComparer.Ordinal)
             .Select(accumulator => accumulator.ToInputs())
             .ToList();
+    }
+
+    /// <summary>
+    ///     Collects one <see cref="ForeignProjectInputs" /> per loaded project in another language that has a project
+    ///     file, keyed by that file and in its ordinal order, with its documents unioned across frameworks and filtered
+    ///     by <paramref name="includeDocument" /> as <see cref="Collect" /> filters a C# project's.
+    /// </summary>
+    internal static IReadOnlyList<ForeignProjectInputs> CollectForeign(
+        Solution solution, Func<string, string, bool> includeDocument)
+    {
+        var byFile = new Dictionary<string, (Project First, SortedSet<string> Documents)>(PathComparison.Comparer);
+
+        foreach (Project project in solution.Projects)
+        {
+            if (ProjectLanguages.IsCSharp(project) || project.FilePath is null) continue;
+
+            string projectFile = Path.GetFullPath(project.FilePath);
+            string projectDirectory = Path.GetDirectoryName(projectFile)!;
+            if (!byFile.TryGetValue(projectFile, out (Project First, SortedSet<string> Documents) seen))
+            {
+                seen = (project, new SortedSet<string>(StringComparer.Ordinal));
+                byFile[projectFile] = seen;
+            }
+
+            AddDocuments(project, projectDirectory, includeDocument, seen.Documents);
+        }
+
+        return byFile
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => new ForeignProjectInputs(
+                pair.Key,
+                Path.GetDirectoryName(pair.Key)!,
+                ProjectLanguages.SourceSuffixOf(pair.Value.First),
+                pair.Value.Documents.ToList(),
+                pair.Value.First.OutputFilePath,
+                pair.Value.First.CompilationOutputInfo.AssemblyPath))
+            .ToList();
+    }
+
+    // Adds the project's documents includeDocument keeps, as absolute paths.
+    private static void AddDocuments(
+        Project project, string projectDirectory, Func<string, string, bool> includeDocument, ISet<string> documents)
+    {
+        foreach (Document document in project.Documents)
+        {
+            if (document.FilePath is null) continue;
+
+            string documentPath = Path.GetFullPath(document.FilePath);
+            if (includeDocument(projectDirectory, documentPath)) documents.Add(documentPath);
+        }
     }
 
     // Accumulates one project's identity and its unioned, ordinal-sorted document and reference sets across

@@ -6,9 +6,9 @@ namespace SlideRule.Roslyn.Caching;
 
 /// <summary>
 ///     The file-system probes that decide, with zero MSBuild, whether a tree's on-disk shape has moved: the
-///     <see cref="Enumerate">cone</see> of <c>*.cs</c> a project directory globs, and the
-///     <see cref="SolutionStructuralPaths(string, IEnumerable{ProjectInputs})">structural path set</see> a whole
-///     solution stamps.
+///     <see cref="Enumerate">cone</see> of sources a project directory globs, and the structural path set a whole
+///     solution stamps,
+///     <see cref="SolutionStructuralPaths(string, IEnumerable{ProjectInputs}, IEnumerable{ForeignProjectInputs})" />.
 /// </summary>
 /// <remarks>
 ///     Every caller deciding whether a model is still valid asks these, so none can drift from another on what
@@ -41,38 +41,41 @@ internal static class ProjectCone
     };
 
     /// <summary>
-    ///     Enumerates every <c>*.cs</c> under <paramref name="projectDirectory" /> (recursively), skipping the
-    ///     <c>bin</c>/<c>obj</c> build-output subtrees; a non-existent directory yields nothing. This is the SDK
-    ///     default-glob cone, the source-membership set a stat sweep cannot see change, because an SDK-glob add
-    ///     touches no MSBuild file. The cone is a superset of a project's <em>compiled</em> documents: a
-    ///     <c>&lt;Compile Remove&gt;</c>'d or <c>None</c>-typed <c>*.cs</c> still lives here, so callers must record
-    ///     cone membership to tell a genuine add from a file that was never compiled in the first place.
+    ///     Enumerates every file whose name ends in <paramref name="sourceSuffix" /> (<c>.cs</c>, <c>.vb</c>) under
+    ///     <paramref name="projectDirectory" /> (recursively), skipping the
+    ///     <see cref="BuildOutputDirectories">build-output subtrees</see>; a non-existent directory yields nothing.
+    ///     This is the SDK default-glob cone, the source-membership set a stat sweep cannot see change, because an
+    ///     SDK-glob add touches no MSBuild file. The cone is a superset of a project's <em>compiled</em> documents: a
+    ///     <c>&lt;Compile Remove&gt;</c>'d or <c>None</c>-typed source still lives here, so callers must record cone
+    ///     membership to tell a genuine add from a file that was never compiled in the first place.
     ///     <paramref name="skipInaccessible" /> skips a directory the walk cannot open instead of throwing, for a
     ///     caller whose answer is advisory; a caller that must never serve a stale answer keeps the throw.
     /// </summary>
     /// <remarks>
     ///     The walk streams, so a caller that asks only whether the cone holds anything new stops at the first
-    ///     hit. The pruned directory names are ordinal, so a differently-cased <c>BIN</c> is walked, matching
-    ///     <see cref="BuildOutputDirectories.IsUnderBuildOutput" />; the <c>.cs</c> suffix follows
-    ///     <see cref="PathComparison" />, as the build's glob matches file names on each platform, so a <c>.CS</c> is
-    ///     source on Windows. A directory link is followed, as the build follows it, unless it leads back into the
-    ///     walk or to no directory (<see cref="IsUnwalkableLink" />). Order is whatever the file system yields:
-    ///     <see cref="Adds" /> sorts, and no caller may key on the raw order.
+    ///     hit. A <c>bin</c> or <c>obj</c> is pruned only beside a project file, and the names are ordinal, so a
+    ///     differently-cased <c>BIN</c> is walked, matching <see cref="BuildOutputDirectories.IsUnderBuildOutput" />;
+    ///     the suffix follows <see cref="PathComparison" />, as the build's glob matches file names on each platform,
+    ///     so a <c>.CS</c> is source on Windows. A directory link is followed, as the build follows it, unless it
+    ///     leads back into the walk or to no directory (<see cref="IsUnwalkableLink" />). Order is whatever the file
+    ///     system yields: <see cref="Adds" /> and <see cref="Sorted" /> sort, and no caller may key on the raw order.
     /// </remarks>
-    public static IEnumerable<string> Enumerate(string projectDirectory, bool skipInaccessible = false)
+    public static IEnumerable<string> Enumerate(
+        string projectDirectory, string sourceSuffix, bool skipInaccessible = false)
     {
         string root = Path.GetFullPath(projectDirectory);
         if (!Directory.Exists(root)) return [];
 
+        var buildOutput = new BuildOutputDirectories();
         return new FileSystemEnumerable<string>(
             root,
             static (ref entry) => entry.ToFullPath(),
             skipInaccessible ? ConeEnumerationSkippingInaccessible : ConeEnumeration)
         {
-            ShouldIncludePredicate = static (ref entry) =>
-                !entry.IsDirectory && entry.FileName.EndsWith(".cs", PathComparison.Comparison),
+            ShouldIncludePredicate = (ref entry) =>
+                !entry.IsDirectory && entry.FileName.EndsWith(sourceSuffix, PathComparison.Comparison),
             ShouldRecursePredicate = (ref entry) =>
-                !BuildOutputDirectories.IsBuildOutputName(entry.FileName)
+                !buildOutput.IsBuildOutputDirectory(entry.FileName, entry.Directory)
                 && !((entry.Attributes & FileAttributes.ReparsePoint) != 0
                      && IsUnwalkableLink(root, entry.Directory.ToString(), entry.ToFullPath()))
         };
@@ -119,12 +122,12 @@ internal static class ProjectCone
     }
 
     /// <summary>
-    ///     The cone's <c>*.cs</c> that <paramref name="known" /> does not already hold, ordinal-sorted so a caller
+    ///     The cone's sources that <paramref name="known" /> does not already hold, ordinal-sorted so a caller
     ///     keying on the result gets the same answer whatever order the file system enumerated.
     /// </summary>
-    public static IReadOnlyList<string> Adds(string projectDirectory, ICollection<string> known)
+    public static IReadOnlyList<string> Adds(string projectDirectory, string sourceSuffix, ICollection<string> known)
     {
-        List<string> adds = Enumerate(projectDirectory)
+        List<string> adds = Enumerate(projectDirectory, sourceSuffix)
             .Where(full => !known.Contains(full))
             .ToList();
         adds.Sort(StringComparer.Ordinal);
@@ -132,7 +135,20 @@ internal static class ProjectCone
     }
 
     /// <summary>
-    ///     The first cone <c>*.cs</c> that <paramref name="known" /> does not hold, or null when there is
+    ///     The cone's sources ordinal-sorted, so a caller persisting the list gets the same one whatever order the
+    ///     file system enumerated; empty for a null <paramref name="sourceSuffix" />, a language with no cone.
+    /// </summary>
+    public static IReadOnlyList<string> Sorted(string projectDirectory, string? sourceSuffix)
+    {
+        if (sourceSuffix is null) return [];
+
+        List<string> cone = Enumerate(projectDirectory, sourceSuffix).ToList();
+        cone.Sort(StringComparer.Ordinal);
+        return cone;
+    }
+
+    /// <summary>
+    ///     The first cone source that <paramref name="known" /> does not hold, or null when there is
     ///     none — the same question <see cref="Adds" /> answers, for a caller that needs only a witness.
     /// </summary>
     /// <remarks>
@@ -140,9 +156,9 @@ internal static class ProjectCone
     ///     notice names when several appeared at once, and any caller that needs the stable choice is asking
     ///     <see cref="Adds" />.
     /// </remarks>
-    public static string? FirstAdd(string projectDirectory, ICollection<string> known)
+    public static string? FirstAdd(string projectDirectory, string sourceSuffix, ICollection<string> known)
     {
-        return Enumerate(projectDirectory)
+        return Enumerate(projectDirectory, sourceSuffix)
             .FirstOrDefault(full => !known.Contains(full));
     }
 
@@ -156,7 +172,8 @@ internal static class ProjectCone
     /// </summary>
     /// <remarks>
     ///     The order is the order stamps are recorded in, so a persisted stamp list keeps its shape. This is the
-    ///     per-project course of <see cref="SolutionStructuralPaths(string, IEnumerable{ProjectInputs})" />.
+    ///     per-project course of
+    ///     <see cref="SolutionStructuralPaths(string, IEnumerable{ProjectInputs}, IEnumerable{ForeignProjectInputs})" />.
     /// </remarks>
     public static IEnumerable<string> StructuralPaths(
         string projectDirectory, string? evaluatedOutputPath, string? intermediateAssemblyPath)
@@ -173,27 +190,33 @@ internal static class ProjectCone
     /// <summary>
     ///     One solution's whole structural set, deduplicated and in stamping order: the solution (or filter) file
     ///     at <paramref name="solutionPath" />, the solution a filter points at, then each of
-    ///     <paramref name="projects" />, in the order given, as its file followed by its
-    ///     <see cref="StructuralPaths" />, then every project file the solution requires that is not already listed.
+    ///     <paramref name="projects" /> and then each of <paramref name="foreignProjects" />, in the order given, as
+    ///     its file followed by its <see cref="StructuralPaths" />, then every project file the solution requires
+    ///     that is not already listed.
     /// </summary>
     /// <remarks>
     ///     The filter leg costs a non-filter solution nothing: the format test comes before any I/O.
     /// </remarks>
     public static IReadOnlyList<string> SolutionStructuralPaths(
-        string solutionPath, IEnumerable<ProjectInputs> projects)
+        string solutionPath, IEnumerable<ProjectInputs> projects, IEnumerable<ForeignProjectInputs> foreignProjects)
     {
-        return SolutionStructuralPaths(
-            solutionPath,
-            projects.Select(project => (
-                Path.GetFullPath(project.CsprojPath),
-                Path.GetFullPath(project.ProjectDirectory),
-                project.EvaluatedOutputPath,
-                project.IntermediateAssemblyPath)));
+        IEnumerable<(string, string, string?, string?)> csharp = projects.Select(project => (
+            Path.GetFullPath(project.CsprojPath),
+            Path.GetFullPath(project.ProjectDirectory),
+            project.EvaluatedOutputPath,
+            project.IntermediateAssemblyPath));
+        IEnumerable<(string, string, string?, string?)> foreign = foreignProjects.Select(project => (
+            Path.GetFullPath(project.ProjectFilePath),
+            Path.GetFullPath(project.ProjectDirectory),
+            project.EvaluatedOutputPath,
+            project.IntermediateAssemblyPath));
+        return SolutionStructuralPaths(solutionPath, csharp.Concat(foreign));
     }
 
     /// <summary>
-    ///     <see cref="SolutionStructuralPaths(string, IEnumerable{ProjectInputs})" /> over projects given by their
-    ///     structural facts alone, each <c>CsprojPath</c> and <c>ProjectDirectory</c> already absolute.
+    ///     <see cref="SolutionStructuralPaths(string, IEnumerable{ProjectInputs}, IEnumerable{ForeignProjectInputs})" />
+    ///     over projects given by their structural facts alone, each <c>CsprojPath</c> and <c>ProjectDirectory</c>
+    ///     already absolute.
     /// </summary>
     public static IReadOnlyList<string> SolutionStructuralPaths(
         string solutionPath,

@@ -36,10 +36,10 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     // ── happy path + the structure-only contract ─────────────────────────────────────────────────────────
 
     [Fact]
-    public void Ingest_HappyPath_PersistsPairAndValidatesUsable()
+    public async Task Ingest_HappyPath_PersistsPairAndValidatesUsable()
     {
         // Arrange + Act
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
+        using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         bool persisted = store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath, Ct);
 
@@ -56,11 +56,11 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     [Fact]
-    public void Validate_ContentEditToTrackedSource_StaysUsable()
+    public async Task Validate_ContentEditToTrackedSource_StaysUsable()
     {
         // Arrange — the headline pin: replay reads text from current disk, so a content edit never
         // invalidates a structure-only capture.
-        BinlogCaptureStore store = ShouldIngestFullCapture();
+        BinlogCaptureStore store = await ShouldIngestFullCaptureAsync();
         string source = Fixture.PathOf("MyApp.Domain", "Money.cs");
         using ScopedFile held = ScopedFile.Hold(source);
         File.AppendAllText(source, $"{Environment.NewLine}public sealed class CaptureContentEditProbe {{ }}{Environment.NewLine}");
@@ -73,10 +73,10 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     [Fact]
-    public void Validate_BareCsprojTouch_RehashesOnceThenStatFastPath()
+    public async Task Validate_BareCsprojTouch_RehashesOnceThenStatFastPath()
     {
         // Arrange
-        BinlogCaptureStore store = ShouldIngestFullCapture();
+        BinlogCaptureStore store = await ShouldIngestFullCaptureAsync();
         string csproj = Fixture.PathOf("MyApp.Domain", "MyApp.Domain.csproj");
         using ScopedFile held = ScopedFile.Hold(csproj);
 
@@ -106,10 +106,10 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     // ── structural / membership invalidation ─────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Validate_CsprojContentEdit_InvalidNamingCsproj()
+    public async Task Validate_CsprojContentEdit_InvalidNamingCsproj()
     {
         // Arrange
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
+        using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath, Ct)
             .ShouldBeTrue();
@@ -128,10 +128,10 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     [Fact]
-    public void Validate_NewSourceFileInCone_InvalidNamingFile()
+    public async Task Validate_NewSourceFileInCone_InvalidNamingFile()
     {
         // Arrange
-        BinlogCaptureStore store = ShouldIngestFullCapture();
+        BinlogCaptureStore store = await ShouldIngestFullCaptureAsync();
         string added = Fixture.PathOf("MyApp.Domain", "CaptureConeAddProbe.cs");
         using ScopedFile held = ScopedFile.Hold(added);
         File.WriteAllText(added, "namespace MyApp.Domain; public sealed class CaptureConeAddProbe { }\n");
@@ -145,10 +145,10 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     [Fact]
-    public void Validate_NewFileUnderObj_StaysUsable()
+    public async Task Validate_NewFileUnderObj_StaysUsable()
     {
         // Arrange
-        BinlogCaptureStore store = ShouldIngestFullCapture();
+        BinlogCaptureStore store = await ShouldIngestFullCaptureAsync();
         string objProbe = Fixture.PathOf("MyApp.Domain", "obj", "CaptureObjProbe.cs");
         using ScopedFile held = ScopedFile.Hold(objProbe);
         File.WriteAllText(objProbe, "namespace MyApp.Domain; public sealed class CaptureObjProbe { }\n");
@@ -159,13 +159,13 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     [Fact]
-    public void Validate_ExcludedStrayInCone_StaysUsableWithNoNotice()
+    public async Task Validate_ExcludedStrayInCone_StaysUsableWithNoNotice()
     {
         // Arrange — MyApp.Domain carries a <Compile Remove>'d Snippets/*.cs: it lives in the project cone on
         // disk but is not a compiled document, so it is absent from the capture's DocumentPaths. The ConeFiles
         // snapshot recorded at ingest covers it; without that, the cone scan would read it as an add and
         // invalidate the capture on every run. This static-fixture stray needs no revert.
-        BinlogCaptureStore store = ShouldIngestFullCapture();
+        BinlogCaptureStore store = await ShouldIngestFullCaptureAsync();
         File.Exists(Fixture.PathOf("MyApp.Domain", "Snippets", "ExcludedScratch.cs"))
             .ShouldBeTrue();
 
@@ -178,10 +178,10 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     [Fact]
-    public void Validate_DeletedRecordedDocument_InvalidNamingFile()
+    public async Task Validate_DeletedRecordedDocument_InvalidNamingFile()
     {
         // Arrange
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
+        using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath, Ct)
             .ShouldBeTrue();
@@ -201,10 +201,10 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     // ── unreadable / version / absent ────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Validate_GarbledManifest_InvalidUnreadable()
+    public async Task Validate_GarbledManifest_InvalidUnreadable()
     {
         // Arrange
-        BinlogCaptureStore store = ShouldIngestFullCapture();
+        BinlogCaptureStore store = await ShouldIngestFullCaptureAsync();
         File.WriteAllText(CaptureFiles.Manifest(Fixture.SolutionPath, _cacheRoot.Path), "{ not: valid json ]");
 
         // Act
@@ -216,10 +216,10 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     [Fact]
-    public void Validate_DeletedBinlogCopy_InvalidUnreadable()
+    public async Task Validate_DeletedBinlogCopy_InvalidUnreadable()
     {
         // Arrange
-        BinlogCaptureStore store = ShouldIngestFullCapture();
+        BinlogCaptureStore store = await ShouldIngestFullCaptureAsync();
         File.Delete(CaptureFiles.Binlog(Fixture.SolutionPath, _cacheRoot.Path));
 
         // Act
@@ -231,10 +231,10 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     [Fact]
-    public void Validate_ToolVersionMismatch_InvalidVersion()
+    public async Task Validate_ToolVersionMismatch_InvalidVersion()
     {
         // Arrange
-        BinlogCaptureStore store = ShouldIngestFullCapture();
+        BinlogCaptureStore store = await ShouldIngestFullCaptureAsync();
         MutateManifest(root => root["ToolVersion"] = "0.0.0-not-this-build");
 
         // Act
@@ -246,10 +246,10 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     [Fact]
-    public void Validate_SchemaVersionMismatch_InvalidUnreadable()
+    public async Task Validate_SchemaVersionMismatch_InvalidUnreadable()
     {
         // Arrange
-        BinlogCaptureStore store = ShouldIngestFullCapture();
+        BinlogCaptureStore store = await ShouldIngestFullCaptureAsync();
         MutateManifest(root => root["SchemaVersion"] = 999);
 
         // Act
@@ -274,10 +274,10 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     // ── ingest refusals ──────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public void Ingest_StructuralFileNewerThanBinlog_ThrowsStaleRefusal()
+    public async Task Ingest_StructuralFileNewerThanBinlog_ThrowsStaleRefusal()
     {
         // Arrange — make one csproj newer than the binlog (a rebuild the binlog no longer reflects).
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
+        using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         string csproj = CsprojPathOf(replayed.Solution, "MyApp.Domain");
         using ScopedFile held = ScopedFile.Hold(csproj);
         DateTime newer = File.GetLastWriteTimeUtc(Fixture.BinlogPath)
@@ -293,7 +293,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     [Fact]
-    public void Ingest_BinlogMissingSolutionProjects_ThrowsMissingCoverageRefusal()
+    public async Task Ingest_BinlogMissingSolutionProjects_ThrowsMissingCoverageRefusal()
     {
         // Arrange — build ONLY the leaf project (MyApp.Legacy.Billing, which references nothing) into its
         // own binlog: replaying it yields a one-project solution that does not cover the full sln.
@@ -303,7 +303,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
             $"build \"{leafCsproj}\" -bl:LogFile=\"{leafBinlog}\" --no-incremental",
             Fixture.PathOf());
 
-        using ReplayedSolution replayed = BinlogReplayer.Replay(leafBinlog, Fixture.SolutionPath, ct: Ct);
+        using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(leafBinlog, Fixture.SolutionPath, ct: Ct);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
 
         // The two solution members the leaf binlog does not build.
@@ -334,11 +334,11 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     }
 
     [Fact]
-    public void Ingest_BinlogHasProjectNotInSolution_ThrowsExtraCoverageRefusal()
+    public async Task Ingest_BinlogHasProjectNotInSolution_ThrowsExtraCoverageRefusal()
     {
         // Arrange — a reduced solution missing the MyApp.Web member; the full binlog builds it anyway.
         using ScopedFile reducedSln = WriteReducedSolutionWithoutWeb();
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
+        using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         var store = new BinlogCaptureStore(reducedSln.Path, _cacheRoot.Path);
         string webCsproj = CsprojPathOf(replayed.Solution, "MyApp.Web");
 
@@ -403,9 +403,9 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     // ── helpers ──────────────────────────────────────────────────────────────────────────────────────────
 
     // Replays the shared full binlog and ingests it against the full solution — the common Arrange.
-    private BinlogCaptureStore ShouldIngestFullCapture()
+    private async Task<BinlogCaptureStore> ShouldIngestFullCaptureAsync()
     {
-        using ReplayedSolution replayed = BinlogReplayer.Replay(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
+        using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
         store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath, Ct)
             .ShouldBeTrue();
