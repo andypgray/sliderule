@@ -19,7 +19,15 @@ internal sealed record CaptureManifest(
     IReadOnlyList<FileStamp> StructuralStamps,
     IReadOnlyList<CaptureProjectEntry> Projects,
     IReadOnlyList<CaptureForeignProjectEntry> ForeignProjects,
+    IReadOnlyList<CaptureReferenceEntry> OtherLanguageReferences,
     FileStamp BinlogCopyStamp);
+
+/// <summary>
+///     One replayed C# project's project references in another language, as the binlog's evaluation of
+///     <paramref name="ProjectFilePath" /> recorded them. A replay of the capture takes these in place of reading the
+///     binlog's evaluations a second time.
+/// </summary>
+internal sealed record CaptureReferenceEntry(string ProjectFilePath, IReadOnlyList<string> References);
 
 /// <summary>
 ///     One replayed project in a language other than C#, recorded as <see cref="CaptureProjectEntry" /> records a

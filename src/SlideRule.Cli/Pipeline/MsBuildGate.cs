@@ -177,7 +177,8 @@ internal static class MsBuildGate
             }
 
             if (capture.State == CaptureState.Usable)
-                return await RunCaptureReplayAsync(capture.BinlogCopyPath!, solution, error, hostSource, invokeRunner);
+                return await RunCaptureReplayAsync(
+                    capture.BinlogCopyPath!, capture.OtherLanguageReferences!, solution, error, hostSource, invokeRunner);
             if (capture.State == CaptureState.Invalid)
                 return await RunNoticeColdAsync(capture.Notice!, solution, error, hostSource, invokeRunner);
         }
@@ -223,7 +224,8 @@ internal static class MsBuildGate
                 if (!request.NoCache)
                 {
                     string? cacheRoot = environment.CacheRootOverride();
-                    new BinlogCaptureStore(solutionPath, cacheRoot).Ingest(replayed.Solution, binlogFullPath, binlog, ct);
+                    new BinlogCaptureStore(solutionPath, cacheRoot).Ingest(
+                        replayed.Solution, replayed.OtherLanguageReferences, binlogFullPath, binlog, ct);
                 }
 
                 return replayed;
@@ -241,12 +243,13 @@ internal static class MsBuildGate
     // (MSBuildLocator is already registered from the up-front call); the two runner invocations build independent
     // runners and the failed one wrote nothing, so the retry cannot double-render.
     private static async Task<int> RunCaptureReplayAsync(
-        string binlogCopyPath, string solutionPath, TextWriter error, ISolutionSource hostSource,
+        string binlogCopyPath, IReadOnlyDictionary<string, IReadOnlyList<string>> otherLanguageReferences,
+        string solutionPath, TextWriter error, ISolutionSource hostSource,
         Func<string?, ISolutionSource, Task<int>> invokeRunner)
     {
         Record(GateAcquisition.CaptureReplay);
 
-        using var source = new LazyCaptureReplaySource(binlogCopyPath);
+        using var source = new LazyCaptureReplaySource(binlogCopyPath, otherLanguageReferences);
         try
         {
             return await invokeRunner(solutionPath, source);
@@ -289,7 +292,7 @@ internal static class MsBuildGate
     {
         try
         {
-            return await BinlogReplayer.ReplayAsync(binlogFullPath, solutionPath, diagnostics.Add, ct);
+            return await BinlogReplayer.ReplayAsync(binlogFullPath, solutionPath, diagnostics.Add, ct: ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

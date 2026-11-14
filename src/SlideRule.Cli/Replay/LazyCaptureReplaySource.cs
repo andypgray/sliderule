@@ -9,13 +9,16 @@ namespace SlideRule.Cli.Replay;
 ///     replay-free and byte-identical to a plain cached run.
 /// </summary>
 /// <remarks>
-///     Replays the capture's binlog copy on the one <see cref="AcquireAsync" /> call the runner makes, and
+///     Replays the capture on the one <see cref="AcquireAsync" /> call the runner makes, and
 ///     owns the <see cref="ReplayedSolution" /> that produces: the handle it hands back is non-owning
 ///     (<c>owned: null</c>) because the replay's reader backs the solution's lazy per-document text loaders,
 ///     so releasing it at handle scope would come too early — <see cref="Dispose" /> releases it at run scope
 ///     instead.
 /// </remarks>
-internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolutionSource, IDisposable
+internal sealed class LazyCaptureReplaySource(
+    string binlogCopyPath,
+    IReadOnlyDictionary<string, IReadOnlyList<string>> otherLanguageReferences)
+    : ISolutionSource, IDisposable
 {
     private ReplayedSolution? _replayed;
 
@@ -40,7 +43,8 @@ internal sealed class LazyCaptureReplaySource(string binlogCopyPath) : ISolution
         ReplayedSolution replayed;
         try
         {
-            replayed = await BinlogReplayer.ReplayAsync(binlogCopyPath, solutionPath, diagnostics.Add, ct);
+            replayed = await BinlogReplayer.ReplayAsync(
+                binlogCopyPath, solutionPath, diagnostics.Add, otherLanguageReferences, ct);
         }
         // Cancellation is the caller's, not a bad capture: let it propagate rather than be reported as a
         // replay failure that would send the gate off to re-run the whole thing cold.

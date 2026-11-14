@@ -41,7 +41,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         // Arrange + Act
         using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
-        bool persisted = store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath, Ct);
+        bool persisted = store.Ingest(replayed.Solution, replayed.OtherLanguageReferences, Fixture.BinlogPath, Fixture.BinlogPath, Ct);
 
         // Assert — both files land under the override root, and validation points at the copy.
         persisted.ShouldBeTrue();
@@ -111,7 +111,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         // Arrange
         using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
-        store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath, Ct)
+        store.Ingest(replayed.Solution, replayed.OtherLanguageReferences, Fixture.BinlogPath, Fixture.BinlogPath, Ct)
             .ShouldBeTrue();
 
         string csproj = CsprojPathOf(replayed.Solution, "MyApp.Domain");
@@ -183,7 +183,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         // Arrange
         using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
-        store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath, Ct)
+        store.Ingest(replayed.Solution, replayed.OtherLanguageReferences, Fixture.BinlogPath, Fixture.BinlogPath, Ct)
             .ShouldBeTrue();
 
         string document = DocumentPathOf(replayed.Solution, "MyApp.Legacy.Billing", "RoundingMode.cs");
@@ -286,7 +286,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
 
         // Act
-        var ex = Should.Throw<UserErrorException>(() => store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath, Ct));
+        var ex = Should.Throw<UserErrorException>(() => store.Ingest(replayed.Solution, replayed.OtherLanguageReferences, Fixture.BinlogPath, Fixture.BinlogPath, Ct));
 
         // Assert — the exact dictated refusal naming the newest offending structural file.
         ex.Message.ShouldBe(BinlogCaptureStore.StaleAtIngestMessage(Fixture.BinlogPath, csproj));
@@ -313,7 +313,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         missing.Count.ShouldBe(2);
 
         // Act
-        var ex = Should.Throw<UserErrorException>(() => store.Ingest(replayed.Solution, leafBinlog, leafBinlog, Ct));
+        var ex = Should.Throw<UserErrorException>(() => store.Ingest(replayed.Solution, replayed.OtherLanguageReferences, leafBinlog, leafBinlog, Ct));
 
         // Assert
         ex.Message.ShouldBe(BinlogCaptureStore.MissingCoverageMessage(leafBinlog, missing));
@@ -329,7 +329,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         using var workspace = new AdhocWorkspace();
         Solution empty = workspace.CurrentSolution;
 
-        var ex = Should.Throw<UserErrorException>(() => store.Ingest(empty, "build.binlog", "build.binlog", Ct));
+        var ex = Should.Throw<UserErrorException>(() => store.Ingest(empty, new Dictionary<string, IReadOnlyList<string>>(), "build.binlog", "build.binlog", Ct));
         ex.Message.ShouldBe(BinlogCaptureStore.SolutionFilterNotSupportedMessage("App.slnf"));
     }
 
@@ -343,7 +343,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         string webCsproj = CsprojPathOf(replayed.Solution, "MyApp.Web");
 
         // Act
-        var ex = Should.Throw<UserErrorException>(() => store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath, Ct));
+        var ex = Should.Throw<UserErrorException>(() => store.Ingest(replayed.Solution, replayed.OtherLanguageReferences, Fixture.BinlogPath, Fixture.BinlogPath, Ct));
 
         // Assert — the refusal names the extra project and the reduced solution's file name.
         ex.Message.ShouldBe(BinlogCaptureStore.ExtraCoverageMessage(Fixture.BinlogPath, "MyApp.Reduced.sln", [webCsproj]));
@@ -407,7 +407,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
     {
         using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(Fixture.BinlogPath, Fixture.SolutionPath, ct: Ct);
         var store = new BinlogCaptureStore(Fixture.SolutionPath, _cacheRoot.Path);
-        store.Ingest(replayed.Solution, Fixture.BinlogPath, Fixture.BinlogPath, Ct)
+        store.Ingest(replayed.Solution, replayed.OtherLanguageReferences, Fixture.BinlogPath, Fixture.BinlogPath, Ct)
             .ShouldBeTrue();
         return store;
     }
@@ -448,9 +448,6 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
 
     private void MutateManifest(Action<JsonObject> mutate)
     {
-        string path = CaptureFiles.Manifest(Fixture.SolutionPath, _cacheRoot.Path);
-        var root = (JsonObject)JsonNode.Parse(File.ReadAllText(path))!;
-        mutate(root);
-        File.WriteAllText(path, root.ToJsonString());
+        CaptureFiles.EditManifest(Fixture.SolutionPath, _cacheRoot.Path, mutate);
     }
 }

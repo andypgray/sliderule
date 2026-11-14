@@ -51,6 +51,12 @@ internal static class BinlogReplayer
     ///     Optional sink for replay diagnostics that do not abort the load, on <see cref="WorkspaceLoader" />'s
     ///     <c>diagnosticLog</c> contract.
     /// </param>
+    /// <param name="recordedOtherLanguageReferences">
+    ///     The other-language project references a build capture recorded for this binlog, keyed by the referring
+    ///     project file, as <see cref="ReplayedSolution.OtherLanguageReferences" /> reported them at ingest. Given,
+    ///     the replay reads the binlog once and takes the references from here; null, it reads them off the
+    ///     build's evaluations in a second read that overlaps the first.
+    /// </param>
     /// <param name="ct">
     ///     Honoured on a best-effort basis around the synchronous binlog reads, and in full by the compilations the
     ///     cross-language check makes.
@@ -64,7 +70,9 @@ internal static class BinlogReplayer
     ///     the differential fidelity test gates that choice.
     /// </remarks>
     public static async Task<ReplayedSolution> ReplayAsync(
-        string binlogPath, string? solutionPath, Action<string>? diagnosticSink = null, CancellationToken ct = default)
+        string binlogPath, string? solutionPath, Action<string>? diagnosticSink = null,
+        IReadOnlyDictionary<string, IReadOnlyList<string>>? recordedOtherLanguageReferences = null,
+        CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogPath);
         if (!File.Exists(binlogPath))
@@ -77,9 +85,11 @@ internal static class BinlogReplayer
         var unsupportedProjects = new HashSet<string>(PathComparison.Comparer);
         var replayedProjects = new HashSet<string>(PathComparison.Comparer);
 
-        // The second full read of the binlog, run beside the reader's own so the two reads overlap.
-        Task<Dictionary<string, List<string>>> otherLanguageReferences = Task.Run(
-            () => OtherLanguageReferencesByProject(binlogPath, ct), CancellationToken.None);
+        // Without a recorded set, a second full read of the binlog, run beside the reader's own so the two overlap.
+        Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> otherLanguageReferences =
+            recordedOtherLanguageReferences is not null
+                ? Task.FromResult(recordedOtherLanguageReferences)
+                : Task.Run(() => OtherLanguageReferencesByProject(binlogPath, ct), CancellationToken.None);
 
         SolutionReader? reader = null;
         AdhocWorkspace? workspace = null;
@@ -110,10 +120,12 @@ internal static class BinlogReplayer
 
             Solution solution = AlignWithMsBuildWorkspace(workspace.AddSolution(solutionInfo));
             // Filtered only once both reads are done, because the reader fills replayedProjects as it walks the log.
-            Dictionary<string, List<string>> referencesByProject = await otherLanguageReferences.ConfigureAwait(false);
-            foreach (string project in replayedProjects)
-                if (referencesByProject.TryGetValue(project, out List<string>? referenced))
-                    unsupportedProjects.UnionWith(referenced);
+            IReadOnlyDictionary<string, IReadOnlyList<string>> referencesByProject =
+                await otherLanguageReferences.ConfigureAwait(false);
+            Dictionary<string, IReadOnlyList<string>> replayedReferences = ReferencesOfReplayed(
+                referencesByProject, replayedProjects);
+            foreach (IReadOnlyList<string> referenced in replayedReferences.Values)
+                unsupportedProjects.UnionWith(referenced);
             // No removal of the projects the default configuration does not build: one the binlog compiled is what
             // this build built, and one it did not compile is not here to remove.
             SettledSolution settled = LoadBoundary.Settle(
@@ -145,7 +157,8 @@ internal static class BinlogReplayer
             }
 
             return new ReplayedSolution(
-                workspace, reader, settled.Solution, settled.TargetFrameworks, settled.ProjectFiles, settled.Report);
+                workspace, reader, settled.Solution, settled.TargetFrameworks, settled.ProjectFiles, settled.Report,
+                replayedReferences);
         }
         catch
         {
@@ -248,7 +261,7 @@ internal static class BinlogReplayer
     // on it, so without them a replay lists one project fewer than a load of the same tree. A ProjectReference that
     // does not reference the output assembly is listed too, as a load lists it. Each list is distinct and
     // ordinal-sorted, so a capture manifest that records them reads the same on every ingest of one binlog.
-    private static Dictionary<string, List<string>> OtherLanguageReferencesByProject(
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> OtherLanguageReferencesByProject(
         string binlogPath, CancellationToken ct)
     {
         var found = new Dictionary<string, List<string>>(PathComparison.Comparer);
@@ -276,7 +289,22 @@ internal static class BinlogReplayer
         ct.ThrowIfCancellationRequested();
         reader.Replay(binlogPath);
         ct.ThrowIfCancellationRequested();
-        return found;
+        return found.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<string>)pair.Value
+                .Distinct(PathComparison.Comparer)
+                .OrderBy(reference => reference, StringComparer.Ordinal)
+                .ToList(),
+            PathComparison.Comparer);
+    }
+
+    // The entries of the projects this replay compiled in C#.
+    private static Dictionary<string, IReadOnlyList<string>> ReferencesOfReplayed(
+        IReadOnlyDictionary<string, IReadOnlyList<string>> referencesByProject, IEnumerable<string> replayedProjects)
+    {
+        return replayedProjects
+            .Where(referencesByProject.ContainsKey)
+            .ToDictionary(project => project, project => referencesByProject[project], PathComparison.Comparer);
     }
 
     // An item spec as the build wrote it, which MSBuild separates with backslashes on every OS.

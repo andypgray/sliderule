@@ -35,13 +35,15 @@ internal sealed class ReplayedSolution : IDisposable
         AdhocWorkspace workspace, SolutionReader reader, Solution solution,
         IReadOnlyDictionary<ProjectId, string> targetFrameworks,
         CanonicalProjectFiles projectFiles,
-        ProjectLoadReport report)
+        ProjectLoadReport report,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> otherLanguageReferences)
     {
         _workspace = workspace;
         _reader = reader;
         Solution = solution;
         TargetFrameworks = targetFrameworks;
         ProjectFiles = projectFiles;
+        OtherLanguageReferences = otherLanguageReferences;
         FailedProjects = report.Failed;
         UncheckedProjects = report.Unchecked;
         _loadVerdict = WorkspaceDiagnostics.OfLoad(
@@ -69,6 +71,12 @@ internal sealed class ReplayedSolution : IDisposable
 
     /// <summary>Each replayed project's canonical <c>.csproj</c> path, resolved once for the replay.</summary>
     public CanonicalProjectFiles ProjectFiles { get; }
+
+    /// <summary>
+    ///     Each replayed C# project's project references in another language, keyed by its project file, each list
+    ///     distinct and ordinal-sorted.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> OtherLanguageReferences { get; }
 
     /// <summary>The <c>.csproj</c> paths of the projects that failed to load.</summary>
     /// <remarks>

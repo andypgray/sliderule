@@ -20,26 +20,33 @@ internal enum CaptureState
 }
 
 /// <summary>
-///     The result of <see cref="BinlogCaptureStore.Validate" />. <see cref="BinlogCopyPath" /> is set only on
-///     <see cref="CaptureState.Usable" /> (the copy to replay); <see cref="Notice" /> only on
+///     The result of <see cref="BinlogCaptureStore.Validate" />. <see cref="BinlogCopyPath" /> and
+///     <see cref="OtherLanguageReferences" /> are set only on <see cref="CaptureState.Usable" /> (the copy to replay,
+///     and the other-language references its replay takes in place of a second read); <see cref="Notice" /> only on
 ///     <see cref="CaptureState.Invalid" /> — a complete user-facing line, carrying no <c>warning: </c> prefix
 ///     of its own.
 /// </summary>
-internal sealed record CaptureValidation(CaptureState State, string? BinlogCopyPath, string? Notice)
+internal sealed record CaptureValidation(
+    CaptureState State,
+    string? BinlogCopyPath,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? OtherLanguageReferences,
+    string? Notice)
 {
     internal static CaptureValidation Absent()
     {
-        return new CaptureValidation(CaptureState.Absent, null, null);
+        return new CaptureValidation(CaptureState.Absent, null, null, null);
     }
 
-    internal static CaptureValidation Usable(string binlogCopyPath)
+    internal static CaptureValidation Usable(string binlogCopyPath, IReadOnlyList<CaptureReferenceEntry> references)
     {
-        return new CaptureValidation(CaptureState.Usable, binlogCopyPath, null);
+        Dictionary<string, IReadOnlyList<string>> byProject = references.ToDictionary(
+            entry => entry.ProjectFilePath, entry => entry.References, PathComparison.Comparer);
+        return new CaptureValidation(CaptureState.Usable, binlogCopyPath, byProject, null);
     }
 
     internal static CaptureValidation Invalid(string notice)
     {
-        return new CaptureValidation(CaptureState.Invalid, null, notice);
+        return new CaptureValidation(CaptureState.Invalid, null, null, notice);
     }
 }
 
@@ -74,7 +81,7 @@ internal sealed class BinlogCaptureStore
 {
     // The manifest schema this store reads and writes. A manifest written under any other version degrades
     // to one UnreadableNotice and re-captures — acceptable for disposable derived data, never a wrong answer.
-    private const int CurrentSchemaVersion = 4;
+    private const int CurrentSchemaVersion = 5;
 
     /// <summary>The <see cref="CaptureState.Invalid" /> notice for a garbled/torn/missing-copy/schema case.</summary>
     internal const string UnreadableNotice =
@@ -173,16 +180,19 @@ internal sealed class BinlogCaptureStore
 
     /// <summary>
     ///     Sanity-checks <paramref name="replayedSolution" />, just replayed from the absolute
-    ///     <paramref name="binlogFullPath" />, and if it passes persists the capture, returning false when a
-    ///     best-effort I/O step failed. Refusals quote <paramref name="binlogArgument" />, the user's as-typed
-    ///     <c>--binlog</c> value, verbatim.
+    ///     <paramref name="binlogFullPath" />, and if it passes persists the capture with
+    ///     <paramref name="otherLanguageReferences" />, the replay's
+    ///     <see cref="ReplayedSolution.OtherLanguageReferences" />, returning false when a best-effort I/O step
+    ///     failed. Refusals quote <paramref name="binlogArgument" />, the user's as-typed <c>--binlog</c> value,
+    ///     verbatim.
     /// </summary>
     /// <exception cref="UserErrorException">
     ///     The solution is a solution filter, or the binlog is stale, misses a project the solution's default
     ///     configuration builds, or contains one the solution does not declare.
     /// </exception>
     public bool Ingest(
-        Solution replayedSolution, string binlogFullPath, string binlogArgument, CancellationToken ct = default)
+        Solution replayedSolution, IReadOnlyDictionary<string, IReadOnlyList<string>> otherLanguageReferences,
+        string binlogFullPath, string binlogArgument, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogFullPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogArgument);
@@ -198,11 +208,15 @@ internal sealed class BinlogCaptureStore
         IReadOnlyList<string> structuralPaths = ProjectCone.SolutionStructuralPaths(solutionPath, inputs, foreignInputs);
         List<CaptureProjectEntry> projects = inputs.Select(ToEntry).ToList();
         List<CaptureForeignProjectEntry> foreignProjects = foreignInputs.Select(ToForeignEntry).ToList();
+        List<CaptureReferenceEntry> references = otherLanguageReferences
+            .Select(pair => new CaptureReferenceEntry(pair.Key, pair.Value))
+            .OrderBy(entry => entry.ProjectFilePath, StringComparer.Ordinal)
+            .ToList();
 
         RefuseIfStale(structuralPaths, binlogFullPath, binlogArgument, ct);
         RefuseIfCoverageMismatch(projects, binlogArgument);
 
-        return TryPersist(projects, foreignProjects, structuralPaths, binlogFullPath, ct);
+        return TryPersist(projects, foreignProjects, references, structuralPaths, binlogFullPath, ct);
     }
 
     private static void RefuseIfStale(
@@ -268,7 +282,8 @@ internal sealed class BinlogCaptureStore
 
     private bool TryPersist(
         IReadOnlyList<CaptureProjectEntry> projects, IReadOnlyList<CaptureForeignProjectEntry> foreignProjects,
-        IReadOnlyList<string> structuralPaths, string binlogFullPath, CancellationToken ct)
+        IReadOnlyList<CaptureReferenceEntry> references, IReadOnlyList<string> structuralPaths, string binlogFullPath,
+        CancellationToken ct)
     {
         List<FileStamp> structuralStamps;
         try
@@ -288,7 +303,7 @@ internal sealed class BinlogCaptureStore
         ct.ThrowIfCancellationRequested();
         var manifest = new CaptureManifest(
             CurrentSchemaVersion, FileStamping.CurrentToolVersion, structuralStamps, projects, foreignProjects,
-            FileStamping.StampOf(captureBinlogPath));
+            references, FileStamping.StampOf(captureBinlogPath));
         return TryWriteManifestAtomic(manifest);
     }
 
@@ -356,7 +371,7 @@ internal sealed class BinlogCaptureStore
         }
 
         PromoteIfChanged(manifest, refreshedStructural);
-        return CaptureValidation.Usable(captureBinlogPath);
+        return CaptureValidation.Usable(captureBinlogPath, manifest.OtherLanguageReferences);
     }
 
     // The SDK-glob add a stat sweep cannot see: a source in neither the cone files nor the documents recorded.

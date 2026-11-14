@@ -388,6 +388,12 @@ public sealed class ManifestJsonTests
                     DocumentPaths: ["C:/repo/src/Legacy/Ledger.vb"],
                     ConeFiles: ["C:/repo/src/Legacy/Ledger.vb"])
             ],
+            OtherLanguageReferences:
+            [
+                new CaptureReferenceEntry(
+                    ProjectFilePath: "C:/repo/src/App/App.csproj",
+                    References: ["C:/repo/src/Native/Native.vcxproj", "C:/repo/src/Db/Db.sqlproj"])
+            ],
             BinlogCopyStamp: binlogCopyStamp);
     }
 }

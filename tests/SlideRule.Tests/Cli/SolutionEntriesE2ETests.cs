@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Shouldly;
 using SlideRule.Cli.Replay;
 using SlideRule.Codebase;
@@ -329,13 +330,14 @@ public sealed class SolutionEntriesE2ETests
     }
 
     [Fact]
-    public async Task Json_ReferencedProjectsInAnotherLanguage_AreListedOnALoadAndAReplayAndGetTheCleanLoadRefusal()
+    public async Task Json_ReferencedProjectsInAnotherLanguage_AreListedOnALoadAReplayAndACaptureReplayAndGetTheCleanLoadRefusal()
     {
         // Arrange — one C# project referencing a C++, a database and a JavaScript project that the solution does not
         // declare. The workspace drops each reference and reports the project as one it opens in no language; a
         // replay reads each off the build's evaluation of the C# project. The solution also declares a generated
         // C++ project that is not on disk, as a premake-built solution does before generation. Each referenced
         // project carries the targets a build of its referrer calls, and builds nothing.
+        using var cache = new TempCacheRoot("referenced-other-language-capture");
         using TempDirectory bed = TestTempRoot.Fresh("referenced-other-language");
         bed.WriteFile(
             ["App", "App.csproj"],
@@ -369,6 +371,13 @@ public sealed class SolutionEntriesE2ETests
         CliResult graph = await CliRunner.InvokeColdAsync("graph", solution, "--no-cache", "--json");
         CliResult replay = await CliRunner.InvokeColdAsync("graph", solution, "--binlog", binlog, "--no-cache", "--json");
         CliResult check = await CliRunner.InvokeColdAsync("check", solution, "--no-cache");
+        FakeEnvironment environment = FakeEnvironment.WithCacheRoot(cache.Root);
+        CliResult ingest = await CliRunner.InvokeColdAsync(environment, "graph", solution, "--binlog", binlog, "--json");
+        CliResult captureReplay = await ReplayCaptureAsync(environment, solution, cache.Root);
+        // A capture replay takes the references from the manifest, so emptying them there leaves only the entry
+        // the solution itself declares.
+        CaptureFiles.EditManifest(solution, cache.Root, manifest => manifest["OtherLanguageReferences"] = new JsonArray());
+        CliResult emptiedReplay = await ReplayCaptureAsync(environment, solution, cache.Root);
 
         // Assert — each is named as a project outside the survey, and none can be the spec project, so the refusal
         // sends the reader to --spec rather than to a restore that cannot open them.
@@ -380,9 +389,28 @@ public sealed class SolutionEntriesE2ETests
         using JsonDocument replayDocument = replay.ShouldHaveJsonStdout();
         replayDocument.UnsupportedProjectEntries()
             .ShouldBe(expected);
+        ingest.ShouldSucceed();
+        captureReplay.ShouldSucceed();
+        captureReplay.Gate.ShouldBe(GateAcquisition.CaptureReplay, captureReplay.Transcript());
+        using JsonDocument captureReplayDocument = captureReplay.ShouldHaveJsonStdout();
+        captureReplayDocument.UnsupportedProjectEntries()
+            .ShouldBe(expected);
+        emptiedReplay.ShouldSucceed();
+        emptiedReplay.Gate.ShouldBe(GateAcquisition.CaptureReplay, emptiedReplay.Transcript());
+        using JsonDocument emptiedReplayDocument = emptiedReplay.ShouldHaveJsonStdout();
+        emptiedReplayDocument.UnsupportedProjectEntries()
+            .ShouldBe([("Gen/Gen.vcxproj", "not a C# project")]);
         check.ShouldRefuseWithExactly(
             "No spec project found: no solution project references SlideRule.dll. Pass --spec to name one.\n"
             + "Considered 1 C# project(s) in the workspace.");
+    }
+
+    // A run with no --binlog over a solution with a capture, after deleting the fragment cache so the run replays the
+    // capture rather than answering from cached fragments.
+    private static async Task<CliResult> ReplayCaptureAsync(FakeEnvironment environment, string solution, string cacheRoot)
+    {
+        CaptureFiles.DropFragmentCache(solution, cacheRoot);
+        return await CliRunner.InvokeColdAsync(environment, "graph", solution, "--json");
     }
 
     [Fact]

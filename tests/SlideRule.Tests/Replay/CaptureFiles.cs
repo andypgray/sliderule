@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using SlideRule.Roslyn.Caching;
 
 namespace SlideRule.Tests.Replay;
@@ -18,5 +19,23 @@ internal static class CaptureFiles
     {
         string cacheDirectory = CacheLocations.CacheDirectory(solutionPath, cacheRoot);
         return CacheLocations.CaptureBinlogPathIn(cacheDirectory);
+    }
+
+    /// <summary>
+    ///     Deletes the solution's fragment cache and leaves the capture, so the next run without <c>--binlog</c>
+    ///     replays the capture rather than answering from cached fragments.
+    /// </summary>
+    public static void DropFragmentCache(string solutionPath, string cacheRoot)
+    {
+        File.Delete(CacheLocations.CacheFilePath(solutionPath, cacheRoot));
+    }
+
+    /// <summary>Rewrites the manifest through <paramref name="edit" />, which changes its JSON object in place.</summary>
+    public static void EditManifest(string solutionPath, string cacheRoot, Action<JsonObject> edit)
+    {
+        string path = Manifest(solutionPath, cacheRoot);
+        var root = (JsonObject)JsonNode.Parse(File.ReadAllText(path))!;
+        edit(root);
+        File.WriteAllText(path, root.ToJsonString());
     }
 }
