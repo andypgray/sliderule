@@ -194,7 +194,7 @@ public sealed class GlobalCallToolFilterTests
             cancellationToken: Ct);
 
         // Assert — a successful result, truncated, unlogged.
-        result.ShouldHaveAnswered()
+        result.ShouldHaveAnswered(harness.Logs)
             .ShouldContain("--- RESPONSE TRUNCATED ---");
         harness.Logs.Warnings.ShouldBeEmpty();
     }
@@ -216,7 +216,7 @@ public sealed class GlobalCallToolFilterTests
 
         // Assert — the hint travels the whole pipeline, keyed on the tool name the filter passes through, and
         // points at scope rather than back down a ladder this survey has already reached the bottom of.
-        string text = result.ShouldHaveAnswered();
+        string text = result.ShouldHaveAnswered(harness.Logs);
         text.ShouldContain("--- RESPONSE TRUNCATED ---");
         text.ShouldContain("Narrow the subject");
         text.ShouldContain("sliderule graph --projects <globs> --json");

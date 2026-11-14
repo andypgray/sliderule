@@ -1,6 +1,7 @@
 using System.Text.Json;
 using ModelContextProtocol.Protocol;
 using Shouldly;
+using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.Mcp;
@@ -43,11 +44,17 @@ internal static class McpResultAssertions
         return text;
     }
 
-    /// <summary>Asserts the tool answered: no error flag, and one text block, whose text is handed back.</summary>
-    internal static string ShouldHaveAnswered(this CallToolResult result)
+    /// <summary>
+    ///     Asserts the tool answered: no error flag, and one text block, whose text is handed back. A refusal's red
+    ///     carries the refusal and everything <paramref name="serverLog" /> captured, the faulting exception's stack
+    ///     included.
+    /// </summary>
+    internal static string ShouldHaveAnswered(this CallToolResult result, CapturingLoggerProvider serverLog)
     {
         string text = result.ShouldHaveTextContent();
-        result.IsError.ShouldNotBe(true, $"the tool refused:{Environment.NewLine}{text}");
+        string refusal = $"the tool refused:{Environment.NewLine}{text}{Environment.NewLine}{Environment.NewLine}"
+                         + $"the server logged:{Environment.NewLine}{serverLog.Transcript()}";
+        result.IsError.ShouldNotBe(true, refusal);
 
         return text;
     }

@@ -7,8 +7,9 @@ namespace SlideRule.Tests.Mcp.TestDoubles;
 ///     An <see cref="ILoggerProvider" /> that records every logger call into a thread-safe queue, so a test
 ///     can assert on what the server logged. It exists to pin the central error contract in
 ///     <c>GlobalCallToolFilter</c>: a <c>UserErrorException</c> is surfaced without logging, while
-///     any other exception is logged as exactly one warning. Registered as the host's only logging provider
-///     (all built-in providers cleared), so <see cref="Warnings" /> reflects the filter alone.
+///     any other exception is logged as exactly one warning. It also supplies the <see cref="Transcript" /> a
+///     refused answer's red prints. Registered as the host's only logging provider (all built-in providers
+///     cleared), so <see cref="Warnings" /> reflects the filter alone.
 /// </summary>
 internal sealed class CapturingLoggerProvider : ILoggerProvider
 {
@@ -18,6 +19,19 @@ internal sealed class CapturingLoggerProvider : ILoggerProvider
     public IReadOnlyList<LogEntry> Warnings => _entries.Where(entry => entry.Level == LogLevel.Warning)
         .ToList();
 
+    /// <summary>
+    ///     Every captured entry in arrival order, one block each: level, category and message, then the exception's
+    ///     <see cref="Exception.ToString" />, stack included, when the entry carries one; <c>(nothing logged)</c> when the
+    ///     log is empty.
+    /// </summary>
+    internal string Transcript()
+    {
+        List<string> blocks = _entries.Select(Describe)
+            .ToList();
+
+        return blocks.Count == 0 ? "(nothing logged)" : string.Join(Environment.NewLine, blocks);
+    }
+
     public ILogger CreateLogger(string categoryName)
     {
         return new CapturingLogger(categoryName, _entries);
@@ -25,6 +39,13 @@ internal sealed class CapturingLoggerProvider : ILoggerProvider
 
     public void Dispose()
     {
+    }
+
+    private static string Describe(LogEntry entry)
+    {
+        var head = $"{entry.Level} {entry.Category}: {entry.Message}";
+
+        return entry.Exception is null ? head : head + Environment.NewLine + entry.Exception;
     }
 
     private sealed class CapturingLogger(string category, ConcurrentQueue<LogEntry> entries) : ILogger

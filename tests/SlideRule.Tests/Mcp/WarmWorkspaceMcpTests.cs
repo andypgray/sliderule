@@ -11,6 +11,7 @@ using SlideRule.Roslyn;
 using SlideRule.Roslyn.Hosting;
 using SlideRule.Roslyn.Sessions;
 using SlideRule.Tests.Cli;
+using SlideRule.Tests.Mcp.TestDoubles;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -344,7 +345,7 @@ public sealed class WarmWorkspaceMcpTests
 
         // Assert — exactly one full reload, and the call still succeeded.
         (session.FullReloadCount - reloadsBefore).ShouldBe(1);
-        after.ShouldHaveAnswered();
+        after.ShouldHaveAnswered(harness.Logs);
     }
 
     [Fact]
@@ -379,7 +380,8 @@ public sealed class WarmWorkspaceMcpTests
         CallToolResult[] results = await Task.WhenAll(first, second);
 
         // Assert — both succeeded with content.
-        results.Select(result => result.ShouldHaveAnswered())
+        CapturingLoggerProvider serverLog = harness.Logs;
+        results.Select(result => result.ShouldHaveAnswered(serverLog))
             .ShouldAllBe(text => text.Length > 0);
     }
 
@@ -397,7 +399,7 @@ public sealed class WarmWorkspaceMcpTests
         // Warm the session WITHOUT loading the spec: arch_graph opens the workspace (it is spec-free), so
         // the spec DLL stays unlocked and can be deleted to model a mid-session removal.
         CallToolResult graph = await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct);
-        graph.ShouldHaveAnswered();
+        graph.ShouldHaveAnswered(harness.Logs);
 
         // Act — delete the bound spec DLL, then check against the still-warm workspace.
         File.Delete(tempSpec);
@@ -455,7 +457,7 @@ public sealed class WarmWorkspaceMcpTests
         CallToolResult afterReload = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
 
         resolutions.FullResolveCount.ShouldBe(2);
-        afterReload.ShouldHaveAnswered();
+        afterReload.ShouldHaveAnswered(harness.Logs);
     }
 
     [Fact]
@@ -470,8 +472,8 @@ public sealed class WarmWorkspaceMcpTests
             .ShouldBeOfType<WarmSolutionSource>();
 
         // Act/Assert — four calls over one load read membership once, and every project is declared.
-        string first = (await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct)).ShouldHaveAnswered();
-        (await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct)).ShouldHaveAnswered();
+        string first = await ShouldAnswerAsync(harness, "arch_graph", null);
+        await ShouldAnswerAsync(harness, "arch_graph", null);
         await ShouldAnswerArchCheckAsync(harness);
         await ShouldAnswerArchCheckAsync(harness);
 
@@ -483,7 +485,7 @@ public sealed class WarmWorkspaceMcpTests
         FixtureEdits.EditOnDisk(
             fixture.SolutionPath,
             solution => Regex.Replace(solution, @"Project\([^\n]*""MyApp\.Legacy\.Billing"",[^\n]*\n\s*EndProject\r?\n", ""));
-        string afterEdit = (await harness.Client.CallToolAsync("arch_graph", cancellationToken: Ct)).ShouldHaveAnswered();
+        string afterEdit = await ShouldAnswerAsync(harness, "arch_graph", null);
 
         // Assert — the reload read membership again, and the survey says Billing is no longer declared.
         source.MembershipReads.ShouldBe(2);
@@ -644,7 +646,7 @@ public sealed class WarmWorkspaceMcpTests
     {
         CallToolResult result = await harness.Client.CallToolAsync(tool, arguments, cancellationToken: Ct);
 
-        return result.ShouldHaveAnswered();
+        return result.ShouldHaveAnswered(harness.Logs);
     }
 
     private static Task<string> ShouldAnswerArchCheckAsync(McpPipelineHarness harness)

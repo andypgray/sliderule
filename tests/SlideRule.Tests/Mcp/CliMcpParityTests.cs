@@ -101,7 +101,7 @@ public sealed class CliMcpParityTests
         CliResult cliCheck = await ColdCheckFull.Value;
         cliCheck.ShouldReportViolations();
         CallToolResult mcpCheck = await harness.Client.CallToolAsync("arch_check", cancellationToken: Ct);
-        mcpCheck.ShouldHaveAnswered()
+        mcpCheck.ShouldHaveAnswered(harness.Logs)
             .ShouldBeTheSameTextAs(cliCheck.Out);
 
         // arch_status ≡ status --json.
@@ -262,8 +262,8 @@ public sealed class CliMcpParityTests
         CallToolResult emptyDiffBase = await harness.Client.CallToolAsync(
             "arch_check", new Dictionary<string, object?> { ["diffBase"] = "" }, cancellationToken: Ct);
 
-        emptyDiffBase.ShouldHaveAnswered()
-            .ShouldBeTheSameTextAs(withoutDiffBase.ShouldHaveAnswered());
+        emptyDiffBase.ShouldHaveAnswered(harness.Logs)
+            .ShouldBeTheSameTextAs(withoutDiffBase.ShouldHaveAnswered(harness.Logs));
     }
 
     [Fact]
@@ -365,7 +365,7 @@ public sealed class CliMcpParityTests
         cliRules.ShouldReportViolations();
         CallToolResult mcpRules = await harness.Client.CallToolAsync(
             "arch_check", new Dictionary<string, object?> { ["rules"] = "exceptions/*" }, cancellationToken: Ct);
-        mcpRules.ShouldHaveAnswered()
+        mcpRules.ShouldHaveAnswered(harness.Logs)
             .ShouldBeTheSameTextAs(cliRules.Out);
 
         // arch_check overview ≡ check --grain overview --json: the whole report with each violation's sites as a
