@@ -8,9 +8,9 @@ namespace SlideRule.Extraction.Passes;
 ///     call it makes to a wrapper with arguments of its own, each materialized in a canonical order.
 /// </summary>
 /// <remarks>
-///     A registration or call inside a wrapper's body that reads one of the wrapper's own parameters belongs to
-///     its template; one that reads none is concrete where it stands and is recorded at its own site, so a fact a
-///     body spells out is never also expanded at every call.
+///     A registration or call inside a wrapper's body that reads one of the wrapper's own parameters, bare or
+///     inside a constructed type, belongs to its template; one that reads none is concrete where it stands and is
+///     recorded at its own site, so a fact a body spells out is never also expanded at every call.
 /// </remarks>
 internal sealed class RegistrationTemplates(RegistrationRecognizer recognizer, Func<INamedTypeSymbol, string> fullName)
 {
@@ -18,31 +18,30 @@ internal sealed class RegistrationTemplates(RegistrationRecognizer recognizer, F
     private readonly Dictionary<string, SortedSet<FragmentSite>> _callSites = new(StringComparer.Ordinal);
     private readonly SortedDictionary<string, Template> _templates = new(StringComparer.Ordinal);
 
-    /// <summary>Whether a registration reads a parameter of the wrapper it was recognized in.</summary>
-    public static bool ReadsWrapper(RecognizedRegistration registration)
+    /// <summary>
+    ///     Adds the registration to <paramref name="wrapper" />'s template when it reads one of the wrapper's
+    ///     parameters, bare or inside a constructed type, and returns whether it reads one.
+    /// </summary>
+    public bool TryAddRegistration(IMethodSymbol wrapper, RecognizedRegistration registration)
     {
-        return registration.Service is ITypeParameterSymbol
-               || registration.Implementation is ITypeParameterSymbol
-               || registration.Lifetime.Parameter is not null;
-    }
+        FragmentRegistrationType service = TypeSlot(registration.Service, wrapper);
+        FragmentRegistrationType? implementation =
+            registration.Implementation is { } type ? TypeSlot(type, wrapper) : null;
+        bool reads = ReadsWrapper(service)
+                     || (implementation is { } implementationSlot && ReadsWrapper(implementationSlot))
+                     || registration.Lifetime.Parameter is not null;
+        if (!reads) return false;
 
-    public void AddRegistration(IMethodSymbol wrapper, RecognizedRegistration registration)
-    {
-        var leaf = new FragmentRegistrationLeaf(
-            registration.Lifetime,
-            TypeSlot(registration.Service),
-            registration.Implementation is { } implementation ? TypeSlot(implementation) : null);
+        var leaf = new FragmentRegistrationLeaf(registration.Lifetime, service, implementation);
         if (TemplateOf(wrapper) is { } template) template.Registrations[LeafKey(leaf)] = leaf;
+        return true;
     }
 
     public void AddCall(IMethodSymbol? wrapper, RecognizedWrapperCall call, FragmentSite site)
     {
-        bool readsWrapper = call.TypeArguments.Any(argument => argument is ITypeParameterSymbol)
-                            || call.LifetimeArguments.Any(argument => argument.Lifetime?.Parameter is not null);
-
         var shape = new FragmentWrapperCall(
             call.Wrapper,
-            call.TypeArguments.Select(TypeSlot).ToList(),
+            call.TypeArguments.Select(argument => TypeSlot(argument, wrapper)).ToList(),
             call.LifetimeArguments
                 .Select(argument => new FragmentLifetimeArgument(argument.Parameter, argument.Lifetime ?? new FragmentRegistrationLifetime()))
                 .OrderBy(argument => argument.Parameter, StringComparer.Ordinal)
@@ -50,7 +49,9 @@ internal sealed class RegistrationTemplates(RegistrationRecognizer recognizer, F
             []);
         string key = CallKey(shape);
 
-        if (readsWrapper && wrapper is not null)
+        if (wrapper is not null
+            && (shape.TypeArguments.Any(ReadsWrapper)
+                || call.LifetimeArguments.Any(argument => argument.Lifetime?.Parameter is not null)))
         {
             if (TemplateOf(wrapper) is { } template) template.Forwards[key] = shape;
             return;
@@ -99,11 +100,51 @@ internal sealed class RegistrationTemplates(RegistrationRecognizer recognizer, F
         return template;
     }
 
-    private FragmentRegistrationType TypeSlot(ITypeSymbol? type)
+    // Whether a slot reads a wrapper parameter: TypeSlot sets TypeParameter for a bare type parameter and Mentions
+    // for a constructed type built over the wrapper's own.
+    private static bool ReadsWrapper(FragmentRegistrationType slot)
+    {
+        return slot.TypeParameter is not null || slot.Mentions is not null;
+    }
+
+    // The sorted, distinct ordinals of the wrapper's own type parameters a constructed type is built over, through
+    // type arguments, containing types, array elements and pointees; null when there are none. An open generic
+    // such as typeof(IRepo<>) mentions nothing.
+    private static IReadOnlyList<int>? MentionedWrapperTypeParameters(ITypeSymbol? type, IMethodSymbol? wrapper)
+    {
+        if (type is not INamedTypeSymbol || wrapper is null) return null;
+
+        var ordinals = new SortedSet<int>();
+        Visit(type);
+        return ordinals.Count == 0 ? null : ordinals.ToList();
+
+        void Visit(ITypeSymbol current)
+        {
+            switch (current)
+            {
+                case ITypeParameterSymbol parameter:
+                    if (RegistrationRecognizer.WrapperTypeParameter(parameter, wrapper) is { } owned) ordinals.Add(owned.Ordinal);
+                    break;
+                case INamedTypeSymbol named:
+                    for (INamedTypeSymbol? level = named; level is not null; level = level.ContainingType)
+                        foreach (ITypeSymbol argument in level.TypeArguments)
+                            Visit(argument);
+                    break;
+                case IArrayTypeSymbol array:
+                    Visit(array.ElementType);
+                    break;
+                case IPointerTypeSymbol pointer:
+                    Visit(pointer.PointedAtType);
+                    break;
+            }
+        }
+    }
+
+    private FragmentRegistrationType TypeSlot(ITypeSymbol? type, IMethodSymbol? wrapper)
     {
         return type switch
         {
-            INamedTypeSymbol named => new FragmentRegistrationType(fullName(named)),
+            INamedTypeSymbol named => new FragmentRegistrationType(fullName(named), Mentions: MentionedWrapperTypeParameters(named, wrapper)),
             ITypeParameterSymbol parameter => new FragmentRegistrationType(TypeParameter: parameter.Ordinal),
             _ => new FragmentRegistrationType()
         };
@@ -123,7 +164,10 @@ internal sealed class RegistrationTemplates(RegistrationRecognizer recognizer, F
 
     private static string TypeKey(FragmentRegistrationType type)
     {
-        return type.FullName ?? (type.TypeParameter is { } ordinal ? $"`{ordinal}" : "?");
+        if (type.FullName is { } name)
+            return type.Mentions is { } mentions ? $"{name}<{string.Join(",", mentions.Select(ordinal => $"`{ordinal}"))}>" : name;
+
+        return type.TypeParameter is { } parameter ? $"`{parameter}" : "?";
     }
 
     private static string LifetimeKey(FragmentRegistrationLifetime lifetime)

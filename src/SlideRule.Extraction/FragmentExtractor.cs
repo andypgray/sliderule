@@ -840,11 +840,7 @@ internal static class FragmentExtractor
 
         private void RecordRegistration(RecognizedRegistration registration, FragmentSite site, IMethodSymbol? wrapper)
         {
-            if (wrapper is not null && RegistrationTemplates.ReadsWrapper(registration))
-            {
-                _registrationTemplates!.AddRegistration(wrapper, registration);
-                return;
-            }
+            if (wrapper is not null && _registrationTemplates!.TryAddRegistration(wrapper, registration)) return;
 
             // Read outside a wrapper's parameters, every type is named and the lifetime a literal.
             if (registration is not { Service: INamedTypeSymbol service, Lifetime.Literal: { } lifetime }) return;

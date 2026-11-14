@@ -94,6 +94,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   enforces IDE0005 in the build. It turned documentation off to avoid CS1591, and the build fails a project
   that enforces IDE0005 without documentation, with `EnableGenerateDocumentationFile`. It now sets
   `GenerateDocumentationFile` to `true` and adds CS1591 to `NoWarn`, so IDE0005 also runs on the spec files.
+- A registration wrapper whose body registers a type constructed over its own type parameter, such as
+  `services.TryAddEnumerable(ServiceDescriptor.Singleton<IOptionsChangeTokenSource<TOptions>, ...<TOptions>>())`,
+  is now recorded at each call, in the calling project, and `explain --type` names the call. It used to be
+  recorded once, at the wrapper's body. Such a wrapper with no calls now registers nothing, and a call that
+  passes an array for the type argument the service is built over registers nothing either, so `Registered()`
+  can hold fewer types than before. When only the implementation is built over that argument, the call
+  registers the service with the implementation unnamed.
 
 ## [0.3.0] - 2026-11-04
 

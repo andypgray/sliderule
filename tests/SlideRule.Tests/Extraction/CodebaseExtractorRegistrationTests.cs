@@ -917,6 +917,159 @@ public sealed class CodebaseExtractorRegistrationTests
             .ShouldBe(UniqueRegistrations);
     }
 
+    // Wrappers whose bodies read a type parameter only inside a constructed type: a descriptor over it, a concrete
+    // service with a constructed implementation, a forward whose argument is constructed, a nested type of a
+    // constructed type, an array element, and two slots of one definition over different parameters. An open
+    // generic, a containing type's parameter and an uncalled wrapper sit beside them.
+    private const string ConstructedWrappers = """
+                                               using Microsoft.Extensions.DependencyInjection;
+                                               using Microsoft.Extensions.DependencyInjection.Extensions;
+                                               namespace W;
+                                               public interface IChangeSource<T> {}
+                                               public class ChangeSource<T> : IChangeSource<T> {}
+                                               public interface IStep {}
+                                               public class Step<T> : IStep {}
+                                               public class Holder<T> {}
+                                               public interface IRepo<T> {}
+                                               public class Repo<T> : IRepo<T> {}
+                                               public class Box<T> {}
+                                               public static class GenericExtensions
+                                               {
+                                                   public static IServiceCollection AddChangeSource<TOptions>(this IServiceCollection services)
+                                                   {
+                                                       services.TryAddEnumerable(ServiceDescriptor.Singleton<IChangeSource<TOptions>, ChangeSource<TOptions>>());
+                                                       return services;
+                                                   }
+
+                                                   public static IServiceCollection AddStep<TModel>(this IServiceCollection services) =>
+                                                       services.AddTransient<IStep, Step<TModel>>();
+
+                                                   public static IServiceCollection AddViaForward<T>(this IServiceCollection services) =>
+                                                       services.AddChangeSource<Holder<T>>();
+
+                                                   public static IServiceCollection AddRepos<T>(this IServiceCollection services) =>
+                                                       services.AddSingleton(typeof(IRepo<>), typeof(Repo<>));
+
+                                                   public static IServiceCollection AddUncalled<T>(this IServiceCollection services) =>
+                                                       services.AddScoped<IChangeSource<T>, ChangeSource<T>>();
+                                               }
+                                               public static class Boxes<TOuter>
+                                               {
+                                                   public static IServiceCollection AddBox<TMethod>(IServiceCollection services) =>
+                                                       services.AddSingleton<Box<TOuter>>();
+                                               }
+                                               public class Outer<T> { public class Inner {} }
+                                               public class Pair<T> {}
+                                               public static class ShapeExtensions
+                                               {
+                                                   public static IServiceCollection AddInner<T>(this IServiceCollection services) =>
+                                                       services.AddSingleton<Outer<T>.Inner>();
+
+                                                   public static IServiceCollection AddHolders<T>(this IServiceCollection services) =>
+                                                       services.AddScoped<Holder<T[]>>();
+
+                                                   public static IServiceCollection AddPair<T, U>(this IServiceCollection services)
+                                                   {
+                                                       services.AddTransient<Pair<T>>();
+                                                       services.AddTransient<Pair<U>>();
+                                                       return services;
+                                                   }
+                                               }
+                                               """;
+
+    private const string ConstructedCallers = """
+                                              using Microsoft.Extensions.DependencyInjection;
+                                              using W;
+                                              namespace N;
+                                              public class Foo {}
+                                              public class Bar {}
+                                              public static class Root
+                                              {
+                                                  public static void Configure(IServiceCollection services)
+                                                  {
+                                                      services.AddChangeSource<Foo>();
+                                                      services.AddChangeSource<Bar>();
+                                                      services.AddStep<Foo>();
+                                                      services.AddViaForward<Bar>();
+                                                      services.AddChangeSource<int[]>();
+                                                      services.AddStep<int[]>();
+                                                      services.AddInner<Foo>();
+                                                      services.AddHolders<Foo>();
+                                                      services.AddHolders<int[]>();
+                                                      services.AddPair<Foo, int[]>();
+                                                      services.AddPair<int[], Foo>();
+                                                  }
+                                              }
+                                              """;
+
+    [Fact]
+    public void Recognize_WrapperOverATypeConstructedFromItsParameter_RecordsEachCallsRegistrationAtTheCall()
+    {
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Wrappers.cs", ConstructedWrappers), ("Root.cs", ConstructedCallers));
+
+        // The array-argument call to AddChangeSource records nothing, since its service is built over the argument;
+        // the one to AddStep keeps its concrete service with the implementation unnamed, and each AddPair call records
+        // only the Pair slot it binds to Foo. The uncalled wrapper's Scoped registration records nothing, while the
+        // open generic and the containing type's parameter read none of their wrapper's parameters and stay at the
+        // body.
+        Registrations(model)
+            .ShouldBe([
+                (Lifetime.Singleton, "W.Box<T>", "W.Box<T>"),
+                (Lifetime.Singleton, "W.IChangeSource<T>", "W.ChangeSource<T>"),
+                (Lifetime.Singleton, "W.IRepo<T>", "W.Repo<T>"),
+                (Lifetime.Singleton, "W.Outer<T>.Inner", "W.Outer<T>.Inner"),
+                (Lifetime.Scoped, "W.Holder<T>", "W.Holder<T>"),
+                (Lifetime.Transient, "W.IStep", null),
+                (Lifetime.Transient, "W.IStep", "W.Step<T>"),
+                (Lifetime.Transient, "W.Pair<T>", "W.Pair<T>")
+            ]);
+        model.Registration(Lifetime.Singleton, "W.IChangeSource<T>", "W.ChangeSource<T>")
+            .Sites.Rendered()
+            .ShouldBe(["Root.cs:10", "Root.cs:11", "Root.cs:13"]);
+        model.Registration(Lifetime.Transient, "W.IStep", "W.Step<T>")
+            .Sites.Rendered()
+            .ShouldBe(["Root.cs:12"]);
+        model.Registration(Lifetime.Transient, "W.IStep", null)
+            .Sites.Rendered()
+            .ShouldBe(["Root.cs:15"]);
+        model.Registration(Lifetime.Singleton, "W.IRepo<T>", "W.Repo<T>")
+            .Sites.Rendered()
+            .ShouldBe(["Wrappers.cs:27"]);
+        model.Registration(Lifetime.Singleton, "W.Box<T>", "W.Box<T>")
+            .Sites.Rendered()
+            .ShouldBe(["Wrappers.cs:35"]);
+        model.Registration(Lifetime.Singleton, "W.Outer<T>.Inner", "W.Outer<T>.Inner")
+            .Sites.Rendered()
+            .ShouldBe(["Root.cs:16"]);
+        model.Registration(Lifetime.Scoped, "W.Holder<T>", "W.Holder<T>")
+            .Sites.Rendered()
+            .ShouldBe(["Root.cs:17"]);
+        model.Registration(Lifetime.Transient, "W.Pair<T>", "W.Pair<T>")
+            .Sites.Rendered()
+            .ShouldBe(["Root.cs:19", "Root.cs:20"]);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Recognize_WrapperOverATypeConstructedFromItsParameter_IsAttributedToEachCallingProject(bool referencedAsImage)
+    {
+        CompilationInput wrappers = CompilationFactory.CompileWithDi("Wrappers", ("Wrappers.cs", ConstructedWrappers));
+        CompilationInput first = CompilationFactory.CompileWithDiReferencing(
+            "First", wrappers.Compilation, "Wrappers", referencedAsImage, ("First.cs", ConstructedCallers));
+        CompilationInput second = CompilationFactory.CompileWithDiReferencing(
+            "Second", wrappers.Compilation, "Wrappers", referencedAsImage, ("Second.cs", ConstructedCallers));
+
+        CodebaseModel model = Harness.Extract([wrappers, first, second]);
+
+        model.Registration(Lifetime.Singleton, "W.IChangeSource<T>", "W.ChangeSource<T>")
+            .Sites.Rendered()
+            .ShouldBe(["First.cs:10", "First.cs:11", "First.cs:13", "Second.cs:10", "Second.cs:11", "Second.cs:13"]);
+        model.Registration(Lifetime.Transient, "W.IStep", "W.Step<T>")
+            .Sites.Rendered()
+            .ShouldBe(["First.cs:12", "Second.cs:12"]);
+    }
+
     [Fact]
     public void Recognize_NonGenericLifetimeWrapperInAnotherProject_IsReachedByItsLifetimeArgument()
     {

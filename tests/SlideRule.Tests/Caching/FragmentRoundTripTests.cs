@@ -196,7 +196,9 @@ public sealed class FragmentRoundTripTests
         // Arrange — a source exercising both DI fact families (GRAMMAR §4.7): a constructor-injection edge,
         // two registrations (a two-arg service/impl and a one-arg self), and a generic wrapper with a defaulted
         // lifetime parameter called once, so a lost edge, dropped registration, mis-serialized lifetime, or a
-        // template or wrapper call lost in serialization would move the merged dump.
+        // template or wrapper call lost in serialization would move the merged dump. A wrapper whose service is
+        // built over its parameter, called with an array, records nothing, so a slot that loses the parameters it
+        // mentions in serialization would emit a registration only the cache has.
         CompilationInput app = CompilationFactory.CompileWithDi("App", ("Wire.cs", """
                                                                                    using Microsoft.Extensions.DependencyInjection;
                                                                                    namespace N;
@@ -210,6 +212,7 @@ public sealed class FragmentRoundTripTests
                                                                                            services.AddSingleton<IFoo, Foo>();
                                                                                            services.AddScoped<Svc>();
                                                                                            services.AddSelf<Foo>();
+                                                                                           services.AddBoxes<int[]>();
                                                                                        }
 
                                                                                        public static IServiceCollection AddSelf<T>(
@@ -218,7 +221,12 @@ public sealed class FragmentRoundTripTests
                                                                                            services.Add(ServiceDescriptor.Describe(typeof(T), typeof(T), lifetime));
                                                                                            return services;
                                                                                        }
+
+                                                                                       public static IServiceCollection AddBoxes<T>(this IServiceCollection services) =>
+                                                                                           services.AddSingleton<IBox<T>, Box<T>>();
                                                                                    }
+                                                                                   public interface IBox<T> {}
+                                                                                   public class Box<T> : IBox<T> {}
                                                                                    """));
         IReadOnlyList<CodebaseFragment> fragments = FragmentExtractor.ExtractAll([app], Ct);
 
@@ -236,6 +244,9 @@ public sealed class FragmentRoundTripTests
         direct.ServiceRegistrations
             .Any(r => r is { Lifetime: Lifetime.Singleton, ServiceFullName: "N.IFoo", ImplementationFullName: "N.Foo" })
             .ShouldBeTrue();
+        direct.ServiceRegistrations
+            .Select(r => r.ServiceFullName)
+            .ShouldNotContain("N.IBox<T>");
         fromCache.Registration(Lifetime.Transient, "N.Foo", "N.Foo")
             .Sites.Lines()
             .ShouldBe([12]);

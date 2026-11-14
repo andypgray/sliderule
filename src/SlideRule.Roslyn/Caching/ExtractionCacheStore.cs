@@ -199,7 +199,7 @@ internal sealed class ExtractionCacheStore
     // gains a slot, even one that deserializes to a harmless default, so a reader never reasons about which
     // slots a file predates. The suite cannot catch a missed bump — every run gets a fresh cache directory — so
     // the discipline is the only guard.
-    private const int CurrentSchemaVersion = 50;
+    private const int CurrentSchemaVersion = 51;
 
     private static readonly IReadOnlySet<string> NoDocuments = new HashSet<string>(PathComparison.Comparer);
 

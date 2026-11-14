@@ -30,9 +30,12 @@ internal sealed record FragmentRegistrationLeaf(
 
 /// <summary>
 ///     A type slot: a definition-level full name, or the ordinal of the enclosing wrapper's type parameter.
-///     Neither set means the source spelled a type that cannot be read, so whatever depends on it records nothing.
+///     <see cref="Mentions" /> holds the sorted, distinct ordinals of the wrapper's type parameters that a
+///     constructed <see cref="FullName" /> is built over, and is null when it is built over none; such a slot reads
+///     only when the call binds every ordinal it mentions. Neither name nor ordinal set means the source spelled a
+///     type that cannot be read, so whatever depends on it records nothing.
 /// </summary>
-internal sealed record FragmentRegistrationType(string? FullName = null, int? TypeParameter = null);
+internal sealed record FragmentRegistrationType(string? FullName = null, int? TypeParameter = null, IReadOnlyList<int>? Mentions = null);
 
 /// <summary>
 ///     A lifetime slot: a literal, or the name of the enclosing wrapper's <c>ServiceLifetime</c> parameter.

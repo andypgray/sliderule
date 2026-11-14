@@ -9,9 +9,10 @@ namespace SlideRule.Extraction.Passes;
 /// </summary>
 /// <remarks>
 ///     A template forwards to other wrappers, so expansion follows the chain with each wrapper's arguments
-///     substituted, and stops at a wrapper already on the chain. A slot that stays unbound (a type the call did
-///     not spell readably, a lifetime that is not a literal and has no default) drops the registration that reads
-///     it, or for an implementation leaves it unnamed, as a direct call would. A call whose wrapper has no
+///     substituted, and stops at a wrapper already on the chain. A slot that stays unbound (a type parameter the
+///     call did not spell readably, bare or mentioned inside a constructed type, or a lifetime that is not a literal
+///     and has no default) drops the registration that reads it, or for an implementation leaves it unnamed, as a
+///     direct call would. A call whose wrapper has no
 ///     template (one compiled into a package) expands to nothing. Several fragments carry one wrapper's template
 ///     when its project builds for several target frameworks, and <c>#if</c> can make them differ. A call expands
 ///     through the template of its own fragment's framework, as each framework's direct registrations are recorded
@@ -94,8 +95,17 @@ internal static class WrapperCallExpander
 
         string? TypeOf(FragmentRegistrationType slot)
         {
-            if (slot.FullName is { } fullName) return fullName;
-            return slot.TypeParameter is { } ordinal && ordinal < types.Count ? types[ordinal] : null;
+            if (slot.FullName is { } fullName)
+                return slot.Mentions is null || slot.Mentions.All(mentioned => Bound(mentioned) is not null)
+                    ? fullName
+                    : null;
+
+            return slot.TypeParameter is { } ordinal ? Bound(ordinal) : null;
+        }
+
+        string? Bound(int ordinal)
+        {
+            return ordinal < types.Count ? types[ordinal] : null;
         }
 
         Lifetime? LifetimeOf(FragmentRegistrationLifetime slot)

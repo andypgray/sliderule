@@ -552,7 +552,11 @@ internal sealed class RegistrationRecognizer
         return (ITypeSymbol?)type.BestNamedCandidate() ?? WrapperTypeParameter(type, wrapper);
     }
 
-    private static ITypeParameterSymbol? WrapperTypeParameter(ISymbol? symbol, IMethodSymbol? wrapper)
+    /// <summary>
+    ///     <paramref name="symbol" /> as a type parameter declared by <paramref name="wrapper" /> itself, or null for
+    ///     anything else, a containing type's parameter or a local function's included.
+    /// </summary>
+    internal static ITypeParameterSymbol? WrapperTypeParameter(ISymbol? symbol, IMethodSymbol? wrapper)
     {
         return symbol is ITypeParameterSymbol { TypeParameterKind: TypeParameterKind.Method } parameter
                && wrapper is not null

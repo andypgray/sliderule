@@ -253,6 +253,53 @@ public sealed class ClaimTracerTests
             """);
     }
 
+    // The shape of a wrapper whose body registers types constructed over its own type parameter: each registration
+    // is sited at the calls that make it, never at the body that spells it.
+    [Fact]
+    public void ARegisteredSubjectOfAGenericWrapper_NamesEachCallSite()
+    {
+        CodebaseModel lab = CompilationFactory.ExtractWithDi(
+            ("Wrappers.cs", """
+                            using Microsoft.Extensions.DependencyInjection;
+                            namespace Lab;
+                            public interface IClock<T> {}
+                            public class Clock<T> : IClock<T> {}
+                            public static class ClockExtensions
+                            {
+                                public static IServiceCollection AddClock<T>(this IServiceCollection services) =>
+                                    services.AddSingleton<IClock<T>, Clock<T>>();
+                            }
+                            """),
+            ("Root.cs", """
+                        using Microsoft.Extensions.DependencyInjection;
+                        namespace Lab;
+                        public class Tick {}
+                        public static class Root
+                        {
+                            public static void Configure(IServiceCollection services)
+                            {
+                                services.AddClock<Tick>();
+                                services.AddClock<string>();
+                            }
+                        }
+                        """));
+        ArchitectureModel model = Checker.Model(arch =>
+            arch.Rule("di/registered-public")
+                .Enforce(arch.Registered().MustBePublic())
+                .Because("b"));
+
+        TypeClaims claims = TypeClaims.Of(model, new ClaimTracer(lab), lab.Type("Lab.Clock<T>"));
+
+        claims.ShouldReadClaims(
+            """
+            rules:
+              di/registered-public: Registered types
+                registered as the implementation of a singleton registration
+                  at Root.cs:8
+                  at Root.cs:9
+            """);
+    }
+
     [Fact]
     public void AMemberRule_IsClaimedThroughItsTypeSubject()
     {

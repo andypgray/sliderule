@@ -1095,8 +1095,13 @@ needs two facts no other section provides: who is *registered* with what lifetim
   substituted, at the call's own `file:line`. A wrapper that calls another wrapper is followed
   along the chain, and a chain that returns to a wrapper already on it stops there. A
   registration in the body that reads none of the wrapper's parameters is recorded once, at
-  the body. Whatever reads a type or lifetime the call does not spell readably (a lifetime
-  passed as a variable, an array type argument) records nothing.
+  the body. A parameter read inside a constructed type (`IOptions<TOptions>`) counts as a
+  read, so `AddTransient<IStep, Step<TModel>>()` in a body is expanded at each call too, and
+  such a wrapper with no calls records nothing. A registration whose service or lifetime reads a
+  type or lifetime the call does not spell readably (a lifetime passed as a variable, an array
+  type argument) records nothing, and one whose implementation alone reads it is recorded with
+  the implementation unnamed, wherever the body uses that type argument, bare or inside a
+  constructed type.
 
   | Recognized call | Lifetime | service / implementation |
   |---|---|---|
