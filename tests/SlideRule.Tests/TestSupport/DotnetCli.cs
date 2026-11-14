@@ -27,9 +27,6 @@ internal static class DotnetCli
         DotnetCommand.ApplyCleanSdkEnvironment(startInfo);
 
         ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
-        if (result.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"'dotnet {commandLine}' failed with exit code {result.ExitCode}."
-                + $"{Environment.NewLine}{result.StandardOutput}{Environment.NewLine}{result.StandardError}");
+        if (result.ExitCode != 0) throw result.FailureOf($"dotnet {commandLine}");
     }
 }

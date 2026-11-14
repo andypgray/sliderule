@@ -19,7 +19,7 @@ internal sealed record FragmentMember(
         IReadOnlyList<SourceLocation> declarationSites = DeclarationSites.ToLocations();
         IReadOnlyList<string> filePaths = DeclarationSites.FilePaths();
         List<ParameterNode> parameters = Facts.Parameters.Select(p => new ParameterNode(p.Name, p.TypeFullName)).ToList();
-        List<AttributeNode> attributes = Facts.Attributes.Select(a => new AttributeNode(a.DefinitionFullName, a.ConstructedName)).ToList();
+        List<AttributeNode> attributes = Facts.Attributes.Select(a => a.ToAttributeNode()).ToList();
 
         return new MemberNode(
             declaringType,

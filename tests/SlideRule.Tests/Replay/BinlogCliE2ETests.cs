@@ -80,7 +80,7 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
 
         // Invalidate ONLY the fragment cache (delete cache.json), leave the capture: now the run must actually
         // replay the capture's binlog copy to get a solution — still no design-time build, still byte-identical.
-        File.Delete(CacheLocations.CacheFilePath(Sln, replayCache));
+        CaptureFiles.DropFragmentCache(Sln, replayCache);
         CliResult autoReplay = await RunAsync(replayCache, "check", Sln, "--spec", CleanSpec);
         autoReplay.ShouldMatchTheOutputOf(cold);
         autoReplay.Gate.ShouldBe(GateAcquisition.CaptureReplay);
@@ -274,7 +274,7 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         // still reports Usable — the failure only surfaces when the lazy source tries to replay it at runtime.
         await File.WriteAllTextAsync(CaptureFiles.Binlog(Sln, cache), "corrupt", Ct);
         // Delete the fragment cache so the runner must actually acquire (and thus replay) rather than hit.
-        File.Delete(CacheLocations.CacheFilePath(Sln, cache));
+        CaptureFiles.DropFragmentCache(Sln, cache);
 
         CliResult run = await RunAsync(cache, "check", Sln, "--spec", CleanSpec);
 

@@ -165,17 +165,8 @@ internal static class MemberSelectionEvaluator
     /// </remarks>
     internal static Func<IMemberInfo, bool> MemberAttributeMatcher(TypeAnchor anchor)
     {
-        (string key, bool onDefinition) = SelectionEvaluator.AnchorKey(anchor);
-        Func<IAttributeInfo, string> nameOf = onDefinition ? a => a.DefinitionFullName : a => a.FullName;
-        return member =>
-        {
-            IReadOnlyList<IAttributeInfo> attributes = member.Attributes;
-            for (var i = 0; i < attributes.Count; i++)
-                if (nameOf(attributes[i]) == key)
-                    return true;
-
-            return false;
-        };
+        Func<IReadOnlyList<IAttributeInfo>, bool> listed = SelectionEvaluator.AttributeNameMatcher(anchor);
+        return member => listed(member.Attributes);
     }
 
     // The definition-level FQNs a .Returning anchor set matches against, byte-identical to the extraction's

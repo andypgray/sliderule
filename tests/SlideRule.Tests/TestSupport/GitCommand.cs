@@ -102,10 +102,7 @@ internal static class GitCommand
         foreach (string argument in args) startInfo.ArgumentList.Add(argument);
 
         ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
-        if (throwOnFailure && result.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"'git {string.Join(" ", args)}' failed with exit code {result.ExitCode}."
-                + $"{Environment.NewLine}{result.StandardOutput}{Environment.NewLine}{result.StandardError}");
+        if (throwOnFailure && result.ExitCode != 0) throw result.FailureOf($"git {string.Join(" ", args)}");
 
         return result;
     }

@@ -100,9 +100,6 @@ public sealed class FrameworkBinlogReplayTests
         DotnetCommand.ApplyCleanSdkEnvironment(startInfo);
 
         ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
-        if (result.ExitCode != 0)
-            throw new InvalidOperationException(
-                $"'{msBuildExe} {solutionPath}' failed with exit code {result.ExitCode}."
-                + $"{Environment.NewLine}{result.StandardOutput}{Environment.NewLine}{result.StandardError}");
+        if (result.ExitCode != 0) throw result.FailureOf($"{msBuildExe} {solutionPath}");
     }
 }
