@@ -5,29 +5,31 @@ namespace SlideRule.Tests.TestSupport;
 
 /// <summary>
 ///     An <see cref="ISolutionSource" /> that wraps a real load, then re-wraps the handle with synthetic
-///     workspace-load diagnostics, synthetic failed projects, synthetic restore-failed, missing and/or
-///     unchecked ones — the one way to drive the incomplete-model gate, and the narrowed-universe slots, over
+///     workspace-load diagnostics, synthetic failed projects, synthetic restore-failed, compiler-lag, missing
+///     and/or unchecked ones — the one way to drive the incomplete-model gate, and the narrowed-universe slots, over
 ///     a fixture that loads perfectly well. A verb's gate test takes its input from here rather than
 ///     inventing its own, so every gated verb is exercised against the same input.
 /// </summary>
 /// <remarks>
 ///     <para>
 ///         <b>The inputs are separate on purpose, because the product separates them.</b> Diagnostics
-///         render and never gate; failed, restore-failed and missing projects each gate, with their own
+///         render and never gate; failed, restore-failed, compiler-lag and missing projects each gate, with their own
 ///         wording and their own remedy, and are what every incomplete-model refusal names; unchecked projects
 ///         scope the answer and never trip that gate, though <c>render</c> and the baseline modes that read
 ///         absence as evidence refuse a narrowed model on their own terms. A caller that wants an
-///         incomplete-model refusal injects a failed, restore-failed or missing project, a caller that wants a
-///         rendered-but-harmless warning injects a diagnostic, a caller that wants a narrowed universe injects an
-///         unchecked project, and a caller testing that they do not leak into each other injects one without the
-///         others.
+///         incomplete-model refusal injects a failed, restore-failed, compiler-lag or missing project, a caller
+///         that wants a rendered-but-harmless warning injects a diagnostic, a caller that wants a narrowed universe
+///         injects an unchecked project, and a caller testing that they do not leak into each other injects one
+///         without the others.
 ///     </para>
 ///     <para>
-///         <b>Why the restore cause is injected rather than restored.</b> A real broken restore costs a live
-///         SDK, a folder feed and a private package root, which is what
-///         <see cref="SlideRule.Tests.Cli.RestoreFailureSilentEdgeE2ETests" /> pays once for the
-///         end-to-end fact. Every wording, exit code and document slot downstream of the gate is a function of
-///         the list alone, so paying that cost again per surface would buy nothing.
+///         <b>Why the restore and compiler-lag causes are injected rather than reproduced.</b> A real broken
+///         restore costs a live SDK, a folder feed and a private package root, which is what
+///         <see cref="SlideRule.Tests.Cli.RestoreFailureSilentEdgeE2ETests" /> pays once for the end-to-end fact;
+///         a real lag costs a fixture the carried compiler cannot read, which
+///         <see cref="SlideRule.Tests.Roslyn.CompilerLagFailuresTests" /> loads once. Every wording, exit code and
+///         document slot downstream of the gate is a function of the list alone, so paying either cost again per
+///         surface would buy nothing.
 ///     </para>
 ///     <para>
 ///         The inner source is the shared warm pool unless a caller passes its own: nothing here asserts on
@@ -46,7 +48,8 @@ internal sealed class DiagnosticInjectingSolutionSource(
     IReadOnlyList<string>? uncheckedProjects = null,
     IReadOnlyList<string>? restoreFailedProjects = null,
     ISolutionSource? inner = null,
-    IReadOnlyList<string>? missingProjects = null) : ISolutionSource
+    IReadOnlyList<string>? missingProjects = null,
+    IReadOnlyList<string>? compilerLagProjects = null) : ISolutionSource
 {
     /// <summary>The load failure the gate rows inject as a diagnostic: it renders, and decides nothing.</summary>
     internal const string SimulatedLoadFailure =
@@ -60,6 +63,12 @@ internal sealed class DiagnosticInjectingSolutionSource(
     /// </summary>
     internal const string SimulatedRestoreFailedProject = "C:/repo/MyApp.Unrestored/MyApp.Unrestored.csproj";
 
+    /// <summary>
+    ///     The project the gate rows inject as one whose code the carried compiler cannot read: it loaded, and the
+    ///     lag gate refuses it.
+    /// </summary>
+    internal const string SimulatedCompilerLagProject = "C:/repo/MyApp.Newer/MyApp.Newer.csproj";
+
     /// <summary>The project file the gate rows inject as declared and not on disk.</summary>
     internal const string SimulatedMissingProject = "C:/repo/MyApp.Vendor/MyApp.Vendor.csproj";
 
@@ -72,6 +81,7 @@ internal sealed class DiagnosticInjectingSolutionSource(
             FailedProjects = failedProjects ?? [],
             UncheckedProjects = uncheckedProjects ?? [],
             RestoreFailedProjects = restoreFailedProjects ?? [],
+            CompilerLagProjects = compilerLagProjects ?? [],
             MissingProjects = missingProjects ?? []
         };
         // Every warm affordance the inner handle carried is forwarded, not just the ones a caller happens to

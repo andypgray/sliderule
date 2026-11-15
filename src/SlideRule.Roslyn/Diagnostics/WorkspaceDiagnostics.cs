@@ -133,6 +133,11 @@ internal sealed record UnsupportedProject(string Path, UnsupportedProjectKind Ki
 ///     edge their package references would have produced, and both causes share one remedy
 ///     (<c>dotnet restore</c>).
 /// </param>
+/// <param name="CompilerLagProjects">
+///     The <c>.csproj</c> paths of the projects whose code the C# compiler this tool carries could not fully read:
+///     a C# version it does not know, or a source generator it cannot load; disjoint from
+///     <see cref="FailedProjects" /> and <see cref="RestoreFailedProjects" />. Their remedy is a newer SlideRule.
+/// </param>
 /// <param name="UnsupportedProjects">
 ///     The projects outside the model that no extractor reached, read off the solution file and off the
 ///     other-language projects the load could not reach: on a replay the compiler calls it declined, on an MSBuild
@@ -153,11 +158,12 @@ internal readonly record struct WorkspaceDiagnostics(
     IReadOnlyList<string> FailedProjects,
     IReadOnlyList<string> UncheckedProjects,
     IReadOnlyList<string> RestoreFailedProjects,
+    IReadOnlyList<string> CompilerLagProjects,
     IReadOnlyList<UnsupportedProject> UnsupportedProjects,
     IReadOnlyList<MultiTargetedProject> MultiTargetedProjects,
     IReadOnlyList<string> MissingProjects)
 {
-    internal static WorkspaceDiagnostics None { get; } = new([], [], [], [], [], [], [], []);
+    internal static WorkspaceDiagnostics None { get; } = new([], [], [], [], [], [], [], [], []);
 
     /// <summary>
     ///     A load's verdict before any extraction: the merge's notes and multi-targeted projects stay empty, since
@@ -168,12 +174,13 @@ internal readonly record struct WorkspaceDiagnostics(
         IReadOnlyList<string> failedProjects,
         IReadOnlyList<string> uncheckedProjects,
         IReadOnlyList<string> restoreFailedProjects,
+        IReadOnlyList<string> compilerLagProjects,
         IReadOnlyList<UnsupportedProject> unsupportedProjects,
         IReadOnlyList<string> missingProjects)
     {
         return new WorkspaceDiagnostics(
-            loadFailures, [], failedProjects, uncheckedProjects, restoreFailedProjects, unsupportedProjects, [],
-            missingProjects);
+            loadFailures, [], failedProjects, uncheckedProjects, restoreFailedProjects, compilerLagProjects,
+            unsupportedProjects, [], missingProjects);
     }
 
     /// <summary>
@@ -230,12 +237,14 @@ internal readonly record struct WorkspaceDiagnostics(
             ActionableDiagnostics, UnsupportedProjects, UnsupportedProjectKind.NotCsharp, UnsupportedProjectKind.SharedProject);
 
     /// <summary>
-    ///     Whether a declared project file is missing, a project failed to load or its NuGet packages did not
-    ///     resolve, whatever the operator opted into: the JSON documents carry this, and the opt-in changes the exit
+    ///     Whether a declared project file is missing, a project failed to load, its NuGet packages did not
+    ///     resolve or the carried compiler could not fully read it, whatever the operator opted into: the JSON documents carry
+    ///     this, and the opt-in changes the exit
     ///     code, never the truth about the model.
     /// </summary>
     internal bool IsIncomplete =>
-        MissingProjects.Count > 0 || FailedProjects.Count > 0 || RestoreFailedProjects.Count > 0;
+        MissingProjects.Count > 0 || FailedProjects.Count > 0 || RestoreFailedProjects.Count > 0
+        || CompilerLagProjects.Count > 0;
 
     /// <summary>
     ///     Whether a solution filter left a declared project unchecked. Never a gate input: a narrowed run is a

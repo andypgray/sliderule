@@ -50,7 +50,7 @@ internal static class CheckJson
     /// <summary>
     ///     The string array at a top-level <paramref name="slot" /> of a check document still in its wire form:
     ///     <c>workspaceDiagnostics</c>, <c>failedProjects</c>, <c>uncheckedProjects</c>,
-    ///     <c>restoreFailedProjects</c>, in document order.
+    ///     <c>restoreFailedProjects</c>, <c>compilerLagProjects</c>, in document order.
     /// </summary>
     internal static IReadOnlyList<string> Strings(string checkJson, string slot)
     {

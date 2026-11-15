@@ -36,8 +36,9 @@ namespace SlideRule.Cli.Rendering;
 ///         The trust stamps, <paramref name="ModelIncomplete" /> through <paramref name="StaleSpec" />,
 ///         are <see cref="WorkspaceTrustStamp" />'s. <paramref name="StaleSpec" /> means the spec's sources differ
 ///         from the build the run loaded, so every verdict is of the rules that build holds.
-///         <paramref name="MissingProjects" />, <paramref name="FailedProjects" /> and
-///         <paramref name="RestoreFailedProjects" /> are the evidence behind <paramref name="ModelIncomplete" />,
+///         <paramref name="MissingProjects" />, <paramref name="FailedProjects" />,
+///         <paramref name="RestoreFailedProjects" /> and <paramref name="CompilerLagProjects" /> are the evidence
+///         behind <paramref name="ModelIncomplete" />,
 ///         which means every verdict was reached against a partial model. The unchecked, unsupported and
 ///         multi-targeted lists scope the verdict rather than invalidate it: every rule ran and answered, over
 ///         less of the solution, or, for a type a multi-targeted project's frameworks share, over the members and
@@ -61,6 +62,7 @@ internal sealed record CheckJson(
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,
+    IReadOnlyList<string>? CompilerLagProjects,
     IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects,
     IReadOnlyList<MultiTargetedProject>? MultiTargetedProjects,
     StaleSpecStamp? StaleSpec,

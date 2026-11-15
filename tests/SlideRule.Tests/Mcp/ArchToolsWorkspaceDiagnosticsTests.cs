@@ -44,6 +44,14 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
 
     private const string UnrestoredProject = DiagnosticInjectingSolutionSource.SimulatedRestoreFailedProject;
 
+    private const string LaggingProject = DiagnosticInjectingSolutionSource.SimulatedCompilerLagProject;
+
+    // The document slots the two loaded-but-incomplete causes ride, which the rows below also use to say which
+    // cause they inject.
+    private const string RestoreFailedSlot = "restoreFailedProjects";
+
+    private const string CompilerLagSlot = "compilerLagProjects";
+
     // How many frameworks each advisory-raising project restores on, and so how many times the load repeats
     // that project's line.
     private const int FrameworksPerProject = 4;
@@ -90,16 +98,21 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
             .ShouldBeEmpty();
     }
 
-    [Fact]
-    public async Task ArchCheck_RestoreFailedProject_StampsTheModelIncompleteVerdict()
+    [Theory]
+    [InlineData(RestoreFailedSlot)]
+    [InlineData(CompilerLagSlot)]
+    public async Task ArchCheck_LoadedButIncompleteProject_StampsTheModelIncompleteVerdictAndNamesIt(string slot)
     {
         // The MCP surface has no exit code, so modelIncomplete is the whole refusal a client can read. It
-        // follows the gate rather than either cause, so a further cause needs no change to any tool.
-        ArchTools tools = ToolsWith([], restoreFailedProjects: [UnrestoredProject]);
+        // follows the gate rather than either cause, so a further cause needs no change to any tool; the slot
+        // beside it is how the client learns which remedy to surface.
+        ArchTools tools = ToolsWithCause(slot);
 
         string document = await tools.CheckAsync(cancellationToken: Ct);
 
         document.ShouldBeStampedIncomplete();
+        CheckJson.Strings(document, slot)
+            .ShouldHaveSingleItem(document);
     }
 
     [Fact]
@@ -122,11 +135,33 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
     }
 
     [Fact]
-    public async Task ArchGraph_RestoreFailedProjectWithTheOptOut_SurveysThePartialModel()
+    public async Task ArchGraph_CompilerLagProject_RefusesWithANewerToolAsTheRemedyAndBothDialectsOfTheOptOut()
+    {
+        // The same refusal for code the carried compiler could not read, whose remedy is a newer tool: nothing
+        // run against the solution repairs it, so the refusal never sends a stranger to a restore or a build.
+        ArchTools tools = ToolsWithCause(CompilerLagSlot);
+
+        var error = await Should.ThrowAsync<UserErrorException>(() => tools.GraphAsync(cancellationToken: Ct));
+
+        error.Message.ShouldContain(
+            "the model is incomplete — the C# 15 compiler this tool carries cannot read all the code of 1 project, "
+            + "so graph cannot survey the codebase:");
+        error.Message.ShouldContain(LaggingProject);
+        error.Message.ShouldContain(
+            "Update SlideRule to a release whose compiler reads it (dotnet tool update -g SlideRule.Cli, or a "
+            + "newer SlideRule.Xunit package), then retry.");
+        error.Message.ShouldContain("allowWorkspaceDiagnostics: true (arch_graph)");
+        error.Message.ShouldNotContain("dotnet restore");
+    }
+
+    [Theory]
+    [InlineData(RestoreFailedSlot)]
+    [InlineData(CompilerLagSlot)]
+    public async Task ArchGraph_LoadedButIncompleteProjectWithTheOptOut_SurveysThePartialModel(string slot)
     {
         // The opt-out the refusal names, taken: one flag for one question, whichever way the model came up
         // short.
-        ArchTools tools = ToolsWith([], restoreFailedProjects: [UnrestoredProject]);
+        ArchTools tools = ToolsWithCause(slot);
 
         string document = await tools.GraphAsync(true, cancellationToken: Ct);
 
@@ -256,16 +291,30 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
             .ShouldBeEmpty();
     }
 
-    // The tools over the clean spec, with diagnostics and any restore-failed projects injected into an otherwise
-    // healthy load.
+    // The tools over the clean spec, with diagnostics and any restore-failed or compiler-lag projects injected into
+    // an otherwise healthy load.
     private static ArchTools ToolsWith(
-        IReadOnlyList<string> diagnostics, IReadOnlyList<string>? restoreFailedProjects = null)
+        IReadOnlyList<string> diagnostics,
+        IReadOnlyList<string>? restoreFailedProjects = null,
+        IReadOnlyList<string>? compilerLagProjects = null)
     {
         return new ArchTools(
             McpServerBindings.MyAppWithCleanSpec(),
-            new DiagnosticInjectingSolutionSource(diagnostics, restoreFailedProjects: restoreFailedProjects),
+            new DiagnosticInjectingSolutionSource(
+                diagnostics, restoreFailedProjects: restoreFailedProjects, compilerLagProjects: compilerLagProjects),
             new SystemEnvironment(),
             ResponseFitter.FirstRung);
+    }
+
+    // The tools with one loaded-but-incomplete project alone, named by the document slot it rides.
+    private static ArchTools ToolsWithCause(string slot)
+    {
+        return slot switch
+        {
+            RestoreFailedSlot => ToolsWith([], restoreFailedProjects: [UnrestoredProject]),
+            CompilerLagSlot => ToolsWith([], compilerLagProjects: [LaggingProject]),
+            _ => throw new ArgumentOutOfRangeException(nameof(slot), slot, "no gate input rides that slot")
+        };
     }
 
     // Fixed width, so every project's line is the same length and the count that overruns the budget is exact.

@@ -16,8 +16,9 @@ namespace SlideRule.Roslyn.Diagnostics;
 ///     </para>
 ///     <para>
 ///         Every message names the projects, one block per cause: a declared project file not on disk first,
-///         then a project that failed to load, then one whose packages did not resolve, most broken first, because
-///         the repairs differ (putting the file back, <c>dotnet build</c>, <c>dotnet restore</c>). A refusal
+///         then a project that failed to load, then one whose packages did not resolve, then one whose code the
+///         carried compiler cannot read, most broken first, because the repairs differ (putting the file back,
+///         <c>dotnet build</c>, <c>dotnet restore</c>, a newer SlideRule). A refusal
 ///         written to stderr below the workspace diagnostics sends the reader to those warnings instead of
 ///         repeating them; the restore tail does so only for "a restore that ran", because the SDK replays
 ///         NuGet's own logs into later builds only where a restore actually ran. A refusal or caveat whose
@@ -34,12 +35,18 @@ internal static class IncompleteModelGate
     /// </summary>
     internal const string AdapterSkipReason =
         "the workspace did not load completely, so no verdict was reached; see Workspace_LoadedCompletely for "
-        + "the projects that are not on disk, failed to load or whose NuGet packages did not resolve.";
+        + "the projects that are not on disk, failed to load, whose NuGet packages did not resolve or whose code "
+        + "the tool's C# compiler cannot read.";
 
     // The one remedy for a declared project file that is not on disk, which every surface shares.
     private const string MissingRemedy =
         "No restore or build creates a project file: initialise the submodule or check out the tree that holds "
         + "it, generate it, or remove its entry from the solution";
+
+    // The one remedy for code the carried compiler cannot read, which every surface shares.
+    private const string LagRemedy =
+        "Update SlideRule to a release whose compiler reads it (dotnet tool update -g SlideRule.Cli, or a newer "
+        + "SlideRule.Xunit package)";
 
     /// <summary>The stderr lines <c>check</c> emits before exit 2.</summary>
     internal static string CheckMessage(WorkspaceDiagnostics diagnostics)
@@ -57,7 +64,11 @@ internal static class IncompleteModelGate
             + "so check cannot pass: package references that resolved to nothing produce no edges, so a rule "
             + "about a package is measured against a model that never saw it:",
             "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
-            + "warnings above. To check against the partial model anyway, pass --allow-workspace-diagnostics.");
+            + "warnings above. To check against the partial model anyway, pass --allow-workspace-diagnostics.",
+            $"error: the model is incomplete — {Lagging(diagnostics)}, so check cannot pass: code the compiler "
+            + "cannot read is missing from the model:",
+            $"See the warnings above for why. {LagRemedy}. To check against the partial model anyway, pass "
+            + "--allow-workspace-diagnostics.");
     }
 
     /// <summary>
@@ -83,6 +94,10 @@ internal static class IncompleteModelGate
             + "model, so the baseline would sign off debt it could not see:",
             "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
             + "warnings above. To baseline against the partial model anyway, pass "
+            + "--allow-workspace-diagnostics.",
+            $"error: the model is incomplete — {Lagging(diagnostics)}, so no baseline was written: a baseline "
+            + "captured from a partial model signs off debt that was never measured:",
+            $"See the warnings above for why. {LagRemedy}. To baseline against the partial model anyway, pass "
             + "--allow-workspace-diagnostics.");
     }
 
@@ -105,6 +120,10 @@ internal static class IncompleteModelGate
             + "no violations, so every count reads low:",
             "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
             + "warnings above. To report against the partial model anyway, pass "
+            + "--allow-workspace-diagnostics.",
+            $"error: the model is incomplete — {Lagging(diagnostics)}, so status cannot report the burndown: "
+            + "code the compiler cannot read contributes no violations, so every count reads low:",
+            $"See the warnings above for why. {LagRemedy}. To report against the partial model anyway, pass "
             + "--allow-workspace-diagnostics.");
     }
 
@@ -131,7 +150,11 @@ internal static class IncompleteModelGate
             + "so nothing was rendered: a card would be committed describing dependencies the model never "
             + "resolved, and --diagram would draw a survey with the external edges missing:",
             "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
-            + "warnings above. To render from the partial model anyway, pass --allow-workspace-diagnostics.");
+            + "warnings above. To render from the partial model anyway, pass --allow-workspace-diagnostics.",
+            $"error: the model is incomplete — {Lagging(diagnostics)}, so nothing was rendered: a card would be "
+            + "committed describing a model missing the code the compiler cannot read:",
+            $"See the warnings above for why. {LagRemedy}. To render from the partial model anyway, pass "
+            + "--allow-workspace-diagnostics.");
     }
 
     /// <summary>
@@ -140,7 +163,7 @@ internal static class IncompleteModelGate
     ///     to compare it against.
     /// </summary>
     /// <remarks>
-    ///     Those two causes alone, never a restore failure: a project whose restore failed is still in the codebase
+    ///     Those two causes alone, never a restore failure or a compiler lag: such a project is still in the codebase
     ///     with its name and its assembly names, so the project list the file records is whole.
     /// </remarks>
     internal static string RenderModelRefusal(WorkspaceDiagnostics diagnostics)
@@ -148,7 +171,7 @@ internal static class IncompleteModelGate
         const string optOut = "--allow-workspace-diagnostics renders the block and the cards from the partial "
                               + "model, but never the model file; drop --model to do that.";
         return Message(
-            diagnostics with { RestoreFailedProjects = [] },
+            diagnostics with { RestoreFailedProjects = [], CompilerLagProjects = [] },
             false,
             $"error: the model is incomplete — {Missing(diagnostics)}, so --model was refused and nothing "
             + "was rendered: the model file names every project the spec governs, and one written now would "
@@ -158,6 +181,8 @@ internal static class IncompleteModelGate
             + "and nothing was rendered: the model file names every project the spec governs, and one "
             + "written now would leave out exactly the projects that failed:",
             $"See the warnings above for why, then restore and build the solution (dotnet build). {optOut}",
+            "",
+            null,
             "",
             null);
     }
@@ -203,7 +228,10 @@ internal static class IncompleteModelGate
             + "cannot survey the codebase: the external references a survey exists to show are exactly what "
             + "did not resolve:",
             "Restore the solution first (dotnet restore), then retry. To survey the partial model as it "
-            + "loaded, pass --allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph).");
+            + "loaded, pass --allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph).",
+            $"the model is incomplete — {Lagging(diagnostics)}, so graph cannot survey the codebase:",
+            $"{LagRemedy}, then retry. To survey the partial model as it loaded, pass "
+            + "--allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph).");
     }
 
     /// <summary>
@@ -237,7 +265,10 @@ internal static class IncompleteModelGate
             "Restore and build the solution first (dotnet restore, dotnet build), then retry.",
             $"No spec project found: NuGet packages did not resolve for {Unrestored(diagnostics)}, so a "
             + "project that references SlideRule.dll may have failed to resolve it:",
-            "Restore the solution first (dotnet restore), then retry.");
+            "Restore the solution first (dotnet restore), then retry.",
+            $"No spec project found: {Lagging(diagnostics)}, so a type that marks the spec may be among the code "
+            + "it could not read:",
+            $"{LagRemedy}, then retry.");
     }
 
     /// <summary>
@@ -262,7 +293,10 @@ internal static class IncompleteModelGate
             "Restore and build the solution first (dotnet build), then retry for a whole answer.",
             $"caveat: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
             + "so a rule about a package cannot be trusted to have been measured for paths under them:",
-            "Restore the solution first (dotnet restore), then retry for a whole answer.");
+            "Restore the solution first (dotnet restore), then retry for a whole answer.",
+            $"caveat: the model is incomplete — {Lagging(diagnostics)}, so a rule cannot be trusted to have "
+            + "been measured for paths under them:",
+            $"{LagRemedy}, then retry for a whole answer.");
     }
 
     /// <summary>
@@ -282,7 +316,10 @@ internal static class IncompleteModelGate
             "Restore and build the solution first (dotnet build), then retry for a whole diagram.",
             $"caveat: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
             + "so a reference that resolves through a package may be missing from the diagram:",
-            "Restore the solution first (dotnet restore), then retry for a whole diagram.");
+            "Restore the solution first (dotnet restore), then retry for a whole diagram.",
+            $"caveat: the model is incomplete — {Lagging(diagnostics)}, so code the compiler cannot read is "
+            + "missing from the diagram:",
+            $"{LagRemedy}, then retry for a whole diagram.");
     }
 
     /// <summary>
@@ -296,6 +333,8 @@ internal static class IncompleteModelGate
         if (diagnostics.MissingProjects.Count > 0) causes.Add("project files the solution declares that are not on disk");
         if (diagnostics.FailedProjects.Count > 0 || diagnostics.RestoreFailedProjects.Count > 0)
             causes.Add("projects that did not load or whose packages did not resolve");
+        if (diagnostics.CompilerLagProjects.Count > 0)
+            causes.Add("projects whose code the tool's C# compiler cannot read");
 
         return "The model is incomplete, so this run fails with exit 2 whatever the rules say. The job log names the "
                + $"{string.Join(", and the ", causes)}.";
@@ -320,7 +359,10 @@ internal static class IncompleteModelGate
             $"caveat: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
             + "so a selection that reads a package's base types, interfaces or attributes cannot be trusted "
             + "for the types they declare:",
-            "Restore the solution first (dotnet restore), then retry for a whole answer.");
+            "Restore the solution first (dotnet restore), then retry for a whole answer.",
+            $"caveat: the model is incomplete — {Lagging(diagnostics)}, so a type declared in code the compiler "
+            + "cannot read reads as unknown:",
+            $"{LagRemedy}, then retry for a whole answer.");
     }
 
     /// <summary>
@@ -346,7 +388,12 @@ internal static class IncompleteModelGate
             "Every rule about a package would be measured over a codebase where that package resolved to "
             + "nothing — a green run against a partial model would sign verdicts that were never reached. "
             + "Restore the solution first (dotnet restore), then retry. To check the partial model as it "
-            + "loaded, override AllowWorkspaceDiagnostics to true on the test class.");
+            + "loaded, override AllowWorkspaceDiagnostics to true on the test class.",
+            $"the model is incomplete — {Lagging(diagnostics)}, so every rule test was skipped:",
+            "Every rule would be measured over a codebase missing the code the compiler cannot read — a green "
+            + $"run against a partial model would sign verdicts that were never reached. {LagRemedy}, then "
+            + "retry. To check the partial model as it loaded, override AllowWorkspaceDiagnostics to true on "
+            + "the test class.");
     }
 
     /// <summary>
@@ -367,6 +414,10 @@ internal static class IncompleteModelGate
             null,
             "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
             + $"NuGet packages not resolving for {Unrestored(diagnostics)}:",
+            null,
+            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
+            + $"the C# {CompilerLagFailures.CarriedHighestLanguageVersion} compiler this tool carries not reading all "
+            + $"the code of {Plurals.Counted(diagnostics.CompilerLagProjects.Count, "project")}:",
             null);
     }
 
@@ -392,10 +443,12 @@ internal static class IncompleteModelGate
         bool missing = diagnostics.MissingProjects.Count > 0;
         bool load = diagnostics.FailedProjects.Count > 0;
         bool restore = diagnostics.RestoreFailedProjects.Count > 0;
+        bool lag = diagnostics.CompilerLagProjects.Count > 0;
 
         var causes = new List<string>();
         if (missing || load) causes.Add(Unloaded(diagnostics));
         if (restore) causes.Add($"NuGet packages did not resolve for {Unrestored(diagnostics)}");
+        if (lag) causes.Add(Lagging(diagnostics));
 
         // A failed load needs the build as well as the restore; an unresolved package needs only the restore; a
         // missing project file needs neither, only the file.
@@ -403,6 +456,7 @@ internal static class IncompleteModelGate
         if (missing) repairs.Add("put the missing project files on disk or remove their entries from the solution");
         if (load) repairs.Add("restore and build the solution (dotnet restore, dotnet build)");
         else if (restore) repairs.Add("restore the solution (dotnet restore)");
+        if (lag) repairs.Add("update SlideRule");
 
         return $"The model is incomplete: {string.Join(" and ", causes)}, so this selection may name types or rest "
                + $"on references that were never extracted; {string.Join(", then ", repairs)}, then re-check "
@@ -449,7 +503,15 @@ internal static class IncompleteModelGate
         return Plurals.Counted(diagnostics.RestoreFailedProjects.Count, "project");
     }
 
-    // A surface's whole refusal: one EvidenceBlock per cause it has, missing files, then failed loads and restores.
+    // "the C# 15 compiler this tool carries cannot read all the code of 1 project".
+    private static string Lagging(WorkspaceDiagnostics diagnostics)
+    {
+        return $"the C# {CompilerLagFailures.CarriedHighestLanguageVersion} compiler this tool carries cannot read "
+               + $"all the code of {Plurals.Counted(diagnostics.CompilerLagProjects.Count, "project")}";
+    }
+
+    // A surface's whole refusal: one EvidenceBlock per cause it has, missing files, then failed loads, restores and
+    // compiler lags.
     // Every lede is built by the caller and the unused ones are dropped, so a single-cause message carries that
     // cause's block alone, with no branch in the caller and no conditional in any literal. The missing block never
     // carries the MSBuild selection note, because no MSBuild could have opened a file that is not there.
@@ -461,7 +523,9 @@ internal static class IncompleteModelGate
         string loadLede,
         string? loadTail,
         string restoreLede,
-        string? restoreTail)
+        string? restoreTail,
+        string lagLede,
+        string? lagTail)
     {
         var blocks = new List<string>();
 
@@ -475,6 +539,10 @@ internal static class IncompleteModelGate
             blocks.Add(
                 EvidenceBlock.Compose(
                     restoreLede, diagnostics.RestoreFailedProjects, restoreTail, withSelectionNote));
+
+        if (diagnostics.CompilerLagProjects.Count > 0)
+            blocks.Add(
+                EvidenceBlock.Compose(lagLede, diagnostics.CompilerLagProjects, lagTail, withSelectionNote));
 
         return string.Join("\n", blocks);
     }

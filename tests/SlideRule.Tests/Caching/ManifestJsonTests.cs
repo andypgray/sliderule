@@ -229,6 +229,7 @@ public sealed class ManifestJsonTests
             SchemaVersion: 7,
             ToolVersion: "0.0.0-manifest-json-test",
             StructuralStamps: [structuralStamp],
+            SdkInstalls: ["C:/dotnet/sdk/10.0.404", "C:/dotnet/sdk/11.0.100"],
             Projects: [project],
             ForeignProjects:
             [
@@ -240,6 +241,7 @@ public sealed class ManifestJsonTests
             FailedProjects: ["C:/repo/src/Broken/Broken.csproj"],
             UncheckedProjects: ["C:/repo/src/Filtered/Filtered.csproj"],
             RestoreFailedProjects: ["C:/repo/src/Unrestored/Unrestored.csproj"],
+            CompilerLagProjects: ["C:/repo/src/Lagging/Lagging.csproj"],
             // A shared project rather than the .fsproj a reader would expect first, because its kind is the
             // non-zero member.
             UnsupportedProjects:

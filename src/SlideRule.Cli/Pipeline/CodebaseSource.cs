@@ -598,12 +598,14 @@ internal sealed class CodebaseSource : IDisposable
             .Select(project => project.Name)
             .ToHashSet(StringComparer.Ordinal);
         var recordedRestoreFailures = new HashSet<string>(recorded.RestoreFailedProjects, PathComparison.Comparer);
+        var recordedCompilerLags = new HashSet<string>(recorded.CompilerLagProjects, PathComparison.Comparer);
         var recordedMessages = new HashSet<string>(recorded.LoadFailures, StringComparer.Ordinal);
 
         return cacheRead.DirtyProjects.All(loaded.Contains)
                && measured.FailedProjects.Count == 0
                && measured.MissingProjects.Count == 0
                && measured.RestoreFailedProjects.All(recordedRestoreFailures.Contains)
+               && measured.CompilerLagProjects.All(recordedCompilerLags.Contains)
                && measured.LoadFailures.All(recordedMessages.Contains);
     }
 

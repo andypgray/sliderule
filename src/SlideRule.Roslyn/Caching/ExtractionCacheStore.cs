@@ -130,7 +130,8 @@ internal sealed record ProjectInputs(
     IReadOnlyList<string> ProjectReferences,
     IReadOnlyList<string> DocumentPaths,
     string? EvaluatedOutputPath = null,
-    string? IntermediateAssemblyPath = null);
+    string? IntermediateAssemblyPath = null,
+    string? CompilerAssemblyPath = null);
 
 /// <summary>
 ///     A loaded project in a language other than C#, as the caller knows it before any file is statted. The model
@@ -207,7 +208,7 @@ internal sealed class ExtractionCacheStore
     // gains a slot, even one that deserializes to a harmless default, so a reader never reasons about which
     // slots a file predates. The suite cannot catch a missed bump — every run gets a fresh cache directory — so
     // the discipline is the only guard.
-    private const int CurrentSchemaVersion = 56;
+    private const int CurrentSchemaVersion = 57;
 
     private static readonly IReadOnlySet<string> NoDocuments = new HashSet<string>(PathComparison.Comparer);
 
@@ -515,6 +516,7 @@ internal sealed class ExtractionCacheStore
             CurrentSchemaVersion,
             FileStamping.CurrentToolVersion,
             fingerprint.StructuralStamps,
+            CompilerLagFailures.SdkInstallsBeside(fingerprint.StructuralStamps.Select(stamp => stamp.Path)),
             fingerprint.Projects,
             fingerprint.ForeignProjects,
             extraction.SpecResolutions,
@@ -522,6 +524,7 @@ internal sealed class ExtractionCacheStore
             extraction.LoadDiagnostics.FailedProjects,
             extraction.LoadDiagnostics.UncheckedProjects,
             extraction.LoadDiagnostics.RestoreFailedProjects,
+            extraction.LoadDiagnostics.CompilerLagProjects,
             extraction.LoadDiagnostics.UnsupportedProjects,
             extraction.LoadDiagnostics.MissingProjects,
             extraction.Fragments);
@@ -594,6 +597,12 @@ internal sealed class ExtractionCacheStore
         // the sweep cannot see.
         if (ForeignConeGrew(manifest.ForeignProjects)) return null;
 
+        // An SDK installed beside a stamped one changes nothing stamped, yet can change which SDK, and so which
+        // compiler, the next load uses.
+        IReadOnlyList<string> sdkInstalls =
+            CompilerLagFailures.SdkInstallsBeside(manifest.StructuralStamps.Select(stamp => stamp.Path));
+        if (!sdkInstalls.SequenceEqual(manifest.SdkInstalls, StringComparer.Ordinal)) return null;
+
         return (manifest, refreshedStructural);
     }
 
@@ -606,6 +615,7 @@ internal sealed class ExtractionCacheStore
             failedProjects: manifest.FailedProjects,
             uncheckedProjects: manifest.UncheckedProjects,
             restoreFailedProjects: manifest.RestoreFailedProjects,
+            compilerLagProjects: manifest.CompilerLagProjects,
             unsupportedProjects: manifest.UnsupportedProjects,
             missingProjects: manifest.MissingProjects);
     }

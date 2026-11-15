@@ -27,7 +27,7 @@ internal sealed record UnsupportedProjectStamp(string Project, string Reason)
 ///         Each is <see cref="WorkspaceDiagnostics" />' fact of the same name, which says what it holds, with
 ///         every path made solution-relative and forward-slashed; <paramref name="ModelIncomplete" /> is
 ///         <see cref="WorkspaceDiagnostics.IsIncomplete" />. The path lists, <paramref name="MissingProjects" />
-///         through <paramref name="RestoreFailedProjects" />, are adjacent and of one type,
+///         through <paramref name="CompilerLagProjects" />, are adjacent and of one type,
 ///         which is a swap the compiler cannot see: a reorder exchanging what failed to load with what a solution
 ///         filter left unchecked type-checks cleanly and reaches the wire. Composed once here, off one
 ///         <see cref="WorkspaceDiagnostics" /> and by name, that reorder is untypeable — and no document decides
@@ -56,6 +56,7 @@ internal readonly record struct WorkspaceTrustStamp(
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,
+    IReadOnlyList<string>? CompilerLagProjects,
     IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects,
     IReadOnlyList<MultiTargetedProject>? MultiTargetedProjects,
     IReadOnlyList<PackageAuditEntry> PackageAudit)
@@ -76,6 +77,7 @@ internal readonly record struct WorkspaceTrustStamp(
             Relative(diagnostics.FailedProjects, relativizer),
             Relative(diagnostics.UncheckedProjects, relativizer),
             Relative(diagnostics.RestoreFailedProjects, relativizer),
+            Relative(diagnostics.CompilerLagProjects, relativizer),
             Unsupported(diagnostics.UnsupportedProjects, relativizer),
             SlideRuleJson.OmitEmpty(diagnostics.MultiTargetedProjects),
             diagnostics.PackageAudit);

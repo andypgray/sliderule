@@ -57,7 +57,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(56);
+            .ShouldBe(57);
     }
 
     [Fact]
@@ -392,11 +392,14 @@ public sealed class ExtractionCacheStoreTests
     [InlineData("tool version", "Miss")]
     [InlineData("project file edited", "Miss")]
     [InlineData("foreign cone grew", "Miss")]
+    [InlineData("compiler rewritten", "Miss")]
+    [InlineData("sdk installed beside", "Miss")]
     public void TryReadSpecResolutions_AnswersExactlyWhenReadAndValidateHitsOrIsPartial(string change, string outcome)
     {
         // Arrange
         using var solution = new SyntheticSolution();
         solution.AddProject("A", ["Legacy"], ("A.cs", "class A {}"));
+        solution.BuildWithSdk("A", "10.0.100");
         solution.AddForeignProject("Legacy", ("Ledger.vb", "Class Ledger\nEnd Class\n"));
         solution.BackdateAll();
         ExtractionCacheStore store = solution.NewStore();
@@ -743,6 +746,7 @@ public sealed class ExtractionCacheStoreTests
                 LoadFailures = ["load-diag-1", "load-diag-2"],
                 FailedProjects = ["/repo/Broken/Broken.csproj"],
                 RestoreFailedProjects = ["/repo/Unrestored/Unrestored.csproj"],
+                CompilerLagProjects = ["/repo/Lagging/Lagging.csproj"],
                 UnsupportedProjects =
                 [
                     new UnsupportedProject("/repo/Fs/Fs.fsproj", UnsupportedProjectKind.NotCsharp),
@@ -773,10 +777,11 @@ public sealed class ExtractionCacheStoreTests
         // cold run refused, which is the whole reason it is persisted rather than recomputed.
         replayed.IntermediateAssemblyPath.ShouldBe("/obj/A.dll");
         result.LoadDiagnostics.LoadFailures.ShouldBe(["load-diag-1", "load-diag-2"]);
-        // And both halves of the gate's own input round-trip beside them. A hit owns no workspace to recompute
-        // either from, so a manifest that lost one would answer green exactly where the cold run refuses.
+        // And each cause of the gate's own input round-trips beside them. A hit owns no workspace to recompute
+        // any from, so a manifest that lost one would answer green exactly where the cold run refuses.
         result.LoadDiagnostics.FailedProjects.ShouldBe(["/repo/Broken/Broken.csproj"]);
         result.LoadDiagnostics.RestoreFailedProjects.ShouldBe(["/repo/Unrestored/Unrestored.csproj"]);
+        result.LoadDiagnostics.CompilerLagProjects.ShouldBe(["/repo/Lagging/Lagging.csproj"]);
         // The coverage statement round-trips with its classification as well as its paths. The kind is the
         // producer's verdict and a hit owns no solution file to re-read it from, so a manifest that stored
         // paths alone would leave the reason to be guessed again on the one path that cannot check. A Web Site's
@@ -1280,6 +1285,15 @@ public sealed class ExtractionCacheStoreTests
             case "foreign cone grew":
                 solution.AddStrayFile("Legacy", "Other.vb", "Class Other\nEnd Class\n");
                 return;
+            case "compiler rewritten":
+                // An SDK updated in place: the compiler A's build reads C# with changes, and nothing the solution
+                // owns does.
+                RewriteBackdated(solution.CompilerAssemblyOf("A"), "an updated compiler\n");
+                return;
+            case "sdk installed beside":
+                // A newer SDK installed side by side: nothing stamped changes, yet the next load may take it.
+                Directory.CreateDirectory(solution.SdkDirectory("11.0.100"));
+                return;
             default:
                 throw new ArgumentOutOfRangeException(nameof(change), change, "no such change");
         }
@@ -1309,6 +1323,10 @@ public sealed class ExtractionCacheStoreTests
 
         private readonly TempDirectory cache = TestTempRoot.Fresh("cache-store");
 
+        // A dotnet root of its own, outside the solution tree, so an SDK placed here is reached only through a
+        // project's compiler assembly.
+        private readonly TempDirectory toolchain = TestTempRoot.Fresh("cache-toolchain");
+
         public SyntheticSolution()
         {
             Root = temp.Path;
@@ -1332,6 +1350,7 @@ public sealed class ExtractionCacheStoreTests
         {
             temp.Dispose();
             cache.Dispose();
+            toolchain.Dispose();
         }
 
         public void AddProject(string name, IReadOnlyList<string> references, params (string File, string Content)[] documents)
@@ -1341,6 +1360,28 @@ public sealed class ExtractionCacheStoreTests
             List<string> documentPaths = WriteDocuments([name], documents);
 
             projects.Add(new ProjectInputs(name, csproj, temp.PathOf(name), references, documentPaths));
+        }
+
+        // Points an added project's build at the compiler assembly of an SDK of the given version, written in the
+        // layout an installed SDK keeps it in.
+        public void BuildWithSdk(string name, string sdkVersion)
+        {
+            string compiler = toolchain.WriteFile(
+                ["dotnet", "sdk", sdkVersion, "Roslyn", "bincore", "Microsoft.CodeAnalysis.CSharp.dll"], "compiler\n");
+            int at = projects.FindIndex(project => project.ProjectName == name);
+            projects[at] = projects[at] with { CompilerAssemblyPath = compiler };
+        }
+
+        public string CompilerAssemblyOf(string name)
+        {
+            return projects.Single(project => project.ProjectName == name)
+                .CompilerAssemblyPath!;
+        }
+
+        // Where an SDK of the given version sits under the dotnet root BuildWithSdk writes into.
+        public string SdkDirectory(string sdkVersion)
+        {
+            return toolchain.PathOf("dotnet", "sdk", sdkVersion);
         }
 
         // A Visual Basic project beside the C# ones, which the cache stamps as structural.
@@ -1460,6 +1501,7 @@ public sealed class ExtractionCacheStoreTests
         public void BackdateAll()
         {
             FixtureEdits.BackdateTree(Root);
+            FixtureEdits.BackdateTree(toolchain.Path);
         }
 
         // The number of project entries the written manifest carries — the fingerprint's own grain, which a

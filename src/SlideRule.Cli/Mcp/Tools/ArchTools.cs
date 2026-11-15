@@ -38,9 +38,10 @@ internal sealed class ArchTools(
         "subjectTypes/subjectGeneratedTypes appear together on a rule whose subject contained generator " +
         "output, pass or fail: how many types it swept and how many nobody wrote. Both absent means none " +
         "were. Narrowing the rule with .Authored() removes them. " +
-        "If declared project files are missing, projects fail to load, or their NuGet packages did not " +
-        "resolve, the report still returns, stamped modelIncomplete: true and " +
-        "missingProjects/failedProjects/restoreFailedProjects — a verdict reached " +
+        "If declared project files are missing, projects fail to load, their NuGet packages did not " +
+        "resolve, or the tool's compiler cannot read their code, the report still returns, stamped " +
+        "modelIncomplete: true and missingProjects/failedProjects/restoreFailedProjects/compilerLagProjects — " +
+        "a verdict reached " +
         "against a partial model; report that, never plain green. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never " +
         "checked — a clean report then covers a subset; say so. " +
@@ -59,9 +60,10 @@ internal sealed class ArchTools(
         "Return the JSON migration burndown (schemaVersion 2): per-rule grandfathered/stale counts and " +
         "promotion suggestions. Each ratchet lists its remaining entries, oldest first, with recordedAt and " +
         "recordedBy from git history, or ageUnknown (noHistory, shallowClone, notCommitted), and oldest repeats the " +
-        "first dated one. If declared project files are missing, projects fail to load, or their NuGet " +
-        "packages did not resolve, the burndown still returns, stamped modelIncomplete: true and " +
-        "missingProjects/failedProjects/restoreFailedProjects — " +
+        "first dated one. If declared project files are missing, projects fail to load, their NuGet " +
+        "packages did not resolve, or the tool's compiler cannot read their code, the burndown still returns, " +
+        "stamped modelIncomplete: true and missingProjects/failedProjects/restoreFailedProjects/" +
+        "compilerLagProjects — " +
         "counts from a partial model; report that rather than quoting them as whole. " +
         "Under a .slnf solution filter, uncheckedProjects names the declared projects the run never checked; " +
         "they contribute no violations, so every count reads low. unsupportedProjects names the projects " +

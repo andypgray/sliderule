@@ -200,7 +200,8 @@ internal static class ProjectCone
     public static IReadOnlyList<string> SolutionStructuralPaths(
         string solutionPath, IEnumerable<ProjectInputs> projects, IEnumerable<ForeignProjectInputs> foreignProjects)
     {
-        IEnumerable<(string, string, string?, string?)> csharp = projects.Select(project => (
+        List<ProjectInputs> csharpProjects = projects.ToList();
+        IEnumerable<(string, string, string?, string?)> csharp = csharpProjects.Select(project => (
             Path.GetFullPath(project.CsprojPath),
             Path.GetFullPath(project.ProjectDirectory),
             project.EvaluatedOutputPath,
@@ -210,7 +211,18 @@ internal static class ProjectCone
             Path.GetFullPath(project.ProjectDirectory),
             project.EvaluatedOutputPath,
             project.IntermediateAssemblyPath));
-        return SolutionStructuralPaths(solutionPath, csharp.Concat(foreign));
+        IReadOnlyList<string> paths = SolutionStructuralPaths(solutionPath, csharp.Concat(foreign));
+
+        // The compiler a project's build reads C# with decides whether the carried one lags it, so an SDK updated in
+        // place is a structural change.
+        IEnumerable<string> compilers = csharpProjects
+            .Select(project => project.CompilerAssemblyPath)
+            .OfType<string>()
+            .Select(Path.GetFullPath)
+            .Where(compiler => !paths.Contains(compiler, PathComparison.Comparer))
+            .Distinct(PathComparison.Comparer)
+            .OrderBy(compiler => compiler, StringComparer.Ordinal);
+        return [.. paths, .. compilers];
     }
 
     /// <summary>

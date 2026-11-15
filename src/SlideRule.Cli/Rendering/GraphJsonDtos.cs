@@ -60,6 +60,7 @@ internal sealed record GraphJson(
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,
+    IReadOnlyList<string>? CompilerLagProjects,
     IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects);
 
 /// <summary>

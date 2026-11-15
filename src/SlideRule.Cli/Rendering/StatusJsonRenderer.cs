@@ -42,6 +42,7 @@ internal static class StatusJsonRenderer
             FailedProjects: trust.FailedProjects,
             UncheckedProjects: trust.UncheckedProjects,
             RestoreFailedProjects: trust.RestoreFailedProjects,
+            CompilerLagProjects: trust.CompilerLagProjects,
             UnsupportedProjects: trust.UnsupportedProjects,
             StaleSpec: trust.StaleSpec,
             Orphans: Orphans(report.OrphanScan),

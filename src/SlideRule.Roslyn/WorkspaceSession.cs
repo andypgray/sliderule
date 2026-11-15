@@ -507,6 +507,10 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         foreach (string path in ProjectCone.SolutionStructuralPaths(solutionPath, projects))
             RecordStructural(path);
 
+        // A compiler the load read C# against is structural: an SDK updated in place can change the lag verdict.
+        foreach (string compiler in CompilerLagFailures.CompilerAssembliesOf(solution))
+            RecordStructural(compiler);
+
         foreach ((string projectDirectory, string suffix) in coneRoots)
         foreach (string coneFile in ProjectCone.Enumerate(projectDirectory, suffix))
             knownConeFiles.Add(coneFile);

@@ -39,6 +39,7 @@ internal static class SolutionProjects
         Solution solution, Func<string, string, bool> includeDocument)
     {
         var byName = new Dictionary<string, Accumulator>(StringComparer.Ordinal);
+        string? solutionSdk = CompilerLagFailures.LoadSdkOf(solution);
 
         foreach (Project project in solution.Projects)
         {
@@ -54,7 +55,8 @@ internal static class SolutionProjects
                     csprojPath,
                     projectDirectory,
                     project.OutputFilePath,
-                    project.CompilationOutputInfo.AssemblyPath);
+                    project.CompilationOutputInfo.AssemblyPath,
+                    CompilerLagFailures.YardstickOf(project, null, solutionSdk));
                 byName[project.Name] = accumulator;
             }
 
@@ -127,7 +129,8 @@ internal static class SolutionProjects
         string csprojPath,
         string projectDirectory,
         string? evaluatedOutputPath,
-        string? intermediateAssemblyPath)
+        string? intermediateAssemblyPath,
+        string? compilerAssemblyPath)
     {
         public string ProjectName { get; } = projectName;
         public SortedSet<string> Documents { get; } = new(StringComparer.Ordinal);
@@ -142,7 +145,8 @@ internal static class SolutionProjects
                 References.ToList(),
                 Documents.ToList(),
                 evaluatedOutputPath,
-                intermediateAssemblyPath);
+                intermediateAssemblyPath,
+                compilerAssemblyPath);
         }
     }
 }

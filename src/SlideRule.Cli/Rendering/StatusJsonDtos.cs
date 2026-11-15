@@ -44,6 +44,7 @@ internal sealed record StatusJson(
     IReadOnlyList<string>? FailedProjects,
     IReadOnlyList<string>? UncheckedProjects,
     IReadOnlyList<string>? RestoreFailedProjects,
+    IReadOnlyList<string>? CompilerLagProjects,
     IReadOnlyList<UnsupportedProjectStamp>? UnsupportedProjects,
     StaleSpecStamp? StaleSpec,
     IReadOnlyList<StatusOrphanJson>? Orphans,

@@ -163,6 +163,7 @@ internal static class SarifReportRenderer
         if (trust.FailedProjects is { } failed) notifications.Add(LoadFailureNotification(failed));
         if (trust.RestoreFailedProjects is { } restoreFailed)
             notifications.Add(RestoreFailureNotification(restoreFailed));
+        if (trust.CompilerLagProjects is { } lagging) notifications.Add(CompilerLagNotification(lagging));
         if (trust.UncheckedProjects is { } narrowed) notifications.Add(NarrowingNotification(narrowed));
         if (trust.UnsupportedProjects is { } unsupported) notifications.Add(UnsupportedNotification(unsupported));
 
@@ -233,6 +234,20 @@ internal static class SarifReportRenderer
                 $"The model is incomplete: NuGet packages did not resolve for {subject}, so these results were "
                 + "reached against a codebase whose package references resolved to nothing: "
                 + string.Join(", ", restoreFailedProjects)),
+            ErrorLevel);
+    }
+
+    // The same error for code the carried compiler could not read, kept apart because its remedy is a newer tool,
+    // never a change to the solution.
+    private static SarifNotification CompilerLagNotification(IReadOnlyList<string> laggingProjects)
+    {
+        string subject = Plurals.Counted(laggingProjects.Count, "project");
+
+        return new SarifNotification(
+            new SarifMessage(
+                $"The model is incomplete: the C# {CompilerLagFailures.CarriedHighestLanguageVersion} compiler this "
+                + $"tool carries cannot read all the code of {subject}, so these results were reached against a "
+                + "codebase missing that code: " + string.Join(", ", laggingProjects)),
             ErrorLevel);
     }
 

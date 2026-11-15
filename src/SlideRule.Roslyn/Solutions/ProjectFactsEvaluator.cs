@@ -18,6 +18,13 @@ namespace SlideRule.Roslyn.Solutions;
 internal readonly record struct ProjectEvaluationRequest(string? ProjectFile, string? TargetFramework);
 
 /// <summary>
+///     What an in-process evaluation says about the compiler a project asks for: its evaluated
+///     <c>LangVersion</c>, empty where nothing set it, and its <c>RoslynTargetsPath</c>, the directory of the
+///     compiler its build runs.
+/// </summary>
+internal sealed record CompilerFacts(string LangVersion, string RoslynTargetsPath);
+
+/// <summary>
 ///     Reads a project's <see cref="ProjectArtifactFacts" /> by evaluating it rather than by parsing its XML:
 ///     every fact here is regularly decided somewhere the project file does not mention, a
 ///     <c>Directory.Build.props</c> above it, a package's imported targets, or an SDK default nobody wrote
@@ -89,15 +96,51 @@ internal static class ProjectFactsEvaluator
     internal static IReadOnlyList<ProjectArtifactFacts?> EvaluateAll(
         IReadOnlyList<ProjectEvaluationRequest> requests, string? solutionFile, int shardCount, CancellationToken ct)
     {
-        var facts = new ProjectArtifactFacts?[requests.Count];
-        if (requests.Count == 0) return facts;
+        string? solutionDirectory = solutionFile is { Length: > 0 } ? Path.GetDirectoryName(solutionFile) : null;
+        return EvaluateEach<ProjectArtifactFacts>(
+            requests, solutionFile, shardCount,
+            () =>
+            {
+                var cones = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+                return (project, projectFile) => ReadFacts(project, cones, projectFile, solutionDirectory);
+            },
+            ct);
+    }
+
+    /// <summary>
+    ///     The <see cref="CompilerFacts" /> of each of <paramref name="requests" /> by index, null where that project
+    ///     could not be evaluated, under the solution properties, shards and evaluation context the artifact facts
+    ///     use.
+    /// </summary>
+    internal static IReadOnlyList<CompilerFacts?> EvaluateCompilerFacts(
+        IReadOnlyList<ProjectEvaluationRequest> requests, string? solutionFile, CancellationToken ct)
+    {
+        int shardCount = Math.Clamp(Environment.ProcessorCount / 2, 1, MaxShards);
+        return EvaluateEach<CompilerFacts>(
+            requests, solutionFile, shardCount,
+            () => (project, _) => new CompilerFacts(
+                project.GetPropertyValue("LangVersion"), project.GetPropertyValue("RoslynTargetsPath")),
+            ct);
+    }
+
+    // The evaluation every entry point shares. newReader makes one reader per shard, so a reader may keep a memo
+    // no other shard touches.
+    private static IReadOnlyList<T?> EvaluateEach<T>(
+        IReadOnlyList<ProjectEvaluationRequest> requests,
+        string? solutionFile,
+        int shardCount,
+        Func<Func<Project, string, T>> newReader,
+        CancellationToken ct)
+        where T : class
+    {
+        var results = new T?[requests.Count];
+        if (requests.Count == 0) return results;
 
         IReadOnlyDictionary<string, string> solutionProperties = SolutionProperties(solutionFile);
-        string? solutionDirectory = solutionFile is { Length: > 0 } ? Path.GetDirectoryName(solutionFile) : null;
         IReadOnlyList<IReadOnlyList<int>> shards = Shards(requests, shardCount);
         try
         {
-            EvaluateShards(facts, requests, shards, solutionProperties, solutionDirectory, ct);
+            EvaluateShards(results, requests, shards, solutionProperties, newReader, ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -107,10 +150,10 @@ internal static class ProjectFactsEvaluator
 
             // MSBuild itself did not load, or a collection could not be built. Every project stays absent,
             // which is the same answer a hand-built extraction gives and is read the same way downstream.
-            Array.Clear(facts);
+            Array.Clear(results);
         }
 
-        return facts;
+        return results;
     }
 
     /// <summary>
@@ -169,38 +212,39 @@ internal static class ProjectFactsEvaluator
     }
 
     // Split out and never inlined so that a runtime unable to load the MSBuild engine assemblies fails at
-    // the call in EvaluateAll, inside its catch, rather than while jitting the caller. Shards write disjoint
-    // indices of `facts`.
+    // the call in EvaluateEach, inside its catch, rather than while jitting the caller. Shards write disjoint
+    // indices of `results`.
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static void EvaluateShards(
-        ProjectArtifactFacts?[] facts,
+    private static void EvaluateShards<T>(
+        T?[] results,
         IReadOnlyList<ProjectEvaluationRequest> requests,
         IReadOnlyList<IReadOnlyList<int>> shards,
         IReadOnlyDictionary<string, string> solutionProperties,
-        string? solutionDirectory,
+        Func<Func<Project, string, T>> newReader,
         CancellationToken ct)
+        where T : class
     {
         var context = EvaluationContext.Create(EvaluationContext.SharingPolicy.Shared);
         var options = new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = shards.Count };
         Parallel.For(
             0, shards.Count, options,
-            shard => EvaluateInto(facts, requests, shards[shard], solutionProperties, solutionDirectory, context, ct));
+            shard => EvaluateInto(results, requests, shards[shard], solutionProperties, context, newReader(), ct));
     }
 
-    private static void EvaluateInto(
-        ProjectArtifactFacts?[] facts,
+    private static void EvaluateInto<T>(
+        T?[] results,
         IReadOnlyList<ProjectEvaluationRequest> requests,
         IReadOnlyList<int> shard,
         IReadOnlyDictionary<string, string> solutionProperties,
-        string? solutionDirectory,
         EvaluationContext context,
+        Func<Project, string, T> read,
         CancellationToken ct)
+        where T : class
     {
         // Every project of the batch evaluates under the solution's properties, so the collection carries them:
         // MSBuild lays a project's own global properties, its framework here, over its collection's.
         using var collection = new ProjectCollection(solutionProperties.ToDictionary());
-        var evaluated = new Dictionary<(string File, string? Framework), ProjectArtifactFacts?>();
-        var cones = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        var evaluated = new Dictionary<(string File, string? Framework), T?>();
 
         foreach (int i in shard)
         {
@@ -210,28 +254,27 @@ internal static class ProjectFactsEvaluator
             if (request.ProjectFile is not { Length: > 0 } projectFile) continue;
 
             (string, string?) key = (PathComparison.Fold(projectFile), request.TargetFramework);
-            if (!evaluated.TryGetValue(key, out ProjectArtifactFacts? result))
+            if (!evaluated.TryGetValue(key, out T? result))
             {
-                result = TryEvaluate(
-                    collection, context, cones, projectFile, request.TargetFramework, solutionDirectory);
+                result = TryEvaluate(collection, context, projectFile, request.TargetFramework, read);
                 evaluated[key] = result;
             }
 
-            facts[i] = result;
+            results[i] = result;
         }
     }
 
-    private static ProjectArtifactFacts? TryEvaluate(
+    private static T? TryEvaluate<T>(
         ProjectCollection collection,
         EvaluationContext context,
-        Dictionary<string, HashSet<string>> cones,
         string projectFile,
         string? targetFramework,
-        string? solutionDirectory)
+        Func<Project, string, T> read)
+        where T : class
     {
         try
         {
-            return Evaluate(collection, context, cones, projectFile, targetFramework, solutionDirectory);
+            return Evaluate(collection, context, projectFile, targetFramework, read);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -239,13 +282,12 @@ internal static class ProjectFactsEvaluator
         }
     }
 
-    private static ProjectArtifactFacts Evaluate(
+    private static T Evaluate<T>(
         ProjectCollection collection,
         EvaluationContext context,
-        Dictionary<string, HashSet<string>> cones,
         string projectFile,
         string? targetFramework,
-        string? solutionDirectory)
+        Func<Project, string, T> read)
     {
         Dictionary<string, string>? globalProperties = targetFramework is { Length: > 0 }
             ? new Dictionary<string, string>(StringComparer.Ordinal) { ["TargetFramework"] = targetFramework }
@@ -263,35 +305,41 @@ internal static class ProjectFactsEvaluator
 
         try
         {
-            var projectSite = new FragmentSite(projectFile, ProjectFileLine);
-            string projectDirectory = Path.GetDirectoryName(projectFile) ?? projectFile;
-            HashSet<string> projectCone = ProjectCone(cones, projectDirectory);
-            RepositoryDeclarations repository = RepositoryOf(project, projectCone, solutionDirectory);
-
-            (IReadOnlyList<string> frameworks, FragmentSite frameworksSite) =
-                ReadTargetFrameworks(project, repository, projectSite);
-            (bool? packable, FragmentSite packableSite) = ReadPackable(project, repository, projectSite);
-            (bool locks, FragmentSite locksSite) = ReadLockPolicy(project, repository, projectSite);
-            IReadOnlyList<FragmentPackageReference> packages =
-                ReadPackageReferences(project, repository, projectSite);
-            IReadOnlyList<string> projectReferences = ReadProjectReferences(project);
-            FragmentProperties properties = ReadProperties(project, repository, projectSite);
-
-            return new ProjectArtifactFacts(
-                frameworks,
-                frameworksSite,
-                packages,
-                packable,
-                packableSite,
-                locks,
-                locksSite,
-                projectReferences,
-                properties);
+            return read(project, projectFile);
         }
         finally
         {
             collection.UnloadProject(project);
         }
+    }
+
+    private static ProjectArtifactFacts ReadFacts(
+        Project project, Dictionary<string, HashSet<string>> cones, string projectFile, string? solutionDirectory)
+    {
+        var projectSite = new FragmentSite(projectFile, ProjectFileLine);
+        string projectDirectory = Path.GetDirectoryName(projectFile) ?? projectFile;
+        HashSet<string> projectCone = ProjectCone(cones, projectDirectory);
+        RepositoryDeclarations repository = RepositoryOf(project, projectCone, solutionDirectory);
+
+        (IReadOnlyList<string> frameworks, FragmentSite frameworksSite) =
+            ReadTargetFrameworks(project, repository, projectSite);
+        (bool? packable, FragmentSite packableSite) = ReadPackable(project, repository, projectSite);
+        (bool locks, FragmentSite locksSite) = ReadLockPolicy(project, repository, projectSite);
+        IReadOnlyList<FragmentPackageReference> packages =
+            ReadPackageReferences(project, repository, projectSite);
+        IReadOnlyList<string> projectReferences = ReadProjectReferences(project);
+        FragmentProperties properties = ReadProperties(project, repository, projectSite);
+
+        return new ProjectArtifactFacts(
+            frameworks,
+            frameworksSite,
+            packages,
+            packable,
+            packableSite,
+            locks,
+            locksSite,
+            projectReferences,
+            properties);
     }
 
     // The SDK spelling first, because an SDK project defines both properties and the plural is authoritative

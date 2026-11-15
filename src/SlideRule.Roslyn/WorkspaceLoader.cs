@@ -58,7 +58,8 @@ internal static class WorkspaceLoader
     ///     load, since a partial load still yields a usable model: <paramref name="diagnosticLog" /> receives the
     ///     workspace's failure messages and the load's own warnings for a host to render, and whether the model
     ///     is incomplete is the answer of <see cref="WorkspaceDiagnostics.FailedProjects" /> and
-    ///     <see cref="WorkspaceDiagnostics.RestoreFailedProjects" /> on
+    ///     <see cref="WorkspaceDiagnostics.RestoreFailedProjects" /> and
+    ///     <see cref="WorkspaceDiagnostics.CompilerLagProjects" /> on
     ///     <see cref="LoadedSolution.LoadDiagnosticsWith" />, never the messages'.
     /// </remarks>
     /// <exception cref="UserErrorException">
@@ -106,6 +107,10 @@ internal static class WorkspaceLoader
             foreach (UnresolvedReferences.Finding found in UnresolvedReferences.Detect(settled.Solution, settled.Report.Failed))
                 diagnosticLog?.Invoke(UnresolvedReferences.Message(found.ProjectPath, found.Names));
 
+            // Before anything compiles: a compile consumes the one load-failure event a generator raises.
+            IReadOnlyList<CompilerLagFailures.Finding> generatorLag = CompilerLagFailures.DetectGenerators(
+                settled.Solution, settled.Report.Failed);
+
             // No step above reads a document's text and the cross-language check below compiles, so the delegate
             // must run between them.
             Solution inspected = beforeFirstRead is null
@@ -126,15 +131,38 @@ internal static class WorkspaceLoader
             // only its assets file can.
             IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(inspected, settled.Report.Failed);
 
+            IReadOnlyList<CompilerLagFailures.Finding> languageLag = CompilerLagFailures.DetectLanguage(
+                inspected, settled.TargetFrameworks, settled.Report.Failed, inspected.FilePath, ct);
+            IReadOnlyList<string> compilerLag = LaggingProjects(
+                [.. generatorLag, .. languageLag], [.. settled.Report.Failed, .. restoreFailed], diagnosticLog);
+
             return new LoadedSolution(
                 workspace, inspected, settled.TargetFrameworks, settled.ProjectFiles, settled.Report,
-                restoreFailed);
+                restoreFailed, compilerLag);
         }
         catch
         {
             workspace.Dispose();
             throw;
         }
+    }
+
+    // The lagging projects no other cause already names, ordinal-sorted, each finding's evidence logged once.
+    private static IReadOnlyList<string> LaggingProjects(
+        IReadOnlyList<CompilerLagFailures.Finding> findings, IReadOnlyList<string> otherwiseBlamed,
+        Action<string>? diagnosticLog)
+    {
+        var blamed = new HashSet<string>(otherwiseBlamed, PathComparison.Comparer);
+        var lagging = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (CompilerLagFailures.Finding finding in findings)
+        {
+            if (blamed.Contains(finding.ProjectPath)) continue;
+
+            lagging.Add(finding.ProjectPath);
+            diagnosticLog?.Invoke(finding.Evidence);
+        }
+
+        return lagging.ToList();
     }
 
     /// <summary>

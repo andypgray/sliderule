@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Roslyn;
+using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Sessions;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -262,6 +263,54 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         // Act — a structural touch on the referenced solution, the filter and every project left alone.
         FixtureEdits.StampForward(fixture.SolutionPath);
         WorkspaceSnapshot after = await session.GetCurrentAsync(filter, Ct);
+
+        // Assert
+        (session.FullReloadCount - reloadsBefore).ShouldBe(1);
+        after.Generation.ShouldBeGreaterThan(before.Generation);
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_CompilerAssemblyRewritten_TriggersReload()
+    {
+        // An SDK updated in place rewrites the compiler a project's build reads C# with, and nothing the solution
+        // owns, yet it can change whether the carried compiler lags. Its own session over its own copy, because the
+        // project's build has to be pointed at an SDK under a temp root: the session finds a project's compiler
+        // beside the SDK its first SDK-located analyzer comes from, so an analyzer item in that layout, with the
+        // SDK's own analyzers turned off, is what points it there. The load drops an analyzer item whose file is
+        // not on disk, so the file exists, as bytes no generator can be read from.
+
+        // Arrange
+        using var fixture = new TempFixtureWorkspace();
+        using TempDirectory dotnetRoot = TestTempRoot.Fresh("session-sdk");
+        string compiler = dotnetRoot.WriteFile(
+            ["sdk", "99.0.100", "Roslyn", "bincore", "Microsoft.CodeAnalysis.CSharp.dll"], "compiler\n");
+        string analyzer = dotnetRoot.WriteFile(
+            ["sdk", "99.0.100", "Sdks", "Fake.Sdk", "analyzers", "Fake.Analyzer.dll"], "analyzer\n");
+        FixtureEdits.EditOnDisk(
+            fixture.PathOf(Domain, $"{Domain}.csproj"),
+            content => content.Replace(
+                "</Project>",
+                "    <PropertyGroup>\n        <EnableNETAnalyzers>false</EnableNETAnalyzers>\n    </PropertyGroup>\n"
+                + $"    <ItemGroup>\n        <Analyzer Include=\"{analyzer}\" />\n    </ItemGroup>\n</Project>"));
+        await using var session = new WorkspaceSession();
+        WorkspaceSnapshot before = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        IEnumerable<string?> domainAnalyzers = before.Solution.Projects
+            .Where(project => project.Name == Domain)
+            .SelectMany(project => project.AnalyzerReferences)
+            .Select(reference => reference.FullPath);
+        CompilerLagFailures.CompilerAssembliesOf(before.Solution)
+            .ShouldContain(
+                compiler,
+                "the analyzer item must point the session at the temp SDK's compiler; Domain's analyzers are:\n"
+                + string.Join("\n", domainAnalyzers));
+        long reloadsBefore = session.FullReloadCount;
+        await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        session.FullReloadCount.ShouldBe(reloadsBefore, "nothing has changed yet, so nothing may reload");
+
+        // Act
+        File.WriteAllText(compiler, "an updated compiler\n");
+        FixtureEdits.StampForward(compiler);
+        WorkspaceSnapshot after = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
 
         // Assert
         (session.FullReloadCount - reloadsBefore).ShouldBe(1);

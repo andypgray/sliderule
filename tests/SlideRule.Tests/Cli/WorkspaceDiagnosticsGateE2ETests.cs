@@ -14,8 +14,8 @@ namespace SlideRule.Tests.Cli;
 ///     <para>
 ///         Every part runs against the real MyApp fixture.
 ///         Driven through <see cref="CheckRunner" /> with an injected source that wraps the real cold load
-///         and adds synthetic diagnostics, synthetic failed projects, synthetic restore-failed ones and/or
-///         synthetic unchecked ones — the one way to exercise the gate without a genuinely broken project,
+///         and adds synthetic diagnostics, synthetic failed projects, synthetic restore-failed or compiler-lag
+///         ones and/or synthetic unchecked ones — the one way to exercise the gate without a broken project,
 ///         and the one way to put the inputs in front of it <em>separately</em>, which is the whole subject
 ///         of the last three parts below.
 ///     </para>
@@ -35,6 +35,17 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     // The project the gate is told restored badly — the fourth input, and the second that decides. It loaded
     // completely, which is exactly why it needs its own slot: nothing about the loaded solution says so.
     private const string RestoreFailedProject = DiagnosticInjectingSolutionSource.SimulatedRestoreFailedProject;
+
+    // The project the gate is told the carried compiler could not fully read. It loaded too, so it needs a slot
+    // of its own for the same reason, and its remedy is a newer tool rather than anything done to the solution.
+    private const string CompilerLagProject = DiagnosticInjectingSolutionSource.SimulatedCompilerLagProject;
+
+    // The document slots the gate inputs ride, which the rows below also use to say which input they inject.
+    private const string MissingSlot = "missingProjects";
+
+    private const string RestoreFailedSlot = "restoreFailedProjects";
+
+    private const string CompilerLagSlot = "compilerLagProjects";
 
     // The NU1510 pruning advisory, captured verbatim. An ordinary restore warning that says nothing about
     // whether the model built — and it refused a solution whose one rule passed, the defect the "no message
@@ -74,6 +85,10 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         + "package references that resolved to nothing produce no edges, so a rule about a package is "
         + "measured against a model that never saw it:";
 
+    private const string LagGateLine =
+        "error: the model is incomplete — the C# 15 compiler this tool carries cannot read all the code of 1 "
+        + "project, so check cannot pass: code the compiler cannot read is missing from the model:";
+
     // The injected-diagnostic runs, each made once for the class. Each is a read-only check over one solution,
     // one spec and one injected cause, and the rows that share one differ only in which channel they assert on
     // — the shape CheckCommandE2ETests and TripwireDiffE2ETests already use. Nothing here writes, so a shared
@@ -88,8 +103,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             CliRunner.CleanSpecDll, false, true, cancellationToken: CancellationToken.None));
 
     private static readonly Lazy<Task<CliResult>> RestoreFailureHuman =
-        new(() => RunWithInjectedRestoreFailureAsync(
-            CliRunner.CleanSpecDll, false, false, cancellationToken: CancellationToken.None));
+        new(() => RunWithInjectedGateInputAsync(
+            RestoreFailedSlot, CliRunner.CleanSpecDll, false, false, cancellationToken: CancellationToken.None));
 
     private static readonly Lazy<Task<CliResult>> AuditDiagnosticJson =
         new(() => RunWithInjectedDiagnosticAsync(
@@ -431,6 +446,8 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             .ShouldBeFalse();
         document.RootElement.TryGetProperty("restoreFailedProjects", out _)
             .ShouldBeFalse();
+        document.RootElement.TryGetProperty("compilerLagProjects", out _)
+            .ShouldBeFalse();
         document.ShouldCarryNoPackageAudit();
     }
 
@@ -529,79 +546,114 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     }
 
     [Fact]
-    public async Task Check_RestoreFailedProject_WithFlag_RestoresPriorExit()
+    public async Task Check_CompilerLagProject_NoFlag_FailsClosedWithItsOwnBlockAndANewerToolAsTheRemedy()
+    {
+        // The project loaded and restored; what is missing is the code the carried compiler could not read, so no
+        // command run against the solution repairs it, and the block sends the reader to a newer tool instead.
+        CliResult result = await RunWithInjectedGateInputAsync(CompilerLagSlot, CliRunner.CleanSpecDll, false, false);
+
+        result.ShouldRefuseWith(
+            LagGateLine + "\n"
+                        + $"  {CompilerLagProject}\n"
+                        + "See the warnings above for why. Update SlideRule to a release whose compiler reads it (dotnet tool "
+                        + "update -g SlideRule.Cli, or a newer SlideRule.Xunit package). To check against the partial model "
+                        + "anyway, pass --allow-workspace-diagnostics.");
+        result.Err.ShouldNotContain("dotnet restore");
+    }
+
+    [Theory]
+    [InlineData(RestoreFailedSlot)]
+    [InlineData(CompilerLagSlot)]
+    public async Task Check_LoadedButIncompleteProject_WithFlag_RestoresPriorExit(string slot)
     {
         // The same escape hatch, deliberately: one flag for one question — is a partial model acceptable —
         // rather than one flag per way the model can come up short.
-        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, true, false);
+        CliResult result = await RunWithInjectedGateInputAsync(slot, CliRunner.CleanSpecDll, true, false);
 
         result.ShouldSucceed();
         result.Err.ShouldNotContain("error: the model is incomplete");
     }
 
-    [Fact]
-    public async Task Check_RestoreFailedProject_ViolatedSpecNoFlag_GateTakesPrecedenceOverExitOne()
+    [Theory]
+    [InlineData(RestoreFailedSlot, RestoreGateLine, RestoreFailedProject)]
+    [InlineData(CompilerLagSlot, LagGateLine, CompilerLagProject)]
+    public async Task Check_LoadedButIncompleteProject_ViolatedSpecNoFlag_GateTakesPrecedenceOverExitOne(
+        string slot, string gateLine, string project)
     {
-        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.ViolatedSpecDll, false, false);
+        CliResult result = await RunWithInjectedGateInputAsync(slot, CliRunner.ViolatedSpecDll, false, false);
 
-        result.ShouldRefuseWith(RestoreGateLine, RestoreFailedProject);
+        result.ShouldRefuseWith(gateLine, project);
     }
 
-    [Fact]
-    public async Task Check_RestoreFailedProjectJson_CarriesTheRestoreFailedProjectsBesideTheVerdict()
+    [Theory]
+    [InlineData(RestoreFailedSlot, CompilerLagSlot, "MyApp.Unrestored/MyApp.Unrestored.csproj")]
+    [InlineData(CompilerLagSlot, RestoreFailedSlot, "MyApp.Newer/MyApp.Newer.csproj")]
+    public async Task Check_LoadedButIncompleteProjectJson_CarriesItInItsOwnSlotBesideTheVerdict(
+        string slot, string otherSlot, string relativeProject)
     {
-        // Its own slot, not a second entry in failedProjects: these projects loaded, so calling them failed
-        // loads would be false, and the remedy a client should surface is a different command. Solution-relative
-        // and forward-slashed, like every other path in the document.
-        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, false, true);
+        // Its own slot, not a second entry in failedProjects or in each other's: these projects loaded, so calling
+        // them failed loads would be false, and the remedy a client should surface differs per slot.
+        // Solution-relative and forward-slashed, like every other path in the document.
+        CliResult result = await RunWithInjectedGateInputAsync(slot, CliRunner.CleanSpecDll, false, true);
 
         result.ShouldRefuseWith();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         document.ShouldBeStampedIncomplete();
         document.RootElement.TryGetProperty("failedProjects", out _)
             .ShouldBeFalse();
-        document.RootElement.Strings("restoreFailedProjects")
+        document.RootElement.TryGetProperty(otherSlot, out _)
+            .ShouldBeFalse();
+        document.RootElement.Strings(slot)
             .ShouldHaveSingleItem()
-            .ShouldEndWith("MyApp.Unrestored/MyApp.Unrestored.csproj");
+            .ShouldEndWith(relativeProject);
     }
 
-    [Fact]
-    public async Task Check_RestoreFailedProjectJsonWithTheOptOut_StillStampsTheModelIncomplete()
+    [Theory]
+    [InlineData(RestoreFailedSlot)]
+    [InlineData(CompilerLagSlot)]
+    public async Task Check_LoadedButIncompleteProjectJsonWithTheOptOut_StillStampsTheModelIncomplete(string slot)
     {
         // The opt-out changes the exit code, never the truth about the model — which is the whole reason the
         // document stamps a fact rather than echoing a verdict.
-        CliResult result = await RunWithInjectedRestoreFailureAsync(CliRunner.CleanSpecDll, true, true);
+        CliResult result = await RunWithInjectedGateInputAsync(slot, CliRunner.CleanSpecDll, true, true);
 
         result.ShouldSucceed();
         using JsonDocument document = result.ShouldHaveJsonStdout();
         document.ShouldBeStampedIncomplete();
-        document.RootElement.Strings("restoreFailedProjects")
+        document.RootElement.Strings(slot)
             .ShouldHaveSingleItem();
     }
 
-    [Fact]
-    public async Task Check_RestoreFailedProjectSarif_RecordsExecutionUnsuccessfulAndNamesTheCause()
+    [Theory]
+    [InlineData(
+        RestoreFailedSlot,
+        "The model is incomplete: NuGet packages did not resolve for 1 project, so these results were reached "
+        + "against a codebase whose package references resolved to nothing: ",
+        "MyApp.Unrestored/MyApp.Unrestored.csproj")]
+    [InlineData(
+        CompilerLagSlot,
+        "The model is incomplete: the C# 15 compiler this tool carries cannot read all the code of 1 project, so "
+        + "these results were reached against a codebase missing that code: ",
+        "MyApp.Newer/MyApp.Newer.csproj")]
+    public async Task Check_LoadedButIncompleteProjectSarif_RecordsExecutionUnsuccessfulAndNamesTheCause(
+        string slot, string notificationLede, string relativeProject)
     {
         // Code scanning has no exit code, so the one channel that can carry a refusal there is
         // executionSuccessful, which follows the gate rather than the cause. The notification names the
         // cause: without it the cause would reach SARIF only as MSBuild's replayed prose, where a fatal
         // failure and a restore warning are the same shape.
-        using TempDirectory temp = TestTempRoot.Fresh("restore-gate-sarif");
-        string sarifPath = temp.PathOf("restore-gate.sarif");
+        using TempDirectory temp = TestTempRoot.Fresh("loaded-gate-sarif");
+        string sarifPath = temp.PathOf("loaded-gate.sarif");
 
-        CliResult result = await RunWithInjectedRestoreFailureAsync(
-            CliRunner.CleanSpecDll, false, false, sarifPath);
+        CliResult result = await RunWithInjectedGateInputAsync(slot, CliRunner.CleanSpecDll, false, false, sarifPath);
 
         result.ShouldRefuseWith();
         string sarif = File.ReadAllText(sarifPath);
         sarif.SarifExecutionSuccessful()
             .ShouldBeFalse(sarif);
-        sarif.ShouldCarryNotification(
-                "error",
-                "The model is incomplete: NuGet packages did not resolve for 1 project, so these results were "
-                + "reached against a codebase whose package references resolved to nothing: ")
+        sarif.ShouldCarryNotification("error", notificationLede)
             .SarifMessageText()
-            .ShouldContain("MyApp.Unrestored/MyApp.Unrestored.csproj");
+            .ShouldContain(relativeProject);
     }
 
     [Fact]
@@ -625,17 +677,20 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     }
 
     [Fact]
-    public async Task Check_LoadFailureAndRestoreFailure_WritesTheLoadBlockFirst()
+    public async Task Check_LoadRestoreAndCompilerLagFailures_WritesTheBlocksMostBrokenFirst()
     {
-        // Both causes at once. A project that never loaded is more fundamentally broken than one that loaded
-        // without its packages, and the two ask for different repairs, so the run is told about both — in that
-        // order, and never merged into one list that would name the wrong remedy for half of it.
+        // Three causes at once. A project that never loaded is more fundamentally broken than one that loaded
+        // without its packages, which is more broken than one whose packages resolved and whose code the tool's
+        // compiler could not all read, and the three ask for different repairs, so the run is told about each — in
+        // that order, and never merged into one list that would name the wrong remedy for part of it.
         CliResult result = await RunWithInjectedDiagnosticAsync(
             [], CliRunner.CleanSpecDll, false, false, null, [BrokenProject],
-            restoreFailedProjects: [RestoreFailedProject]);
+            restoreFailedProjects: [RestoreFailedProject], compilerLagProjects: [CompilerLagProject]);
 
-        result.ShouldRefuseWith(GateLine, BrokenProject, RestoreGateLine, RestoreFailedProject);
+        result.ShouldRefuseWith(
+            GateLine, BrokenProject, RestoreGateLine, RestoreFailedProject, LagGateLine, CompilerLagProject);
         result.Err.ShouldContainInOrder(GateLine, RestoreGateLine);
+        result.Err.ShouldContainInOrder(RestoreGateLine, LagGateLine);
     }
 
     [Fact]
@@ -678,24 +733,25 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         document.ShouldNameOnlyMissing("MyApp.Vendor/MyApp.Vendor.csproj", result.Transcript());
     }
 
-    [Fact]
-    public async Task Check_MissingProjectFileSummary_NamesTheMissingFileAsTheCause()
+    [Theory]
+    [InlineData(MissingSlot, "project files the solution declares that are not on disk")]
+    [InlineData(CompilerLagSlot, "projects whose code the tool's C# compiler cannot read")]
+    public async Task Check_GatedRunSummary_NamesTheCauseTheJobLogLists(string slot, string cause)
     {
         // The job summary sends its reader to the job log for the projects, so it names the cause the log lists: a
-        // run gated on a missing project file alone has no failed load or restore to look for there.
-        using TempDirectory temp = TestTempRoot.Fresh("missing-gate-summary");
-        string summaryPath = temp.PathOf("missing-gate.md");
+        // run gated on a missing project file or a compiler lag alone has no failed load or restore to look for
+        // there.
+        using TempDirectory temp = TestTempRoot.Fresh("gate-summary");
+        string summaryPath = temp.PathOf("gate.md");
 
-        CliResult result = await RunWithInjectedDiagnosticAsync(
-            [], CliRunner.CleanSpecDll, false, false,
-            missingProjects: [DiagnosticInjectingSolutionSource.SimulatedMissingProject],
-            annotationsSummary: summaryPath);
+        CliResult result = await RunWithInjectedGateInputAsync(
+            slot, CliRunner.CleanSpecDll, false, false, annotationsSummary: summaryPath);
 
         result.ShouldRefuseWith();
         File.ReadAllText(summaryPath)
             .ShouldContain(
                 "\n\nThe model is incomplete, so this run fails with exit 2 whatever the rules say. The job log names "
-                + "the project files the solution declares that are not on disk.\n\n",
+                + $"the {cause}.\n\n",
                 customMessage: result.Transcript());
     }
 
@@ -711,15 +767,27 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
             cancellationToken: cancellationToken);
     }
 
-    // The restore-failure shape: no diagnostic at all, because the SDK's replay of NuGet's own logs is not
-    // this product's to synthesize — the project beside it is the whole gate input.
-    private static Task<CliResult> RunWithInjectedRestoreFailureAsync(
-        string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null,
-        CancellationToken? cancellationToken = null)
+    // One gate input alone, named by the document slot it rides, with no diagnostic at all: the SDK's replay of
+    // NuGet's own logs, and the load log's evidence for a lag, are not this product's to synthesize, so the
+    // project is the whole gate input.
+    private static Task<CliResult> RunWithInjectedGateInputAsync(
+        string slot, string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null,
+        string? annotationsSummary = null, CancellationToken? cancellationToken = null)
     {
-        return RunWithInjectedDiagnosticAsync(
-            [], spec, allowWorkspaceDiagnostics, json, sarif,
-            restoreFailedProjects: [RestoreFailedProject], cancellationToken: cancellationToken);
+        return slot switch
+        {
+            MissingSlot => RunWithInjectedDiagnosticAsync(
+                [], spec, allowWorkspaceDiagnostics, json, sarif, cancellationToken: cancellationToken,
+                missingProjects: [DiagnosticInjectingSolutionSource.SimulatedMissingProject],
+                annotationsSummary: annotationsSummary),
+            RestoreFailedSlot => RunWithInjectedDiagnosticAsync(
+                [], spec, allowWorkspaceDiagnostics, json, sarif, restoreFailedProjects: [RestoreFailedProject],
+                cancellationToken: cancellationToken, annotationsSummary: annotationsSummary),
+            CompilerLagSlot => RunWithInjectedDiagnosticAsync(
+                [], spec, allowWorkspaceDiagnostics, json, sarif, cancellationToken: cancellationToken,
+                annotationsSummary: annotationsSummary, compilerLagProjects: [CompilerLagProject]),
+            _ => throw new ArgumentOutOfRangeException(nameof(slot), slot, "no gate input rides that slot")
+        };
     }
 
     private static async Task<CliResult> RunWithInjectedDiagnosticAsync(
@@ -730,11 +798,13 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         bool forTheHook = false,
         CancellationToken? cancellationToken = null,
         IReadOnlyList<string>? missingProjects = null,
-        string? annotationsSummary = null)
+        string? annotationsSummary = null,
+        IReadOnlyList<string>? compilerLagProjects = null)
     {
         string solution = CliRunner.MyAppSolution;
         var source = new DiagnosticInjectingSolutionSource(
-            diagnostics, failedProjects, uncheckedProjects, restoreFailedProjects, missingProjects: missingProjects);
+            diagnostics, failedProjects, uncheckedProjects, restoreFailedProjects, missingProjects: missingProjects,
+            compilerLagProjects: compilerLagProjects);
         CheckRequest request = CheckRequests.For(solution, spec, SolutionPaths.SolutionDirectoryOf(solution))
             with
             {

@@ -54,6 +54,8 @@ internal sealed class ReplayedSolution : IDisposable
             // as it stands on disk now, so reading one here would stamp today's restore onto yesterday's model, and
             // a capture replayed because it was structurally valid is a capture of a build that compiled.
             restoreFailedProjects: [],
+            // Empty on this path: the replay reader hides the recorded command lines a version verdict needs.
+            compilerLagProjects: [],
             // The solution file's entries, as on an MSBuild load, joined with the compiler invocations the C#-only
             // predicate declined from the capture.
             unsupportedProjects: report.Unsupported,

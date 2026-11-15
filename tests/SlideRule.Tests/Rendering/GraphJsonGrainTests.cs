@@ -57,7 +57,7 @@ public sealed class GraphJsonGrainTests
 
         index.ShouldContain("\"modelIncomplete\": true");
         index.ShouldContain("\"failedProjects\"");
-        index.ShouldContain("\"restoreFailedProjects\"");
+        index.ShouldSerializeBefore("restoreFailedProjects", "compilerLagProjects");
     }
 
     [Fact]
@@ -256,7 +256,8 @@ public sealed class GraphJsonGrainTests
         {
             LoadFailures = loadFailures ?? [],
             FailedProjects = ["Acme.App/Acme.App.csproj"],
-            RestoreFailedProjects = ["Acme.Core/Acme.Core.csproj"]
+            RestoreFailedProjects = ["Acme.Core/Acme.Core.csproj"],
+            CompilerLagProjects = ["Acme.Next/Acme.Next.csproj"]
         };
 
         return GraphJsonRenderer.Document(

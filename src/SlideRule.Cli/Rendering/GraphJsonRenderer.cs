@@ -74,6 +74,7 @@ internal static class GraphJsonRenderer
             FailedProjects: trust.FailedProjects,
             UncheckedProjects: trust.UncheckedProjects,
             RestoreFailedProjects: trust.RestoreFailedProjects,
+            CompilerLagProjects: trust.CompilerLagProjects,
             UnsupportedProjects: trust.UnsupportedProjects);
 
         return JsonSerializer.Serialize(document, SlideRuleJson.Context.GraphJson);

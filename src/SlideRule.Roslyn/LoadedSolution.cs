@@ -19,7 +19,8 @@ internal sealed class LoadedSolution : IDisposable
         IReadOnlyDictionary<ProjectId, string> targetFrameworks,
         CanonicalProjectFiles projectFiles,
         ProjectLoadReport report,
-        IReadOnlyList<string> restoreFailedProjects)
+        IReadOnlyList<string> restoreFailedProjects,
+        IReadOnlyList<string> compilerLagProjects)
     {
         _workspace = workspace;
         Solution = solution;
@@ -30,6 +31,7 @@ internal sealed class LoadedSolution : IDisposable
             failedProjects: report.Failed,
             uncheckedProjects: report.Unchecked,
             restoreFailedProjects: restoreFailedProjects,
+            compilerLagProjects: compilerLagProjects,
             unsupportedProjects: report.Unsupported,
             missingProjects: report.Missing);
     }

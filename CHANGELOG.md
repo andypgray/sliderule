@@ -75,7 +75,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   projects share at its highest version (`net11.0-windows`), so a spec on a .NET 11 estate can reference its
   projects, and sets `EnableWindowsTargeting` on a Windows framework so the spec builds off Windows. The
   `derive_spec` recipe gives the same framework rule.
-
+- A project whose C# version or source generators the tool's C# compiler cannot read now refuses the check as a
+  failed restore does: `check` exits 2 and names it under `compilerLagProjects`, and the xUnit adapter's
+  `Workspace_LoadedCompletely` fails. `--allow-workspace-diagnostics` overrides it. Such a project used to lose that
+  code from the model with nothing reported. The extraction cache's format changes, so the first run after the
+  update extracts every project again.
 - `explain <rule-id>` and `baseline rename` open no workspace when the cache records the spec's resolution, even
   after a source edit leaves some projects to re-extract. They read only the spec, and the record holds only what
   determines which project builds it. A convention or `.csproj` spec used to load the edited projects first.

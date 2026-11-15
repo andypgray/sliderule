@@ -65,6 +65,7 @@ public sealed class CheckJsonOrderTests
     [InlineData("failedProjects")]
     [InlineData("uncheckedProjects")]
     [InlineData("restoreFailedProjects")]
+    [InlineData("compilerLagProjects")]
     [InlineData("unsupportedProjects")]
     [InlineData("multiTargetedProjects")]
     [InlineData("staleSpec")]
@@ -81,12 +82,21 @@ public sealed class CheckJsonOrderTests
     [InlineData("failedProjects")]
     [InlineData("uncheckedProjects")]
     [InlineData("restoreFailedProjects")]
+    [InlineData("compilerLagProjects")]
     [InlineData("unsupportedProjects")]
     [InlineData("multiTargetedProjects")]
     [InlineData("staleSpec")]
     public void Document_TrustStamps_SerializeAheadOfTheSummaryTheyInvalidate(string key)
     {
         StampedDocument.ShouldSerializeBefore(key, "summary");
+    }
+
+    [Fact]
+    public void Document_CompilerLagProjects_SerializesRightAfterTheRestoreFailedProjects()
+    {
+        // Beside the other cause whose projects loaded, in the order the gate's refusal writes its blocks.
+        StampedDocument.ShouldSerializeBefore("restoreFailedProjects", "compilerLagProjects");
+        StampedDocument.ShouldSerializeBefore("compilerLagProjects", "unsupportedProjects");
     }
 
     [Theory]
@@ -228,7 +238,8 @@ public sealed class CheckJsonOrderTests
                  new[]
                  {
                      "modelIncomplete", "missingProjects", "failedProjects", "uncheckedProjects",
-                     "restoreFailedProjects", "unsupportedProjects", "multiTargetedProjects", "staleSpec", "summary"
+                     "restoreFailedProjects", "compilerLagProjects", "unsupportedProjects", "multiTargetedProjects",
+                     "staleSpec", "summary"
                  })
             index.ShouldContain($"\"{stamp}\"");
     }
@@ -311,6 +322,7 @@ public sealed class CheckJsonOrderTests
             FailedProjects = ["App.Web/App.Web.csproj"],
             UncheckedProjects = ["App.Reports/App.Reports.csproj"],
             RestoreFailedProjects = ["App.Data/App.Data.csproj"],
+            CompilerLagProjects = ["App.Next/App.Next.csproj"],
             UnsupportedProjects =
             [
                 new UnsupportedProject("App.Signals/App.Signals.fsproj", UnsupportedProjectKind.NotCsharp)

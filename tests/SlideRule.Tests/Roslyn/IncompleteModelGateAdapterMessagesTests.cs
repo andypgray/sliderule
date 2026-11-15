@@ -1,5 +1,6 @@
 using Shouldly;
 using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Roslyn.MsBuild;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -31,6 +32,11 @@ public sealed class IncompleteModelGateAdapterMessagesTests
 
     private const string MissingProject = "C:/repo/App.Vendor/App.Vendor.csproj";
 
+    private const string LaggingProject = "C:/repo/App.Newer/App.Newer.csproj";
+
+    private const string LagLede =
+        "the model is incomplete — the C# 15 compiler this tool carries cannot read all the code of 1 project";
+
     [Fact]
     public void AdapterRefusal_MissingProjectFile_NamesTheFileAndARemedyThatCanEndIt()
     {
@@ -48,17 +54,38 @@ public sealed class IncompleteModelGateAdapterMessagesTests
     }
 
     [Fact]
-    public void AdapterRefusal_EveryCause_WritesTheMissingBlockThenTheLoadBlockThenTheRestoreBlock()
+    public void AdapterRefusal_EveryCause_WritesTheMissingLoadRestoreAndLagBlocksInThatOrder()
     {
         string refusal = IncompleteModelGate.AdapterRefusal(
-            Diagnostics([BrokenProject], [UnrestoredProject], [MissingProject]));
+            Diagnostics([BrokenProject], [UnrestoredProject], [MissingProject], [LaggingProject]));
 
         refusal.ShouldSatisfyAllConditions(
             () => refusal.ShouldContainInOrder("1 project file the solution declares is not on disk", MissingProject),
             () => refusal.ShouldContainInOrder(MissingProject, "1 project failed to load"),
             () => refusal.ShouldContainInOrder("1 project failed to load", BrokenProject),
             () => refusal.ShouldContainInOrder(BrokenProject, "NuGet packages did not resolve for 1 project"),
-            () => refusal.ShouldContainInOrder("NuGet packages did not resolve for 1 project", UnrestoredProject));
+            () => refusal.ShouldContainInOrder("NuGet packages did not resolve for 1 project", UnrestoredProject),
+            () => refusal.ShouldContainInOrder(UnrestoredProject, LagLede),
+            () => refusal.ShouldContainInOrder(LagLede, LaggingProject));
+    }
+
+    [Fact]
+    public void AdapterRefusal_CompilerLag_NamesTheProjectTheStakesAndANewerToolAsTheRemedy()
+    {
+        // Nothing done to the solution repairs code the carried compiler cannot read, so the block names the
+        // packages a newer compiler ships in, and the MSBuild selection note follows the project as it does for
+        // every cause a load reported.
+        string refusal = IncompleteModelGate.AdapterRefusal(Diagnostics(lagging: [LaggingProject]));
+
+        refusal.ShouldBe(
+            LagLede + ", so every rule test was skipped:\n"
+                    + $"  {LaggingProject}\n"
+                    + $"  {MsBuildBootstrap.SelectionNote()}\n"
+                    + "Every rule would be measured over a codebase missing the code the compiler cannot read — a green "
+                    + "run against a partial model would sign verdicts that were never reached. Update SlideRule to a "
+                    + "release whose compiler reads it (dotnet tool update -g SlideRule.Cli, or a newer SlideRule.Xunit "
+                    + "package), then retry. To check the partial model as it loaded, override AllowWorkspaceDiagnostics "
+                    + "to true on the test class.");
     }
 
     [Fact]
@@ -116,24 +143,37 @@ public sealed class IncompleteModelGateAdapterMessagesTests
     }
 
     [Fact]
-    public void AdapterSkipReason_NamesBothCausesInTheOnePlaceTheProjectsCanBeRead()
+    public void AdapterOptedIn_CompilerLag_SaysWhatTheVerdictsWereReachedDespite()
+    {
+        string skip = IncompleteModelGate.AdapterOptedIn(Diagnostics(lagging: [LaggingProject]));
+
+        skip.ShouldBe(
+            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
+            + "the C# 15 compiler this tool carries not reading all the code of 1 project:\n"
+            + $"  {LaggingProject}");
+    }
+
+    [Fact]
+    public void AdapterSkipReason_NamesEveryCauseInTheOnePlaceTheProjectsCanBeRead()
     {
         // Deliberately constant and deliberately short: the projects themselves ride
         // Workspace_LoadedCompletely's failure, so this points there rather than repeating them once per rule.
         IncompleteModelGate.AdapterSkipReason.ShouldBe(
             "the workspace did not load completely, so no verdict was reached; see Workspace_LoadedCompletely "
-            + "for the projects that are not on disk, failed to load or whose NuGet packages did not resolve.");
+            + "for the projects that are not on disk, failed to load, whose NuGet packages did not resolve or whose "
+            + "code the tool's C# compiler cannot read.");
     }
 
     private static WorkspaceDiagnostics Diagnostics(
         IReadOnlyList<string>? failed = null, IReadOnlyList<string>? restoreFailed = null,
-        IReadOnlyList<string>? missing = null)
+        IReadOnlyList<string>? missing = null, IReadOnlyList<string>? lagging = null)
     {
         return WorkspaceDiagnostics.None with
         {
             FailedProjects = failed ?? [],
             RestoreFailedProjects = restoreFailed ?? [],
-            MissingProjects = missing ?? []
+            MissingProjects = missing ?? [],
+            CompilerLagProjects = lagging ?? []
         };
     }
 }

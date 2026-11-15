@@ -72,6 +72,7 @@ public sealed class CheckCacheClosureE2ETests
     /// </summary>
     [Theory]
     [InlineData("restore-failed")]
+    [InlineData("compiler-lag")]
     [InlineData("failed")]
     public async Task Check_CleanProjectOutsideTheClosureRecordedAsBroken_StillReportedOnAClosurePartial(string verdict)
     {
@@ -87,7 +88,12 @@ public sealed class CheckCacheClosureE2ETests
 
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
         partial.Source.ShouldHaveLoadedOnly(true, Web, Billing);
-        string slot = verdict == "restore-failed" ? "restoreFailedProjects" : "failedProjects";
+        string slot = verdict switch
+        {
+            "restore-failed" => "restoreFailedProjects",
+            "compiler-lag" => "compilerLagProjects",
+            _ => "failedProjects"
+        };
         CheckJson.Strings(partial.Result.Out, slot)
             .ShouldHaveSingleItem(partial.Result.Transcript())
             .ShouldEndWith($"{Domain}/{Domain}.csproj");
@@ -95,14 +101,17 @@ public sealed class CheckCacheClosureE2ETests
         partial.Result.ShouldMatchTheOutputOf(noCache.Result);
     }
 
-    [Fact]
-    public async Task Check_ClosureThatFindsAFailureTheRecordDoesNotHold_LoadsTheWholeSolution()
+    [Theory]
+    [InlineData("failed")]
+    [InlineData("restore-failed")]
+    [InlineData("compiler-lag")]
+    public async Task Check_ClosureThatFindsAFailureTheRecordDoesNotHold_LoadsTheWholeSolution(string verdict)
     {
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("check-closure");
         await RunCheckAsync(workspace.SolutionPath, cache.Root, source: CountingSolutionSource.OverWarmPool());
         EditWebBody(workspace);
-        var closureFails = new CountingSolutionSource(new ClosureFailingSolutionSource());
+        var closureFails = new CountingSolutionSource(new ClosureFailingSolutionSource(verdict));
 
         CacheRun partial = await RunCheckAsync(workspace.SolutionPath, cache.Root, source: closureFails);
         CacheRun noCache = await RunCheckAsync(workspace.SolutionPath, cache.Root, true);
@@ -175,19 +184,20 @@ public sealed class CheckCacheClosureE2ETests
                 "        log.Append(description);", "        log.Append(System.DateTime.Now);\n        log.Append(description);"));
     }
 
-    // A whole cold load that reports Domain as restore-failed, or a project outside the solution as failed to
+    // A whole cold load that reports Domain as restore-failed, as lagging the carried compiler, or as failed to
     // load, beside a workspace message: a verdict only a whole load can have measured.
     private static ISolutionSource BrokenDomain(TempFixtureWorkspace workspace, string verdict)
     {
-        return verdict == "restore-failed"
-            ? new DiagnosticInjectingSolutionSource(
-                [DiagnosticInjectingSolutionSource.SimulatedLoadFailure],
-                restoreFailedProjects: [workspace.PathOf(Domain, $"{Domain}.csproj")],
-                inner: new ColdSolutionSource())
-            : new DiagnosticInjectingSolutionSource(
-                [DiagnosticInjectingSolutionSource.SimulatedLoadFailure],
-                [workspace.PathOf(Domain, $"{Domain}.csproj")],
-                inner: new ColdSolutionSource());
+        string domain = workspace.PathOf(Domain, $"{Domain}.csproj");
+        string[] load = [DiagnosticInjectingSolutionSource.SimulatedLoadFailure];
+        return verdict switch
+        {
+            "restore-failed" => new DiagnosticInjectingSolutionSource(
+                load, restoreFailedProjects: [domain], inner: new ColdSolutionSource()),
+            "compiler-lag" => new DiagnosticInjectingSolutionSource(
+                load, compilerLagProjects: [domain], inner: new ColdSolutionSource()),
+            _ => new DiagnosticInjectingSolutionSource(load, [domain], inner: new ColdSolutionSource())
+        };
     }
 
     private static Task<CacheRun> RunCheckAsync(
@@ -199,8 +209,9 @@ public sealed class CheckCacheClosureE2ETests
         return CacheRuns.CheckAsync(solution, spec, cacheRoot, noCache, source: source);
     }
 
-    // A cold source whose closure loads report a project that failed to load, which no recorded verdict holds.
-    private sealed class ClosureFailingSolutionSource : ISolutionSource
+    // A cold source whose closure loads report a project that failed to load, restore-failed or lagged the carried
+    // compiler, which no recorded verdict holds.
+    private sealed class ClosureFailingSolutionSource(string verdict) : ISolutionSource
     {
         private readonly ColdSolutionSource cold = new();
 
@@ -213,9 +224,20 @@ public sealed class CheckCacheClosureE2ETests
             string solutionPath, IReadOnlyCollection<string> projectFiles, CancellationToken ct)
         {
             SolutionHandle real = await cold.AcquireClosureAsync(solutionPath, projectFiles, ct);
-            WorkspaceDiagnostics failed = real.LoadDiagnostics with
+            WorkspaceDiagnostics failed = verdict switch
             {
-                FailedProjects = [DiagnosticInjectingSolutionSource.SimulatedFailedProject]
+                "restore-failed" => real.LoadDiagnostics with
+                {
+                    RestoreFailedProjects = [DiagnosticInjectingSolutionSource.SimulatedRestoreFailedProject]
+                },
+                "compiler-lag" => real.LoadDiagnostics with
+                {
+                    CompilerLagProjects = [DiagnosticInjectingSolutionSource.SimulatedCompilerLagProject]
+                },
+                _ => real.LoadDiagnostics with
+                {
+                    FailedProjects = [DiagnosticInjectingSolutionSource.SimulatedFailedProject]
+                }
             };
             return new SolutionHandle(
                 real.Solution, failed, real, real.ProjectFiles, targetFrameworks: real.TargetFrameworks,

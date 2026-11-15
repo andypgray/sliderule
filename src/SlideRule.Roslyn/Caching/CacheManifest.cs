@@ -16,6 +16,8 @@ namespace SlideRule.Roslyn.Caching;
 ///     <see
 ///         cref="ProjectCone.SolutionStructuralPaths(string, IEnumerable{ProjectInputs}, IEnumerable{ForeignProjectInputs})" />
 ///     yields, each <see cref="ForeignProjectInputs">foreign project</see>'s documents among them.
+///     <paramref name="SdkInstalls" /> lists the SDK version directories installed beside every SDK compiler among
+///     those stamps, which a hit compares with the directories installed now.
 ///     <paramref name="Diagnostics" /> and the project lists after it are the recorded run's load verdict, field for
 ///     field the <see cref="WorkspaceDiagnostics" /> its load reported, stored because a hit opens no workspace to
 ///     recompute them from; each unsupported project's kind is stored rather than re-derived, so a cold run and a hit
@@ -25,6 +27,7 @@ internal sealed record CacheManifest(
     int SchemaVersion,
     string ToolVersion,
     IReadOnlyList<FileStamp> StructuralStamps,
+    IReadOnlyList<string> SdkInstalls,
     IReadOnlyList<ProjectCacheEntry> Projects,
     IReadOnlyList<ForeignProjectEntry> ForeignProjects,
     IReadOnlyList<SpecResolutionRecord> SpecResolutions,
@@ -32,6 +35,7 @@ internal sealed record CacheManifest(
     IReadOnlyList<string> FailedProjects,
     IReadOnlyList<string> UncheckedProjects,
     IReadOnlyList<string> RestoreFailedProjects,
+    IReadOnlyList<string> CompilerLagProjects,
     IReadOnlyList<UnsupportedProject> UnsupportedProjects,
     IReadOnlyList<string> MissingProjects,
     IReadOnlyList<CodebaseFragment> Fragments);

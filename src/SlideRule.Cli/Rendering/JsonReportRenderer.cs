@@ -63,6 +63,7 @@ internal static class JsonReportRenderer
             FailedProjects: trust.FailedProjects,
             UncheckedProjects: trust.UncheckedProjects,
             RestoreFailedProjects: trust.RestoreFailedProjects,
+            CompilerLagProjects: trust.CompilerLagProjects,
             UnsupportedProjects: trust.UnsupportedProjects,
             MultiTargetedProjects: trust.MultiTargetedProjects,
             StaleSpec: trust.StaleSpec,
