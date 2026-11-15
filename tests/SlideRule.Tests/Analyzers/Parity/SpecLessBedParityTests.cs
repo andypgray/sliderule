@@ -440,8 +440,8 @@ public sealed class SpecLessBedParityTests(ParityBeds beds) : IClassFixture<Pari
     }
 
     /// <summary>
-    ///     A ban on the class that declares an extension indexer, from the project that indexes through it. What
-    ///     either side records for the access is not pinned here; the row holds that the two sides agree.
+    ///     A ban on the class that declares an extension indexer, from the project that indexes through it: the
+    ///     element access references that class.
     /// </summary>
     [Fact]
     public async Task TheBuildTier_OverABanOnAnExtensionIndexersClass_AgreesWithTheWholeSolutionCheck()
@@ -451,6 +451,12 @@ public sealed class SpecLessBedParityTests(ParityBeds beds) : IClassFixture<Pari
             arch => arch.Rule("csharp15/consumer-not-through-the-indexer")
                 .Enforce(arch.Namespace("CSharp15App.Consumer").MustNotReference(arch.Types.Named("SequenceIndexer")))
                 .Because("The consumer indexes sequences through the framework, never through a domain helper."));
+
+        string kennel = BedSource("CSharp15App", "CSharp15App.Consumer", "Kennel.cs");
+        subject.Expectation.Keys.Describe()
+            .ShouldBe(
+                [$"csharp15/consumer-not-through-the-indexer [Reference] T:CSharp15App.Consumer.Kennel -> T:CSharp15App.Domain.Sequences.SequenceIndexer at {kennel}:20"],
+                "the element access through the extension indexer");
 
         await subject.ShouldHoldOnBothLegsAsync(Ct);
     }

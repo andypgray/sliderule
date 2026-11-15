@@ -99,17 +99,82 @@ public sealed class CodebaseExtractorMemberEdgeTests
     [Fact]
     public void ExtractFromCompilations_ExtensionMethodCall_ResolvesThroughReducedFromToStaticClass()
     {
-        CodebaseModel model = CompilationFactory.Extract("""
-                                                         namespace N;
-                                                         public static class Ext { public static string Ext(this string s) => s; }
-                                                         public class Caller { public string Go(string t) => t.Ext(); }
-                                                         """);
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors("""
+                                                                            namespace N;
+                                                                            public static class Ext { public static string Echo(this string s) => s; }
+                                                                            public class Caller { public string Go(string t) => t.Echo(); }
+                                                                            """);
 
         // ReducedFrom-first normalization: the reduced call resolves to the declaring static class's method,
         // and the DocId carries the receiver parameter (System.String), not the reduced no-arg form.
-        MemberEdge edge = model.MemberEdge("N.Caller", "M:N.Ext.Ext(System.String)");
+        MemberEdge edge = model.MemberEdge("N.Caller", "M:N.Ext.Echo(System.String)");
         edge.Member.Kind.ShouldBe(MemberKind.Method);
         edge.Member.ContainingType.FullName.ShouldBe("N.Ext");
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_ExtensionBlockMethod_BothSpellingsAreOneUseOfTheEmittedMethod()
+    {
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors("""
+                                                                            namespace N;
+                                                                            public static class Ext { extension(string s) { public string Echo() => s; } }
+                                                                            public class Caller
+                                                                            {
+                                                                                public string Go(string t) => t.Echo();
+                                                                                public string Again(string t) => Ext.Echo(t);
+                                                                            }
+                                                                            """);
+
+        // The block method resolves to the static method the compiler emits for it, which is what the static
+        // spelling binds to, so the receiver is the ID's first parameter, as for a classic extension method.
+        MemberEdge edge = model.MemberEdges("N.Caller")
+            .ShouldHaveSingleItem();
+        edge.Member.SymbolId.ShouldBe("M:N.Ext.Echo(System.String)");
+        edge.Member.ContainingType.FullName.ShouldBe("N.Ext");
+        edge.Sites.Lines()
+            .ShouldBe([5, 6]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_GenericExtensionBlockGenericMethod_UsesAndInventoryShareTheDefinitionId()
+    {
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors("""
+                                                                            namespace N;
+                                                                            public static class Ext { extension<T>(T r) { public T Pick<U>(U u) => r; } }
+                                                                            public class Caller
+                                                                            {
+                                                                                public int Go(int n) => n.Pick("x");
+                                                                                public int Again(int n) => Ext.Pick<int, string>(n, "x");
+                                                                            }
+                                                                            """);
+
+        // A constructed receiver's emitted method numbers its type parameters differently from the definition,
+        // so the use resolves to the definition the inventory records.
+        const string pick = "M:N.Ext.Pick``2(``0,``1)";
+        MemberEdge edge = model.MemberEdges("N.Caller")
+            .ShouldHaveSingleItem();
+        edge.Member.SymbolId.ShouldBe(pick);
+        edge.Sites.Lines()
+            .ShouldBe([5, 6]);
+        model.Member("N.Ext", pick)
+            .Name.ShouldBe("Pick");
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_ExtensionBlockProperty_IsAUseOfTheMemberTheInventoryRecords()
+    {
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors("""
+                                                                            namespace N;
+                                                                            public static class Ext { extension(string s) { public int Size => s.Length; } }
+                                                                            public class Caller { public int Go(string t) => t.Size; }
+                                                                            """);
+
+        // A property keeps its own ID, the block's, which the static class's inventory carries too.
+        MemberEdge edge = model.MemberEdges("N.Caller")
+            .ShouldHaveSingleItem();
+        edge.Member.Kind.ShouldBe(MemberKind.Property);
+        edge.Member.ContainingType.FullName.ShouldBe("N.Ext");
+        edge.Member.SymbolId.ShouldBe(model.Type("N.Ext").MemberNamed("Size").SymbolId);
     }
 
     [Fact]
@@ -328,6 +393,22 @@ public sealed class CodebaseExtractorMemberEdgeTests
         // The edge-side indexer exclusion (GRAMMAR §4.5, §11 growth): an element access binds no
         // SimpleNameSyntax, so the indexer never surfaces in the member channel; the type edge stands.
         model.ShouldHaveEdge("N.User", "N.Box");
+        model.MemberEdges("N.User")
+            .ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_ExtensionIndexerElementAccess_ProducesNoMemberEdge()
+    {
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors("""
+                                                                            namespace N;
+                                                                            public class Box {}
+                                                                            public static class Ext { extension(Box b) { public int this[int i] => i; } }
+                                                                            public class User { public int Go(Box b) => b[0]; }
+                                                                            """);
+
+        // An extension indexer references its static class and, as every indexer, is no member use.
+        model.ShouldHaveEdge("N.User", "N.Ext");
         model.MemberEdges("N.User")
             .ShouldBeEmpty();
     }

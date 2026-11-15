@@ -10,7 +10,9 @@ namespace SlideRule.Extraction.Passes;
 /// </summary>
 /// <remarks>
 ///     Records and static classes are classes at the symbol level, and record structs are structs. Every other
-///     kind (Error, TypeParameter, Array, Pointer, Dynamic, Module, Submission, FunctionPointer) is unmappable.
+///     kind (Error, TypeParameter, Array, Pointer, Dynamic, Module, Submission, FunctionPointer, and an
+///     extension block) is unmappable; the members of an extension block are attributed to the static class
+///     that declares it (<see cref="ExtensionBlocks" />).
 /// </remarks>
 internal static class TypeKindMapper
 {

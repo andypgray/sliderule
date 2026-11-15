@@ -31,3 +31,16 @@ public sealed class Gauge : IGauge
     {
     }
 }
+
+// The compiler emits each method of an extension block as a static method of the declaring class, which is
+// what a member anchor reflects on. MemberUseVerbTests and the parity corpus each re-declare this class.
+public static class Sequences
+{
+    extension(IEnumerable<int> values)
+    {
+        public int Total()
+        {
+            return 0;
+        }
+    }
+}

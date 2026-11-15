@@ -114,6 +114,42 @@ public sealed class MemberUseVerbTests
     }
 
     [Fact]
+    public void MustNotUse_ExtensionBlockMethod_CatchesBothSpellingsAsOneViolation()
+    {
+        // Mirrors Sequences in MemberTargets.cs, whose emitted static Total is what the anchor reflects on.
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors("""
+                                                                            namespace SlideRule.Tests.Checking.MemberTargets
+                                                                            {
+                                                                                public static class Sequences
+                                                                                {
+                                                                                    extension(System.Collections.Generic.IEnumerable<int> values)
+                                                                                    {
+                                                                                        public int Total() => 0;
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                            namespace App
+                                                                            {
+                                                                                using SlideRule.Tests.Checking.MemberTargets;
+                                                                                public class Report
+                                                                                {
+                                                                                    public int Sum(System.Collections.Generic.IEnumerable<int> v)
+                                                                                    {
+                                                                                        return v.Total()
+                                                                                            + Sequences.Total(v);
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                            """);
+
+        RuleResult result = Checker.Verdict(model, arch => arch.Namespace("App.*")
+            .MustNotUse(arch.Member(typeof(Sequences), nameof(Sequences.Total))));
+
+        result.ShouldHaveFailedWithMemberUseAtSites("App.Report", $"{T}Sequences.Total", ["Test.cs:18", "Test.cs:19"])
+            .Member!.SymbolId.ShouldBe($"M:{T}Sequences.Total(System.Collections.Generic.IEnumerable{{System.Int32}})");
+    }
+
+    [Fact]
     public void MustNotUse_DispatchBoundary_ConcreteBanAndInterfaceBanEachCatchOnlyTheirReceiver()
     {
         // A ban on the concrete member catches only the concrete-typed call (member bans are

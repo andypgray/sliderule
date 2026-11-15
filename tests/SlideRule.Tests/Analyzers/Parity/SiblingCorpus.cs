@@ -1,4 +1,5 @@
 using SlideRule.Baselines;
+using SlideRule.Tests.Checking.MemberTargets;
 using SlideRule.Tests.TestSupport;
 
 namespace SlideRule.Tests.Analyzers.Parity;
@@ -230,6 +231,67 @@ internal static class SiblingCorpus
                             .AttributedWith("System.Reflection.DefaultMemberAttribute")))
                     .Because("A type that names a default member is reached through that member, and the "
                              + "web layer calls what it means by name."));
+    }
+
+    /// <summary>
+    ///     The members of extension blocks, each reached from another project: an extension property, a block
+    ///     method by both spellings, a generic block's method and an extension indexer, beside a classic
+    ///     extension method. Each references the static class that declares it, and the block method is a use
+    ///     of the method a member anchor reflects on.
+    /// </summary>
+    /// <remarks>
+    ///     The library sits in the member targets' namespace, so the class the anchor's <c>typeof</c> names is
+    ///     this one by full name.
+    /// </remarks>
+    internal static ParitySubject ExtensionMembers()
+    {
+        return new SiblingWorld()
+            .Project(
+                "Seq", "Seq.Lib",
+                "using System.Collections.Generic;\n\nnamespace SlideRule.Tests.Checking.MemberTargets;\n\n"
+                + "public static class Sequences\n{\n"
+                + "    extension(IEnumerable<int> values)\n    {\n"
+                + "        public int Doubled => 2;\n"
+                + "        public int Total() => 0;\n    }\n\n"
+                + "    extension<T>(T item)\n    {\n"
+                + "        public T Echo() => item;\n    }\n}\n\n"
+                + "public static class SequenceIndexer\n{\n"
+                + "    extension(IEnumerable<int> values)\n    {\n"
+                + "        public int this[int index] => index;\n    }\n}\n\n"
+                + "public static class SequenceHelpers\n{\n"
+                + "    public static int Second(this IEnumerable<int> values) => 0;\n}")
+            .Project(
+                "App", "App.Site",
+                "using System.Collections.Generic;\nusing SlideRule.Tests.Checking.MemberTargets;\n\nnamespace App;\n\n"
+                + "public class Reader\n{\n"
+                + "    public int Read(IEnumerable<int> values)\n    {\n"
+                + "        return values.Doubled\n"
+                + "            + values.Total()\n"
+                + "            + Sequences.Total(values)\n"
+                + "            + 5.Echo()\n"
+                + "            + values[2]\n"
+                + "            + values.Second();\n    }\n}",
+                "Seq.Lib")
+            .Subject(
+                "Sibling/extension members",
+                arch =>
+                {
+                    arch.Rule("extensions/app-not-through-sequences")
+                        .Enforce(arch.Namespace("App").MustNotReference(arch.Types.Named("Sequences")))
+                        .Because("The app reads sequences through the framework, never through a library helper.");
+
+                    arch.Rule("extensions/app-not-through-the-indexer")
+                        .Enforce(arch.Namespace("App").MustNotReference(arch.Types.Named("SequenceIndexer")))
+                        .Because("The app indexes sequences through the framework, never through a library helper.");
+
+                    arch.Rule("extensions/app-not-through-the-helpers")
+                        .Enforce(arch.Namespace("App").MustNotReference(arch.Types.Named("SequenceHelpers")))
+                        .Because("The app reads sequences through the framework, never through a library helper.");
+
+                    arch.Rule("extensions/app-never-totals")
+                        .Enforce(arch.Namespace("App").MustNotUse(arch.Member(typeof(Sequences), nameof(Sequences.Total))))
+                        .Because("A total is the library's to compute, and the app asks the library for one.");
+                });
     }
 
     /// <summary>A rule over the container's registrations, which a build has none of.</summary>

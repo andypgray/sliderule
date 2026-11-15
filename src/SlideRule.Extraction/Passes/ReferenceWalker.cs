@@ -18,7 +18,9 @@ namespace SlideRule.Extraction.Passes;
 ///     <em>uses</em> the member it names. Attribute applications, <c>base(…)</c>/<c>this(…)</c> initializers,
 ///     <c>with</c> expressions and array creation carry no object-creation expression, so none of them reaches
 ///     the construct channel. Type targets and member symbols are both normalized to definition level, so a
-///     yielded member's <c>ContainingType</c> agrees with the type channel's target for that node.
+///     yielded member's <c>ContainingType</c> agrees with the type channel's target for that node, with one
+///     exception: a property declared in an extension block keeps the block as its containing type, while the
+///     target is the static class that declares the block.
 /// </remarks>
 internal static class ReferenceWalker
 {
@@ -108,6 +110,11 @@ internal static class ReferenceWalker
             case ThrowExpressionSyntax throwExpression:
                 return ThrowSpan(throwExpression, throwExpression.ThrowKeyword);
 
+            // The brackets, as a member use is sited at the member's own name. The binding node of a conditional
+            // access is its brackets already.
+            case ElementAccessExpressionSyntax elementAccess:
+                return elementAccess.ArgumentList.Span;
+
             default:
                 return node.Span;
         }
@@ -169,13 +176,15 @@ internal static class ReferenceWalker
 
     /// <summary>
     ///     A referenced type's original definition, or <see langword="null" /> when the symbol is absent or is
-    ///     not a type the model records (<see cref="TypeKindMapper.IsModelledType" />).
+    ///     not a type the model records (<see cref="TypeKindMapper.IsModelledType" />). An extension block
+    ///     answers the static class that declares it.
     /// </summary>
     private static INamedTypeSymbol? ReferencedDefinition(INamedTypeSymbol? symbol)
     {
         if (symbol is null) return null;
 
         INamedTypeSymbol definition = symbol.OriginalDefinition;
+        if (definition.IsExtensionBlock() && definition.ContainingType is { } declaringClass) definition = declaringClass.OriginalDefinition;
         if (!definition.IsModelledType()) return null;
 
         return definition;
@@ -229,6 +238,12 @@ internal static class ReferenceWalker
             // expression-bodied `=> throw new X()` — its operand is always present.
             case ThrowExpressionSyntax throwExpression:
                 return new WalkChannels(Thrown: ThrownTypeOf(throwExpression.Expression, model));
+
+            // An indexer is never a member use (§4.5), and an ordinary one needs no arm: its receiver's type is
+            // named elsewhere. An extension indexer is reached through no name at all, so its access is the one
+            // node that can reference the static class declaring it, and it references that class only.
+            case ElementAccessExpressionSyntax or ElementBindingExpressionSyntax:
+                return new WalkChannels(ExtensionIndexerBlockOf(node, model));
 
             default:
                 return WalkChannels.None;
@@ -392,6 +407,15 @@ internal static class ReferenceWalker
         return created is { TypeKind: Microsoft.CodeAnalysis.TypeKind.Delegate } ? null : created;
     }
 
+    // The extension block declaring the indexer an element access binds to, or null for any other access.
+    private static INamedTypeSymbol? ExtensionIndexerBlockOf(SyntaxNode access, SemanticModel model)
+    {
+        return model.GetSymbolInfo(access).BestCandidate() is IPropertySymbol { IsIndexer: true, ContainingType: { } block }
+               && block.IsExtensionBlock()
+            ? block
+            : null;
+    }
+
     private static INamedTypeSymbol? ContainingTypeOf(ISymbol? symbol)
     {
         return symbol switch
@@ -409,8 +433,9 @@ internal static class ReferenceWalker
     ///     The normalized member a name uses (GRAMMAR §4.5), or <see langword="null" /> when the name is not a
     ///     member use. A <c>nameof</c> operand is excluded here, the member channel only, so its type edge
     ///     still rides. Constructors, operators, conversions, local functions and accessors are not uses; a
-    ///     reduced extension call is a use of the declaring static class's method, and an accessor already
-    ///     resolves to its property or event.
+    ///     reduced extension call is a use of the declaring static class's method, a method declared in an
+    ///     extension block is a use of the static method the compiler emits for it (so <c>s.M()</c> and
+    ///     <c>Ext.M(s)</c> are one member), and an accessor already resolves to its property or event.
     /// </summary>
     private static ISymbol? MemberUseOf(ISymbol? symbol, SyntaxNode node)
     {
@@ -419,8 +444,11 @@ internal static class ReferenceWalker
         switch (symbol)
         {
             case IMethodSymbol { MethodKind: MethodKind.Ordinary or MethodKind.ReducedExtension } method:
-                IMethodSymbol normalized = method.ReducedFrom ?? method;
-                return normalized.OriginalDefinition;
+                IMethodSymbol normalized = (method.ReducedFrom ?? method).OriginalDefinition;
+                if (normalized.ContainingType?.IsExtensionBlock() == true)
+                    return ExtensionBlocks.ImplementationOf(normalized) ?? normalized;
+
+                return normalized;
 
             case IPropertySymbol property:
                 return property.OriginalDefinition;

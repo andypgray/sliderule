@@ -576,6 +576,13 @@ other `(first, more)` lists have no sequence form yet (§11).
   `arch.Namespace("System.Data.SqlClient").Named("SqlException")`. `arch.Types` holds only the
   types the solution declares, and a hierarchy adjective or `Under` never matches a type the
   solution only references, so an exception spelled with either removes nothing there.
+- **An extension block belongs to the static class that declares it.** The compiler turns
+  `extension(IEnumerable<int> s) { … }` into an unnamed type nested in that class. No source can
+  name it, so the type-side screen drops it, and a reference to any of its members (an extension
+  property, a method, an indexer, static or not) is a reference to the declaring static class, as
+  a classic extension method call is. The code inside a block's members is that class's code: its
+  references, uses, constructions, catches and throws are the class's edges, and the receiver
+  `extension(…)` names is a reference, as the type of a classic `this` parameter is.
 - **Edges are definition-level (v1).** A source-level reference to `IHandler<Order>` is a
   reference to *both* the open definition `IHandler<T>` and the argument `Order`; the checker
   mints no edge to the closed construction. A closed generic in an `arch.Type(...)` /
@@ -839,7 +846,12 @@ express them: members as constraint **targets**. Member *subjects* are §4.6.
   body `new`s (`AddScoped(sp => new Foo(…))`) IS caught and wants `.Except(root)` or a baseline, so
   the boundary is one sentence to teach. The verb (`MustNotConstruct`) is §5.3; the glossary clause is §10.
 - **Normalizations**: an accessor resolves to its property/event; a reduced extension-method
-  call resolves through `ReducedFrom` to the declaring static class's method; constructed
+  call resolves through `ReducedFrom` to the declaring static class's method; a method declared in
+  an extension block resolves to the static method the compiler emits for it, whose first
+  parameter is the receiver where the method has one, so `s.M()` and `Ext.M(s)` are one use of one
+  member; an extension
+  property keeps its own ID, under the block's compiler-generated name; an extension indexer
+  access references its static class (§4.1) and is no use, as no indexer is; constructed
   generic members resolve to their `OriginalDefinition` — member edges are definition-level
   exactly like type edges (§4.1); same-type accesses are dropped (matches the type-edge
   self-drop).
@@ -877,7 +889,10 @@ express them: members as constraint **targets**. Member *subjects* are §4.6.
   reported, since following it would silently anchor the post-conversion type. A reduced extension
   call `x.Ext()` in the instance form anchors the declaring static class (the `ReducedFrom` parity
   above); in the static form an extension is anchored like any other static call, so `() => Ext.M(arg)`
-  and `() => captured.M()` both name `Ext.M`. What the **compiler** already refuses
+  and `() => captured.M()` both name `Ext.M`. A method declared in an extension block is anchored
+  as `arch.Member(typeof(Ext), nameof(Ext.M))`, since the class carries the method the compiler
+  emits for it; an extension property leaves no member of its own name on the class, so no anchor
+  reaches it. What the **compiler** already refuses
   needs no runtime handling: events (CS0070), inaccessible members (CS0122), `ref`-returns
   (CS8153), `ref struct` receivers (CS8640), and statics accessed through an instance (CS0176); a
   method-group body (`x => x.M` or `() => T.M`) warns CS8974 and is steered to the invocation form
@@ -927,8 +942,12 @@ Quarantine desugaring (§7) — is the underlying **type** selection.
   (they carry no inventory, and §4.9 gates on public besides). **Enum and
   delegate types contribute no inventory** — an enum's fields are its values (an enum-value read
   stays a recorded field *use*, §4.5, untouched by this section) and a delegate's `Invoke`/
-  `BeginInvoke` are runtime plumbing, not authored surface. **External (metadata) types carry no
-  inventory** — the member axis is solution-declared-only, exactly as external types carry a
+  `BeginInvoke` are runtime plumbing, not authored surface. **A static class's extension blocks
+  inventory onto the class**, as classic extension members do: a block method as the static method
+  the compiler emits for it (static; an instance method's receiver is its first parameter, which
+  the `this` parameter rule below then covers, and a static method has no receiver), and a block
+  property as a property of the class, static only as declared. A block's indexers and accessors stay out, as anywhere else. **External (metadata)
+  types carry no inventory** — the member axis is solution-declared-only, exactly as external types carry a
   shallow type hierarchy (§5.2).
 - **An empty member subject fails the rule** by default, the member analog of the empty-type
   subject (§4.1), with its own pinned message *"The subject selection matched no
@@ -1243,8 +1262,10 @@ consumes it.
 
 - **An exposure edge** is `(source type, exposed type, file:line sites)`, recorded at every
   public **signature position** of an effectively-public member: a method's return type and each
-  parameter type, and a property/field/event's type. The sites are the exposing members'
-  declaration lines. Where the signature **textually names** its type, the exposure edge is
+  parameter type, and a property/field/event's type. An extension block's receiver is a parameter
+  type of each instance member the block declares: a method's first parameter, as in its inventory
+  (§4.6), and a property's, beside its type. A static block member has no receiver. The sites are the
+  exposing members' declaration lines. Where the signature **textually names** its type, the exposure edge is
   minted **beside** the ordinary reference edge that type-name syntax mints (the double-mint of
   §4.5's explicit-`new` precedent) — one site, two facts, the exposure channel never standing
   in for the type edge. A signature spelling that names no type mints no twin: the wrappers

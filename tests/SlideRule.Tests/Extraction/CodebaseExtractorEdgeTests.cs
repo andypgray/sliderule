@@ -254,6 +254,91 @@ public sealed class CodebaseExtractorEdgeTests
             .ShouldBe([3]);
     }
 
+    // One row per member an extension block declares, each reached from a line of its own: the compiler places
+    // them in an unnamed type nested in the static class, and the reference is to the static class.
+    [Theory]
+    [InlineData("public int Twice => x * 2;", "n.Twice")]
+    [InlineData("public static int Zero => 0;", "int.Zero")]
+    [InlineData("public int Twice() => x * 2;", "n.Twice()")]
+    [InlineData("public int this[int i] => x * i;", "n[2]")]
+    public void ExtractFromCompilations_ExtensionBlockMemberAccess_ProducesEdgeToDeclaringStaticClass(string member, string access)
+    {
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors($$"""
+                                                                              namespace N;
+                                                                              public static class Ext { extension(int x) { {{member}} } }
+                                                                              public class Caller
+                                                                              {
+                                                                                  public int M(int n) => {{access}};
+                                                                              }
+                                                                              """);
+
+        model.Edge("N.Caller", "N.Ext")
+            .Sites.Lines()
+            .ShouldBe([5]);
+    }
+
+    // An access whose brackets sit on a line after the receiver's, plain and conditional.
+    [Theory]
+    [InlineData("[2]")]
+    [InlineData("?[2]")]
+    public void ExtractFromCompilations_ExtensionIndexerAccess_ProducesEdgeAtTheBrackets(string brackets)
+    {
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors($$"""
+                                                                              namespace N;
+                                                                              public class Bag {}
+                                                                              public static class Ext { extension(Bag b) { public int this[int i] => i; } }
+                                                                              public class Caller
+                                                                              {
+                                                                                  public int? M(Bag b) => b
+                                                                                      {{brackets}};
+                                                                              }
+                                                                              """);
+
+        model.Edge("N.Caller", "N.Ext")
+            .Sites.Lines()
+            .ShouldBe([7]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_GenericExtensionBlockMemberAccess_ProducesEdgeToDeclaringStaticClass()
+    {
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors("""
+                                                                            namespace N;
+                                                                            public static class Ext { extension<T>(T r) { public T Self => r; } }
+                                                                            public class Caller { public int M(int n) => n.Self; }
+                                                                            """);
+
+        model.Edge("N.Caller", "N.Ext")
+            .Sites.Lines()
+            .ShouldBe([3]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_InsideAnExtensionBlock_ProducesEdgesFromTheDeclaringStaticClass()
+    {
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors("""
+                                                                            namespace N;
+                                                                            public class Bag {}
+                                                                            public class Clock { public static int Now => 1; }
+                                                                            public static class Ext
+                                                                            {
+                                                                                extension(Bag b)
+                                                                                {
+                                                                                    public int Later => Clock.Now;
+                                                                                }
+                                                                            }
+                                                                            """);
+
+        // The receiver is named in the block's parameter list, as a classic extension method's `this` parameter
+        // names it in the method's, and the body is the static class's code.
+        model.Edge("N.Ext", "N.Bag")
+            .Sites.Lines()
+            .ShouldBe([6]);
+        model.Edge("N.Ext", "N.Clock")
+            .Sites.Lines()
+            .ShouldBe([8]);
+    }
+
     [Fact]
     public void ExtractFromCompilations_PropertyAccess_ProducesEdgeToContainingType()
     {

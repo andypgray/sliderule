@@ -363,6 +363,8 @@ internal static class FragmentExtractor
                 break;
             case IPropertySymbol property:
                 yield return property.Type;
+                foreach (ITypeSymbol receiver in ExtensionReceiverTypesOf(property))
+                    yield return receiver;
                 break;
             case IFieldSymbol field:
                 yield return field.Type;
@@ -371,6 +373,24 @@ internal static class FragmentExtractor
                 yield return @event.Type;
                 break;
         }
+    }
+
+    // An extension property's receiver, a signature position as a classic extension method's `this` is: the
+    // first parameter of the static method the compiler emits for its accessor. Empty for a static extension
+    // property, which has no receiver, and for any other property.
+    private static IEnumerable<ITypeSymbol> ExtensionReceiverTypesOf(IPropertySymbol property)
+    {
+        if (!property.ContainingType.IsExtensionBlock()) return [];
+        if ((property.GetMethod ?? property.SetMethod) is not { } accessor) return [];
+        if (ExtensionBlocks.ImplementationOf(accessor) is not { Parameters.IsEmpty: false } implementation) return [];
+
+        return [implementation.Parameters[0].Type];
+    }
+
+    private static IEnumerable<INamedTypeSymbol> ExtensionBlocksOf(INamedTypeSymbol type)
+    {
+        return type.GetTypeMembers()
+            .Where(nested => nested.IsExtensionBlock());
     }
 
     // Effective visibility (GRAMMAR §4.9): a public member of an internal type is not surface, so it mints
@@ -710,7 +730,7 @@ internal static class FragmentExtractor
                 return fqn;
             }
 
-            foreach (SyntaxReference reference in symbol.DeclaringSyntaxReferences)
+            foreach (SyntaxReference reference in WalkedDeclarationsOf(symbol))
             {
                 SyntaxNode root = reference.GetSyntax();
                 SemanticModel model = ModelFor(root.SyntaxTree);
@@ -738,6 +758,19 @@ internal static class FragmentExtractor
                     Record(channels.Thrown, _throwEdgeSites, site);
                 }
             }
+        }
+
+        // The type's own declarations, then each extension block's it declares. A block is never a modelled type,
+        // and the walk stops at every nested type declaration, so without the second half the code inside an
+        // extension member would be walked as nobody's.
+        private static IEnumerable<SyntaxReference> WalkedDeclarationsOf(INamedTypeSymbol symbol)
+        {
+            foreach (SyntaxReference reference in symbol.DeclaringSyntaxReferences)
+                yield return reference;
+
+            foreach (INamedTypeSymbol block in ExtensionBlocksOf(symbol))
+            foreach (SyntaxReference reference in block.DeclaringSyntaxReferences)
+                yield return reference;
         }
 
         // Drops the self-edge before resolving, so a self-edge mints no external; null for an empty or dropped
@@ -1058,8 +1091,30 @@ internal static class FragmentExtractor
                 if (IsInventoried(member))
                     members.Add((member, BuildMember(member, implementations.Contains(member))));
 
+            foreach (ISymbol member in ExtensionBlockMembersOf(type))
+                members.Add((member, BuildMember(member, isInterfaceImplementation: false)));
+
             members.Sort((left, right) => string.CompareOrdinal(left.Member.Facts.SymbolId, right.Member.Facts.SymbolId));
             return members;
+        }
+
+        // The members the type's extension blocks declare, inventoried on the type as classic extension members are:
+        // a method as the static method the compiler emits for it, whose first parameter is an instance method's
+        // receiver as a classic extension method's `this` is, and a property as itself. The emitted methods are
+        // implicitly declared, which keeps them out of the type's own member list above; the ID a use of either
+        // records (ReferenceWalker.MemberUseOf) must agree with the one recorded here.
+        private static IEnumerable<ISymbol> ExtensionBlockMembersOf(INamedTypeSymbol type)
+        {
+            foreach (INamedTypeSymbol block in ExtensionBlocksOf(type))
+            foreach (ISymbol member in block.GetMembers())
+            {
+                if (!IsInventoried(member)) continue;
+
+                if (member is not IMethodSymbol method)
+                    yield return member;
+                else if (ExtensionBlocks.ImplementationOf(method) is { } implementation)
+                    yield return implementation;
+            }
         }
 
         // The implementations the type's own interface map names (GRAMMAR §4.6). Only the type's own members are

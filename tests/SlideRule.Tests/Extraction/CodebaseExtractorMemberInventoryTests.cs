@@ -568,6 +568,46 @@ public sealed class CodebaseExtractorMemberInventoryTests
     }
 
     [Fact]
+    public void Inventory_ExtensionBlockMembers_AreTheDeclaringStaticClasssMembers()
+    {
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors("""
+                                                                            namespace N;
+                                                                            public static class StringExtensions
+                                                                            {
+                                                                                extension(string text)
+                                                                                {
+                                                                                    public string Shout() => text;
+                                                                                    public int Size => text.Length;
+                                                                                    public static int Zero => 0;
+                                                                                    public static int Count() => 0;
+                                                                                    public char this[long i] => text[(int)i];
+                                                                                }
+                                                                            }
+                                                                            """);
+
+        // A method is the static method the compiler emits for it, an instance method's receiver first as a
+        // classic extension method's `this` and a static method's absent; a property is itself, static only as
+        // declared; an indexer and the accessors stay out.
+        TypeNode extensions = model.Type("N.StringExtensions");
+        extensions.Members.Select(m => (m.Name, m.Kind, m.IsStatic))
+            .ShouldBe(
+                [
+                    ("Count", MemberKind.Method, true),
+                    ("Shout", MemberKind.Method, true),
+                    ("Size", MemberKind.Property, false),
+                    ("Zero", MemberKind.Property, true)
+                ],
+                ignoreOrder: true);
+        MemberNode shout = extensions.Member("M:N.StringExtensions.Shout(System.String)");
+        shout.Parameters.Select(p => (p.Name, p.TypeFullName))
+            .ShouldBe([("text", "System.String")]);
+        shout.DeclarationSites.Lines()
+            .ShouldBe([6]);
+        extensions.Member("M:N.StringExtensions.Count")
+            .Parameters.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void Inventory_RefInOutParameters_RecordTheUnderlyingType()
     {
         CodebaseModel model = CompilationFactory.Extract("""

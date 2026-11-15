@@ -65,6 +65,37 @@ public sealed class CodebaseExtractorExposureEdgeTests
             .ShouldBe([4]);
     }
 
+    // An extension block's receiver is in the signature of each member it declares with a receiver, as a
+    // classic extension method's `this` parameter is: a method's through the static method the compiler emits
+    // for it, a property's through its accessor's. A static member has no receiver.
+    [Theory]
+    [InlineData("public int Size() => 0;", new[] { "N.Gadget", "System.Int32" })]
+    [InlineData("public int Size => 0;", new[] { "N.Gadget", "System.Int32" })]
+    [InlineData("public int Size { set {} }", new[] { "N.Gadget", "System.Int32" })]
+    [InlineData("public static int Size() => 0;", new[] { "System.Int32" })]
+    [InlineData("public static int Size => 0;", new[] { "System.Int32" })]
+    public void ExtractFromCompilations_ExtensionBlockMember_ExposesItsReceiver(string member, string[] exposed)
+    {
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors($$"""
+                                                                              namespace N;
+                                                                              public class Gadget {}
+                                                                              public static class C
+                                                                              {
+                                                                                  extension(Gadget g)
+                                                                                  {
+                                                                                      {{member}}
+                                                                                  }
+                                                                              }
+                                                                              """);
+
+        model.ExposureEdges("N.C")
+            .TargetNames()
+            .ShouldBe(exposed, ignoreOrder: true);
+        model.ExposureEdge("N.C", "System.Int32")
+            .Sites.Lines()
+            .ShouldBe([7]);
+    }
+
     [Fact]
     public void ExtractFromCompilations_ConstructedGenericReturn_MintsDefinitionAndArgument()
     {

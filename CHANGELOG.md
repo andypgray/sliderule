@@ -105,6 +105,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   load a generator built against a newer compiler. A union was left out of the model, and on a machine whose
   newest SDK is 11 a Razor project's compiled views were missing, with nothing reported. A union is now a struct
   that references each of its case types, as the build analyzer reports it.
+- C# 14 extension members now reach the model. An access to an extension property, to a method declared in an
+  `extension(…)` block or to an extension indexer references the static class that declares it, and the
+  property and method accesses are also member uses, so a `MustNotReference` or `MustNotUse` rule now catches
+  them, where it used to pass. `s.M()` and `Ext.M(s)` are one use of one member. The code inside an extension
+  member is that class's code, and the class's members now include its block members, an instance method with
+  its receiver as the first parameter as a classic extension method has. A spec over code that declares
+  extension blocks can turn red where it was green.
 - `--spec` given the DLL a declared project builds now checks the solution as `--spec` given that project's
   `.csproj` does. The spec project is left out of the check and its sources are compared with its build, on a
   cold run, a cache hit and in the MCP server. The DLL form used to check the spec project's own code against

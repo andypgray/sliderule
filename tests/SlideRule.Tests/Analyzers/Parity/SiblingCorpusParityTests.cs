@@ -186,6 +186,32 @@ public sealed class SiblingCorpusParityTests
     }
 
     [Fact]
+    public async Task TheBuildTier_OverTheMembersOfExtensionBlocks_AgreesWithTheWholeSolutionCheck()
+    {
+        ParitySubject subject = SiblingCorpus.ExtensionMembers();
+        const string total = "M:SlideRule.Tests.Checking.MemberTargets.Sequences.Total(System.Collections.Generic.IEnumerable{System.Int32})";
+        const string sequences = "T:SlideRule.Tests.Checking.MemberTargets.Sequences";
+
+        // One line per access: the property, the block method reduced and static, the generic block's method,
+        // the indexer and the classic extension method.
+        subject.Expectation.Keys.Describe()
+            .ShouldBe(
+                [
+                    $"extensions/app-never-totals [MemberUse] T:App.Reader -> {total} at App.Site.cs:11",
+                    $"extensions/app-never-totals [MemberUse] T:App.Reader -> {total} at App.Site.cs:12",
+                    $"extensions/app-not-through-sequences [Reference] T:App.Reader -> {sequences} at App.Site.cs:10",
+                    $"extensions/app-not-through-sequences [Reference] T:App.Reader -> {sequences} at App.Site.cs:11",
+                    $"extensions/app-not-through-sequences [Reference] T:App.Reader -> {sequences} at App.Site.cs:12",
+                    $"extensions/app-not-through-sequences [Reference] T:App.Reader -> {sequences} at App.Site.cs:13",
+                    "extensions/app-not-through-the-helpers [Reference] T:App.Reader -> T:SlideRule.Tests.Checking.MemberTargets.SequenceHelpers at App.Site.cs:15",
+                    "extensions/app-not-through-the-indexer [Reference] T:App.Reader -> T:SlideRule.Tests.Checking.MemberTargets.SequenceIndexer at App.Site.cs:14"
+                ],
+                "a reference from every extension member access and one use of the block method, both spellings");
+
+        await subject.ShouldHoldOnBothLegsAsync(Ct);
+    }
+
+    [Fact]
     public async Task TheBuildTier_OverARuleAboutRegistrations_SaysNothing()
     {
         ParitySubject subject = SiblingCorpus.RegisteredElsewhere();
