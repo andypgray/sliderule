@@ -840,6 +840,45 @@ public sealed class CodebaseExtractorRegistrationTests
                                           }
                                           """;
 
+    // The same wrappers as the methods of a C# 14 extension block, whose receiver is the block's.
+    private const string UniqueBlockWrappers = """
+                                               using System;
+                                               using Microsoft.Extensions.DependencyInjection;
+                                               using Microsoft.Extensions.DependencyInjection.Extensions;
+                                               namespace W;
+                                               public static class UniqueExtensions
+                                               {
+                                                   extension(IServiceCollection services)
+                                                   {
+                                                       public IServiceCollection AddUnique<TService, TImplementing>()
+                                                           where TService : class where TImplementing : class, TService =>
+                                                           services.AddUnique<TService, TImplementing>(ServiceLifetime.Singleton);
+
+                                                       public IServiceCollection AddUnique<TService, TImplementing>(ServiceLifetime lifetime)
+                                                           where TService : class where TImplementing : class, TService
+                                                       {
+                                                           services.RemoveAll<TService>();
+                                                           services.Add(ServiceDescriptor.Describe(typeof(TService), typeof(TImplementing), lifetime));
+                                                           return services;
+                                                       }
+
+                                                       public IServiceCollection AddUnique<TService>(Func<IServiceProvider, TService> factory)
+                                                           where TService : class
+                                                       {
+                                                           services.Add(ServiceDescriptor.Describe(typeof(TService), factory, ServiceLifetime.Singleton));
+                                                           return services;
+                                                       }
+
+                                                       public IServiceCollection AddWithDefault<TService>(ServiceLifetime lifetime = ServiceLifetime.Transient)
+                                                           where TService : class
+                                                       {
+                                                           services.Add(ServiceDescriptor.Describe(typeof(TService), typeof(TService), lifetime));
+                                                           return services;
+                                                       }
+                                                   }
+                                               }
+                                               """;
+
     private const string UniqueCallers = """
                                          using Microsoft.Extensions.DependencyInjection;
                                          using W;
@@ -873,10 +912,12 @@ public sealed class CodebaseExtractorRegistrationTests
     ];
 
     // The wrappers declared in wrapperNamespace, the namespace Microsoft's guidance gives Add{Group} methods among
-    // them; the callers' import of W becomes a comment there, so every line keeps its number.
-    private static (string Path, string Source)[] UniqueWiring(string wrapperNamespace)
+    // them, and in an extension block when inBlock is set; the callers' import of W becomes a comment there, so
+    // every line keeps its number.
+    private static (string Path, string Source)[] UniqueWiring(string wrapperNamespace, bool inBlock = false)
     {
-        string wrappers = UniqueWrappers.Replace("namespace W;", $"namespace {wrapperNamespace};", StringComparison.Ordinal);
+        string declared = inBlock ? UniqueBlockWrappers : UniqueWrappers;
+        string wrappers = declared.Replace("namespace W;", $"namespace {wrapperNamespace};", StringComparison.Ordinal);
         string callers = wrapperNamespace == "W"
             ? UniqueCallers
             : UniqueCallers.Replace("using W;", "// the wrappers share the collection's namespace", StringComparison.Ordinal);
@@ -884,11 +925,13 @@ public sealed class CodebaseExtractorRegistrationTests
     }
 
     [Theory]
-    [InlineData("W")]
-    [InlineData(DiNamespace)]
-    public void Recognize_GenericWrapperOverDescriptor_RecordsEachCallsRegistrationAtTheCall(string wrapperNamespace)
+    [InlineData("W", false)]
+    [InlineData(DiNamespace, false)]
+    [InlineData("W", true)]
+    [InlineData(DiNamespace, true)]
+    public void Recognize_GenericWrapperOverDescriptor_RecordsEachCallsRegistrationAtTheCall(string wrapperNamespace, bool inBlock)
     {
-        CodebaseModel model = CompilationFactory.ExtractWithDi(UniqueWiring(wrapperNamespace));
+        CodebaseModel model = CompilationFactory.ExtractWithDi(UniqueWiring(wrapperNamespace, inBlock));
 
         // The call passing a lifetime that is not a literal records nothing; the wrapper bodies record nothing of
         // their own, since every registration there reads a type or lifetime parameter.
@@ -900,13 +943,17 @@ public sealed class CodebaseExtractorRegistrationTests
     }
 
     [Theory]
-    [InlineData(false, "W")]
-    [InlineData(true, "W")]
-    [InlineData(false, DiNamespace)]
-    [InlineData(true, DiNamespace)]
-    public void Recognize_GenericWrapperInAnotherProject_IsExpandedAtTheMerge(bool referencedAsImage, string wrapperNamespace)
+    [InlineData(false, "W", false)]
+    [InlineData(true, "W", false)]
+    [InlineData(false, DiNamespace, false)]
+    [InlineData(true, DiNamespace, false)]
+    [InlineData(false, "W", true)]
+    [InlineData(true, "W", true)]
+    [InlineData(false, DiNamespace, true)]
+    [InlineData(true, DiNamespace, true)]
+    public void Recognize_GenericWrapperInAnotherProject_IsExpandedAtTheMerge(bool referencedAsImage, string wrapperNamespace, bool inBlock)
     {
-        (string Path, string Source)[] wiring = UniqueWiring(wrapperNamespace);
+        (string Path, string Source)[] wiring = UniqueWiring(wrapperNamespace, inBlock);
         CompilationInput wrappers = CompilationFactory.CompileWithDi("Wrappers", wiring[0]);
         CompilationInput callers = CompilationFactory.CompileWithDiReferencing(
             "App", wrappers.Compilation, "Wrappers", referencedAsImage, wiring[1]);
@@ -915,6 +962,66 @@ public sealed class CodebaseExtractorRegistrationTests
 
         Registrations(model)
             .ShouldBe(UniqueRegistrations);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Recognize_BlockWrapperCalledInItsStaticForm_IsExpandedAtTheCall(bool referencedAsImage)
+    {
+        // C# 14 lets a caller spell a block method as the static method the compiler emits for it, which is the
+        // symbol that call binds to, while the template is read from the block method.
+        CompilationInput wrappers = CompilationFactory.CompileWithDi("Wrappers", ("Wrappers.cs", UniqueBlockWrappers));
+        CompilationInput callers = CompilationFactory.CompileWithDiReferencing(
+            "App", wrappers.Compilation, "Wrappers", referencedAsImage, ("Root.cs", """
+                                                                                    using Microsoft.Extensions.DependencyInjection;
+                                                                                    using W;
+                                                                                    namespace N;
+                                                                                    public interface IFoo {}
+                                                                                    public class Foo : IFoo {}
+                                                                                    public static class Root
+                                                                                    {
+                                                                                        public static void Configure(IServiceCollection services) =>
+                                                                                            UniqueExtensions.AddUnique<IFoo, Foo>(services);
+                                                                                    }
+                                                                                    """));
+
+        CodebaseModel model = Harness.Extract([wrappers, callers]);
+
+        Registrations(model)
+            .ShouldBe([(Lifetime.Singleton, "N.IFoo", "N.Foo")]);
+    }
+
+    [Fact]
+    public void Recognize_WrapperInAGenericExtensionBlock_RecordsNothing()
+    {
+        // The emitted static method takes the block's type parameter ahead of the method's, so read as a wrapper
+        // the call's first type argument, int, would stand for TService.
+        CodebaseModel model = CompilationFactory.ExtractWithDi(("Reg.cs", """
+                                                                          using Microsoft.Extensions.DependencyInjection;
+                                                                          namespace N;
+                                                                          public class Foo {}
+                                                                          public class Builder<TB> { public IServiceCollection Services { get; } = null!; }
+                                                                          public static class BuilderExtensions
+                                                                          {
+                                                                              extension<TB>(Builder<TB> builder)
+                                                                              {
+                                                                                  public Builder<TB> AddFor<TService>() where TService : class
+                                                                                  {
+                                                                                      builder.Services.AddSingleton<TService>();
+                                                                                      return builder;
+                                                                                  }
+                                                                              }
+                                                                          }
+                                                                          public static class Root
+                                                                          {
+                                                                              public static void Configure(Builder<int> builder) =>
+                                                                                  BuilderExtensions.AddFor<int, Foo>(builder);
+                                                                          }
+                                                                          """));
+
+        Registrations(model)
+            .ShouldBeEmpty();
     }
 
     // Wrappers whose bodies read a type parameter only inside a constructed type: a descriptor over it, a concrete

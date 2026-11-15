@@ -128,6 +128,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   member is that class's code, and the class's members now include its block members, an instance method with
   its receiver as the first parameter as a classic extension method has. A spec over code that declares
   extension blocks can turn red where it was green.
+- A registration wrapper declared in an `extension(IServiceCollection services)` block is now followed, so the
+  registrations made through it are recorded at each call, whether the call is `services.AddX<T>()` or
+  `Ext.AddX<T>(services)`. A wrapper in a block with type parameters is still not followed.
 - `--spec` given the DLL a declared project builds now checks the solution as `--spec` given that project's
   `.csproj` does. The spec project is left out of the check and its sources are compared with its build, on a
   cold run, a cache hit and in the MCP server. The DLL form used to check the spec project's own code against

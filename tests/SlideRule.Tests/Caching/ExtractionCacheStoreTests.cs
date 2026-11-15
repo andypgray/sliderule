@@ -57,7 +57,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(57);
+            .ShouldBe(58);
     }
 
     [Fact]

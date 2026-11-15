@@ -1107,7 +1107,8 @@ needs two facts no other section provides: who is *registered* with what lifetim
   registers concrete types is seen where its body makes the call, since the pass walks every
   tree. A **generic or lifetime-taking wrapper** (a method declared in the solution, in any
   namespace, the two above included, whose first parameter is `IServiceCollection` or a builder that
-  exposes one as a readable instance property, on itself, a base class or an interface, and
+  exposes one as a readable instance property, on itself, a base class or an interface (for a method
+  in an `extension(…)` block, the block's receiver, in a block that takes no type parameters), and
   which takes type parameters or a `ServiceLifetime` parameter) is read as a template over its own parameters
   and expanded at **each call**, in whichever project the call sits: `services.AddUnique<IFoo,
   Foo>()` records what the wrapper's body registers, with `IFoo`, `Foo` and the lifetime the

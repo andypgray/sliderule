@@ -884,13 +884,16 @@ internal static class FragmentExtractor
         // The wrappers this compilation declares, from its type symbols, each keyed by every declaration of it. The
         // walk reads the compilation's types rather than the declaring pass's table, which keeps one symbol per full
         // name and so one of two file-local types that share it. A partial method's implementing declaration is
-        // keyed to the implementation part, the symbol its body's type parameters bind to.
+        // keyed to the implementation part, the symbol its body's type parameters bind to. The static method the
+        // compiler emits for a method of an extension block is implicitly declared yet reports the block method's
+        // declaration. The IsImplicitlyDeclared screen keeps that slot with the block method, which the body's type
+        // parameters bind to, whatever order the walk meets the two in.
         private Dictionary<MethodDeclarationSyntax, IMethodSymbol> DeclaredWrappers(RegistrationRecognizer recognizer)
         {
             IEnumerable<IMethodSymbol> methods = DeclaredTypes(_compilation)
                 .SelectMany(type => type.GetMembers())
                 .OfType<IMethodSymbol>()
-                .Where(recognizer.IsWrapper);
+                .Where(method => !method.IsImplicitlyDeclared && recognizer.IsWrapper(method));
 
             var wrappers = new Dictionary<MethodDeclarationSyntax, IMethodSymbol>();
             foreach (IMethodSymbol method in methods)

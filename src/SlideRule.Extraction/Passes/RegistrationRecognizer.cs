@@ -21,7 +21,9 @@ namespace SlideRule.Extraction.Passes;
 /// <remarks>
 ///     A wrapper is a method the solution declares, in any namespace, whose first parameter is
 ///     <c>IServiceCollection</c>, or a builder exposing one as a readable instance property, and which has type
-///     parameters or a <c>ServiceLifetime</c> parameter (<see cref="IsWrapper" />). Inside one, passed as
+///     parameters or a <c>ServiceLifetime</c> parameter (<see cref="IsWrapper" />). For a method of a C# 14
+///     extension block that first parameter is the block's receiver, and a block with type parameters declares no
+///     wrapper. Inside one, passed as
 ///     <c>wrapper</c>, a type parameter or a lifetime parameter of that wrapper is readable and comes back as
 ///     itself, for the template the merge expands at each call. Every other registration form is the §4.7
 ///     honesty boundary and yields nothing: <c>Configure</c>/<c>AddOptions</c>, keyed-service overloads,
@@ -126,7 +128,9 @@ internal sealed class RegistrationRecognizer
     /// </summary>
     public static string? WrapperKey(IMethodSymbol wrapper)
     {
-        IMethodSymbol definition = wrapper.OriginalDefinition;
+        // A method of an extension block is keyed by its emitted implementation, which a call spelling the
+        // static form binds to, so that call and one through the receiver reach the same template.
+        IMethodSymbol definition = ExtensionBlocks.ImplementationOf(wrapper) ?? wrapper.OriginalDefinition;
         return definition.GetDocumentationCommentId() is { } id ? $"{definition.ContainingAssembly?.Name}:{id}" : null;
     }
 
@@ -136,16 +140,28 @@ internal sealed class RegistrationRecognizer
     /// </summary>
     public bool IsWrapper(IMethodSymbol method)
     {
-        if (method.MethodKind != MethodKind.Ordinary || method.Parameters.Length == 0) return false;
+        if (method.MethodKind != MethodKind.Ordinary) return false;
 
-        // Ahead of ReachesServices, which reads every member of the first parameter's type and its bases: the
-        // declaring side asks this of every method the solution declares.
+        // Ahead of ReachesServices, which reads every member of the receiver's type and its bases: the declaring
+        // side asks this of every method the solution declares.
         if (method.TypeParameters.Length == 0 && !method.Parameters.Any(parameter => IsServiceLifetime(parameter.Type))) return false;
-        if (!ReachesServices(method.Parameters[0].Type)) return false;
+        if (Receiver(method) is not { } receiver || !ReachesServices(receiver.Type)) return false;
 
         // The framework's own methods in these namespaces (Configure<T>, AddKeyedSingleton) have the shape too, so
         // only one the solution declares is a wrapper there.
         return !IsDiNamespace(method) || IsSolutionDeclared(method);
+    }
+
+    // The first parameter, or for a method of an extension block the parameter its emitted implementation takes
+    // first: the block's receiver, or a static block method's own first parameter. Null for a method of a generic
+    // block, whose implementation declares the block's type parameters ahead of the method's, so the type
+    // arguments of a call spelling the static form would not line up with the template's type parameters.
+    private static IParameterSymbol? Receiver(IMethodSymbol method)
+    {
+        if (!method.ContainingType.IsExtensionBlock()) return method.Parameters.FirstOrDefault();
+        if (!method.ContainingType.TypeParameters.IsEmpty) return null;
+
+        return ExtensionBlocks.ImplementationOf(method)?.Parameters.FirstOrDefault();
     }
 
     // Source symbols come only from the solution's compilations. One read from metadata is the solution's when a
