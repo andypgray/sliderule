@@ -156,7 +156,7 @@ internal sealed class InitRunner(
             .Distinct(StringComparer.Ordinal)
             .ToList();
         (int? pin, string? globalJson) = SpecFramework.SdkPin(layout.SolutionDirectory);
-        return SpecFramework.Choose(frameworks, pin, globalJson);
+        return SpecFramework.Choose(frameworks, pin, globalJson, System.Environment.Version.Major);
     }
 
     private void Write(string path, string text, Layout layout)

@@ -6,7 +6,7 @@ Choose who drafts your first rules. On path 1, you write them; on path 2, a codi
 
 ## Requirements
 
-Install a .NET 10 SDK on the machine running SlideRule. The tool targets `net10.0`; solution loads use `MSBuildWorkspace` with the SDK's MSBuild, which a runtime alone does not provide. This applies to solution-loading runs of `init`, `check`, `explain`, `render`, `status`, `graph`, `baseline`, `hook` and `mcp`. Your product code can target .NET Framework 4.8, including non-SDK-style projects. SlideRule reads its source without retargeting it. The spec compiles against the `SlideRule` package, which targets `netstandard2.0`.
+Install a .NET 10 SDK on the machine running SlideRule. The tool runs on the newest .NET runtime installed, 10 or later; solution loads use `MSBuildWorkspace` with the SDK's MSBuild, which a runtime alone does not provide. This applies to solution-loading runs of `init`, `check`, `explain`, `render`, `status`, `graph`, `baseline`, `hook` and `mcp`. Your product code can target .NET Framework 4.8, including non-SDK-style projects. SlideRule reads its source without retargeting it. The spec compiles against the `SlideRule` package, which targets `netstandard2.0`.
 
 SlideRule ships as a .NET global tool:
 
@@ -28,7 +28,7 @@ sliderule init MyApp.sln
 
 `init` creates `arch/MyApp.Architecture/MyApp.Architecture.csproj` and `ArchitectureSpec.cs` next to the solution. The class has an empty `Define` method. It adds the project to the solution, writes `sliderule.json` naming both, builds the spec and runs a first check. With no rules, that check passes; `init` returns its verdict. The package reference uses the running tool's version, printed by `sliderule --version`.
 
-The scaffold disables central package management and packing, turns documentation generation on with CS1591 suppressed, and clears an inherited `TargetFramework`. Without `--framework`, an all-.NET Framework solution gets its highest framework. Other solutions get `net10.0`, or `netN.0` when `global.json` pins an SDK below 10; that choice rejects pins below SDK 6. A `typeof()` anchor needs a spec framework compatible with the product project it references. See [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md#the-spec-project).
+The scaffold disables central package management and packing, turns documentation generation on with CS1591 suppressed, and clears an inherited `TargetFramework`. Without `--framework`, an all-.NET Framework solution gets its highest framework. Other solutions get the newest `netN.0` their projects target, at least `net10.0` and at most the runtime the tool runs on, with the platform suffix the projects share (`net11.0-windows`). When `global.json` pins an SDK below 10 they get that SDK's `netN.0`; that choice rejects pins below SDK 6. A `typeof()` anchor needs a spec framework compatible with the product project it references. See [Writing specs](https://github.com/andypgray/sliderule/blob/main/WRITING-SPECS.md#the-spec-project).
 
 Before writing, `init` rejects an existing spec, settings file or destination folder, a solution filter, or a project above the destination that would compile the spec class. The [`init` reference](https://github.com/andypgray/sliderule/blob/main/CLI.md#init) explains these cases and framework selection.
 

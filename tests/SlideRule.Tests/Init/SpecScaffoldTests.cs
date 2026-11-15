@@ -43,6 +43,22 @@ public sealed class SpecScaffoldTests
     }
 
     [Fact]
+    public void Project_ForAWindowsFramework_AlsoEnablesWindowsTargeting()
+    {
+        SpecScaffold scaffold = SpecScaffold.Embedded;
+
+        string project = scaffold.Project("1.2.3", "net11.0-windows10.0.19041.0");
+
+        project.ShouldBe(scaffold.ProjectTemplate
+            .Replace("Version=\"...\"", "Version=\"1.2.3\"", StringComparison.Ordinal)
+            .Replace(
+                SpecScaffold.FrameworkLiteral,
+                "<TargetFrameworks>net11.0-windows10.0.19041.0</TargetFrameworks>\n"
+                + "        <EnableWindowsTargeting>true</EnableWindowsTargeting>",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void SpecClass_WithAHeaderAndRules_PutsTheHeaderFirstAndTheRulesInsideDefine()
     {
         SpecScaffold scaffold = SpecScaffold.Embedded;

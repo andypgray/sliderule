@@ -2,7 +2,8 @@
 
     <PropertyGroup>
         <!-- net10.0 host: orchestrates workspace load → spec load → extract → check → render.
-             RollForward=Major so a global tool runs on a newer shared runtime. This project packs as
+             RollForward=LatestMajor runs the tool on the newest installed .NET runtime, 10 or later, so it
+             loads a spec built for any runtime the machine has. This project packs as
              the `sliderule` global tool and MCP server; PackageId is set explicitly to
              SlideRule.Cli because AssemblyName is `sliderule-cli`, which would otherwise become
              the package id. The assembly is not plain `sliderule`: that differs from the contract's
@@ -13,7 +14,7 @@
         <OutputType>Exe</OutputType>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
-        <RollForward>Major</RollForward>
+        <RollForward>LatestMajor</RollForward>
         <AssemblyName>sliderule-cli</AssemblyName>
 
         <!-- Global tool + MCP server identity. PackAsTool applies the DotnetTool package type;

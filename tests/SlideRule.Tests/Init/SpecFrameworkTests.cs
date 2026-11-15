@@ -13,17 +13,35 @@ namespace SlideRule.Tests.Init;
 public sealed class SpecFrameworkTests
 {
     [Theory]
-    [InlineData(new[] { "net8.0", "net48" }, null, "net10.0")]
-    [InlineData(new[] { "net8.0" }, 9, "net9.0")]
-    [InlineData(new[] { "net8.0" }, 10, "net10.0")]
-    [InlineData(new[] { "netstandard2.0" }, null, "net10.0")]
-    [InlineData(new[] { "netstandard2.0" }, 8, "net8.0")]
-    [InlineData(new[] { "net472", "net48" }, null, "net48")]
-    [InlineData(new[] { "net472", "net48" }, 8, "net48")]
-    [InlineData(new string[0], null, "net10.0")]
-    public void Choose_PicksTheFrameworkTheEstateAndThePinAllow(string[] products, int? pin, string expected)
+    [InlineData(new[] { "net8.0", "net48" }, null, 10, "net10.0")]
+    [InlineData(new[] { "net8.0" }, 9, 10, "net9.0")]
+    [InlineData(new[] { "net8.0" }, 10, 10, "net10.0")]
+    [InlineData(new[] { "netstandard2.0" }, null, 10, "net10.0")]
+    [InlineData(new[] { "netstandard2.0" }, 8, 10, "net8.0")]
+    [InlineData(new[] { "net472", "net48" }, null, 10, "net48")]
+    [InlineData(new[] { "net472", "net48" }, 8, 10, "net48")]
+    [InlineData(new string[0], null, 10, "net10.0")]
+    [InlineData(new[] { "net11.0", "netstandard2.0" }, null, 11, "net11.0")]
+    [InlineData(new[] { "net11.0" }, null, 10, "net10.0")]
+    [InlineData(new[] { "net12.0", "net11.0" }, null, 11, "net11.0")]
+    [InlineData(new[] { "net8.0" }, null, 11, "net10.0")]
+    [InlineData(new[] { "net11.0" }, 11, 11, "net11.0")]
+    [InlineData(new[] { "net11.0" }, 10, 11, "net10.0")]
+    [InlineData(new[] { "net11.0-windows" }, null, 11, "net11.0-windows")]
+    [InlineData(new[] { "net11.0", "net11.0-windows" }, null, 11, "net11.0-windows")]
+    [InlineData(new[] { "net11.0-windows", "net11.0-android" }, null, 11, "net11.0")]
+    [InlineData(new[] { "net11.0-windows10.0.22621.0", "net11.0-windows10.0.19041.0" }, null, 11, "net11.0-windows10.0.22621.0")]
+    [InlineData(new[] { "net11.0-windows", "net11.0-windows10.0.19041.0" }, null, 11, "net11.0-windows10.0.19041.0")]
+    [InlineData(new[] { "net10.0-windows" }, null, 10, "net10.0-windows")]
+    [InlineData(new[] { "net8.0-windows", "net10.0" }, null, 10, "net10.0-windows")]
+    [InlineData(new[] { "net11.0-windows", "net10.0" }, null, 10, "net10.0")]
+    public void Choose_PicksTheFrameworkTheEstateThePinAndTheRuntimeAllow(
+        string[] products,
+        int? pin,
+        int runtime,
+        string expected)
     {
-        string framework = SpecFramework.Choose(products, pin, "global.json");
+        string framework = SpecFramework.Choose(products, pin, "global.json", runtime);
 
         framework.ShouldBe(expected);
     }
@@ -31,7 +49,7 @@ public sealed class SpecFrameworkTests
     [Fact]
     public void Choose_UnderAPinBelowSdk6_RefusesNamingThePinAndTheOverride()
     {
-        var refusal = Should.Throw<UserErrorException>(() => SpecFramework.Choose(["net5.0"], 5, "C:/repo/global.json"));
+        var refusal = Should.Throw<UserErrorException>(() => SpecFramework.Choose(["net5.0"], 5, "C:/repo/global.json", 10));
 
         refusal.Message.ShouldBe(
             "C:/repo/global.json pins SDK 5, which cannot compile a spec class (it needs C# 10, SDK 6 or later). "

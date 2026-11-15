@@ -23,13 +23,16 @@ jobs:
   # no Build Tools 17 anywhere on it) and `windows-2022` is the VS 17 machine, so the non-SDK-style
   # projects in the 2003 MSBuild XML namespace that the README claims are proven on both.
   #
-  # One leg more runs SDK 11 on ubuntu, with SDK 10 beside it: the newest SDK picks the MSBuild and the
-  # generators a workspace load sees, and the test host still runs on .NET 10, so that pair is what a
-  # consumer machine with SDK 11 installed looks like. `sdk` is the band in use, `beside` the bands the
-  # leg also installs, and `dotnet` what setup-dotnet is asked for. The name keeps the four SDK 10 legs'
-  # check names as they were.
+  # Two legs more run SDK 11 on ubuntu, with SDK 10 beside it, so the newest SDK picks the MSBuild and the
+  # generators a workspace load sees. On the first the test host stays on .NET 10, the shape a consumer's
+  # net10.0 test project running the xUnit adapter has. On the second, `runtime: '11'` rolls the test host
+  # onto .NET 11, and with it every in-process CLI and MCP test and every child CLI: the shape the tool
+  # itself has on any machine holding .NET 11. `sdk` is the band in use, `beside` the bands the leg also
+  # installs, `dotnet` what setup-dotnet is asked for, and `runtime` the major the Test step rolls onto.
+  # A separate include entry forms a leg of its own, since GitHub never merges an include entry into a
+  # combination another include created. The name keeps the existing legs' check names as they were.
   build-and-test:
-    name: ${{ matrix.sdk == '10.0' && format('build-and-test ({0})', matrix.os) || format('build-and-test ({0}, SDK {1})', matrix.os, matrix.sdk) }}
+    name: ${{ matrix.sdk == '10.0' && format('build-and-test ({0})', matrix.os) || matrix.runtime && format('build-and-test ({0}, SDK {1}, runtime {2})', matrix.os, matrix.sdk, matrix.runtime) || format('build-and-test ({0}, SDK {1})', matrix.os, matrix.sdk) }}
     strategy:
       fail-fast: false
       matrix:
@@ -45,6 +48,13 @@ jobs:
             dotnet: |
               10.0.x
               11.0.x
+          - os: ubuntu-latest
+            sdk: '11.0'
+            beside: '10.0'
+            dotnet: |
+              10.0.x
+              11.0.x
+            runtime: '11'
 
     runs-on: ${{ matrix.os }}
 
@@ -214,9 +224,16 @@ jobs:
       # leg, the same shape as the manifest-version job's nuget.org read — so the other legs skip with the
       # reason rather than making a public run depend on learn.microsoft.com on every leg. A runner that
       # cannot reach the pages at all reports the same skip, naming them.
+      #
+      # On the runtime leg DOTNET_ROLL_FORWARD moves the net10.0 test host onto the newest runtime, and
+      # SLIDERULE_TESTS_RUNTIME_MAJOR names the major TestHostRuntimeTests holds it to, so a roll-forward
+      # that stopped applying reds rather than passing on .NET 10. Both are empty elsewhere, which the host
+      # and the guard ignore.
       - name: Test
         env:
           SLIDERULE_LINK_CHECK: ${{ matrix.os == 'ubuntu-latest' && matrix.sdk == '10.0' && 'true' || '' }}
+          DOTNET_ROLL_FORWARD: ${{ matrix.runtime && 'LatestMajor' || '' }}
+          SLIDERULE_TESTS_RUNTIME_MAJOR: ${{ matrix.runtime }}
         run: dotnet test SlideRule.slnx --no-build --output Detailed
 
   # Packs on Linux, then does two things with the result. First, asserts the MCP manifest lands at

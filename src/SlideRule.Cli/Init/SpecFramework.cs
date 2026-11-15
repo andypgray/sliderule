@@ -9,16 +9,17 @@ namespace SlideRule.Cli.Init;
 ///     from what the product projects target and the SDK a <c>global.json</c> pins.
 /// </summary>
 /// <remarks>
-///     The spec has to build with the SDK the repository pins, and a later <c>typeof()</c> anchor needs it able to
-///     reference the product projects. An estate on .NET Framework alone gets its highest framework; any other
-///     estate gets <c>net10.0</c>, or under a pin below SDK 10 the pinned SDK's own <c>netN.0</c>, which that SDK can
-///     build and which references every older target. Below SDK 6 the spec class cannot compile (it needs C# 10),
-///     so that pin refuses.
+///     The spec has to build with the SDK the repository pins, the running tool has to load it, and a later
+///     <c>typeof()</c> anchor needs it able to reference the product projects. An estate on .NET Framework alone
+///     gets its highest framework. Any other estate gets the newest .NET major its projects target, at least 10
+///     and at most both the running runtime's major and the pinned SDK's, carrying the one platform suffix the
+///     projects at or below that major share, at its highest version (<c>net11.0-windows</c>), since a bare
+///     framework cannot reference a platform one. Under a pin below SDK 10 it gets the pinned SDK's own
+///     <c>netN.0</c>, which that SDK can build and which references every older target. Below SDK 6 the spec class
+///     cannot compile (it needs C# 10), so that pin refuses.
 /// </remarks>
 internal static class SpecFramework
 {
-    private const string Default = "net10.0";
-
     private const int DefaultMajor = 10;
 
     // The oldest SDK whose compiler takes the spec class: file-scoped namespaces are C# 10.
@@ -34,8 +35,13 @@ internal static class SpecFramework
     ///     The major version of the SDK <c>global.json</c> pins, or null when nothing pins one.
     /// </param>
     /// <param name="globalJson">The pinning file, named in the refusal.</param>
+    /// <param name="runtimeMajor">The major version of the runtime the tool is running on.</param>
     /// <exception cref="UserErrorException">The pin is below SDK 6.</exception>
-    internal static string Choose(IReadOnlyCollection<string> productFrameworks, int? sdkPinMajor, string? globalJson)
+    internal static string Choose(
+        IReadOnlyCollection<string> productFrameworks,
+        int? sdkPinMajor,
+        string? globalJson,
+        int runtimeMajor)
     {
         List<string> classified = productFrameworks.Where(framework => !IsFramework(framework))
             .ToList();
@@ -43,7 +49,8 @@ internal static class SpecFramework
             return productFrameworks.OrderByDescending(FrameworkVersion)
                 .First();
 
-        if (sdkPinMajor is not { } pin || pin >= DefaultMajor) return Default;
+        if (sdkPinMajor is not { } pin || pin >= DefaultMajor)
+            return Modern(classified, Math.Min(runtimeMajor, sdkPinMajor ?? int.MaxValue));
 
         if (pin < MinimumSdkMajor)
             throw new UserErrorException(
@@ -51,6 +58,62 @@ internal static class SpecFramework
                 + "Pass --framework with a framework your SDK can build, or run init outside the pin.");
 
         return string.Create(CultureInfo.InvariantCulture, $"net{pin}.0");
+    }
+
+    // The newest major at or below the ceiling, raised to 10, with a platform suffix when every platform framework
+    // at or below that major names the same platform: a platform spec references both its platform's projects and
+    // the bare ones, and a bare spec references no platform project (NU1201). Of that platform's suffixes the one
+    // with the highest version wins, since it references the lower ones.
+    private static string Modern(IEnumerable<string> frameworks, int ceiling)
+    {
+        List<(int Major, string Platform)> modern = frameworks.Select(ModernParts)
+            .OfType<(int Major, string Platform)>()
+            .ToList();
+        int major = modern.Select(parts => parts.Major)
+            .Where(candidate => candidate <= ceiling)
+            .Append(DefaultMajor)
+            .Max();
+        List<IGrouping<string, string>> platforms = modern
+            .Where(parts => parts.Major <= major && parts.Platform.Length > 0)
+            .Select(parts => parts.Platform)
+            .GroupBy(PlatformName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        string platform = platforms.Count == 1 ? platforms[0].MaxBy(PlatformVersion)! : "";
+
+        return string.Create(CultureInfo.InvariantCulture, $"net{major}.0{platform}");
+    }
+
+    // "-windows10.0.19041.0" names "windows".
+    private static string PlatformName(string platform)
+    {
+        return new string(platform.Skip(1)
+            .TakeWhile(char.IsAsciiLetter)
+            .ToArray());
+    }
+
+    // "-windows10.0.19041.0" is 10.0.19041.0; a suffix with no version, or one that does not parse, is the lowest.
+    private static Version PlatformVersion(string platform)
+    {
+        string digits = platform[(1 + PlatformName(platform).Length)..];
+        return Version.TryParse(digits, out Version? version) ? version : new Version(0, 0);
+    }
+
+    // net5.0 and later as their major and platform suffix ("-windows10.0.19041.0", or ""), or null for any other
+    // framework.
+    private static (int Major, string Platform)? ModernParts(string framework)
+    {
+        if (!framework.StartsWith("net", StringComparison.Ordinal)) return null;
+
+        int dot = framework.IndexOf('.', StringComparison.Ordinal);
+        if (dot < 0) return null;
+
+        string digits = framework[3..dot];
+        if (!int.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out int major) || major < 5)
+            return null;
+
+        int dash = framework.IndexOf('-', StringComparison.Ordinal);
+        string platform = dash < 0 ? "" : framework[dash..];
+        return (major, platform);
     }
 
     /// <summary>

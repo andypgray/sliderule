@@ -43,7 +43,7 @@ FAIL cli/no-stdout — The Host layer must not use `Console.Out`, `Console.Write
   because: Stdout is a protocol channel here — the MCP server speaks JSON-RPC over it and CLI output flows through System.CommandLine's console — so a direct Console write corrupts the wire and is invisible to the in-process tests.
   citation: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#stdio
   fix: Write CLI output through the command's InvocationConfiguration console; route server diagnostics to the logger or Console.Error.
-  subject: 270 types, 2 generated
+  subject: 271 types, 2 generated
   src/SlideRule.Cli/Rendering/ProgressPrinter.cs:10 — SlideRule.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
   src/SlideRule.Cli/Rendering/ProgressPrinter.cs:15 — SlideRule.Cli.Rendering.ProgressPrinter uses System.Console.WriteLine()
 ```
@@ -136,9 +136,9 @@ The persisted cache has one directory per solution. After an edit, a cached chec
 
 ## .NET Framework
 
-The tool runs on .NET 10. Your application and its spec can target .NET Framework.
+The tool runs on the newest .NET runtime installed, 10 or later. Your application and its spec can target .NET Framework.
 
-A spec project can target `net48` at its default C# 7.3 language version and build on any OS, including Linux. It references the `netstandard2.0` `SlideRule` contract package. The CLI loads its built DLL into a collectible, isolated `AssemblyLoadContext` and builds the model on .NET 10. A `typeof()` anchor on a product type works when that runtime can load the type and its dependencies. A type implementing `System.Web.IHttpHandler` cannot load there; the resulting `TypeLoadException` becomes a user error naming the unavailable type. Use a namespace pattern for such types. Patterns require no assembly load, even from a spec that cannot reference `System.Data`. `DerivedFrom` also accepts a base type's fully qualified name as a string when the spec cannot compile against it.
+A spec project can target `net48` at its default C# 7.3 language version and build on any OS, including Linux. It references the `netstandard2.0` `SlideRule` contract package. The CLI loads its built DLL into a collectible, isolated `AssemblyLoadContext` and builds the model on the runtime the tool runs on. A `typeof()` anchor on a product type works when that runtime can load the type and its dependencies. A type implementing `System.Web.IHttpHandler` cannot load there; the resulting `TypeLoadException` becomes a user error naming the unavailable type. Use a namespace pattern for such types. Patterns require no assembly load, even from a spec that cannot reference `System.Data`. `DerivedFrom` also accepts a base type's fully qualified name as a string when the spec cannot compile against it.
 
 Non-SDK-style projects load through Roslyn's `net472` Framework build host. These include projects in the 2003 MSBuild XML namespace, with explicit `<Reference>` items and a `Properties\AssemblyInfo.cs` compile item. A check reports at `file:line` even from an unbuilt tree:
 
@@ -175,7 +175,7 @@ The seventh example uses Microsoft's reference application:
 
 ## Installing
 
-Install `SlideRule.Cli` as a .NET global tool on a machine with a .NET 10 SDK. The [requirements](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#requirements) cover setup, including repositories whose `global.json` pins an SDK below 10.
+Install `SlideRule.Cli` as a .NET global tool on a machine with a .NET 10 or later SDK. The [requirements](https://github.com/andypgray/sliderule/blob/main/GETTING-STARTED.md#requirements) cover setup, including repositories whose `global.json` pins an SDK below 10.
 
 The [command-line reference](https://github.com/andypgray/sliderule/blob/main/CLI.md) describes every command's options and exit codes, including failed loads and filtered solutions.
 

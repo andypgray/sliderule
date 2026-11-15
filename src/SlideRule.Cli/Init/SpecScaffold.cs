@@ -62,12 +62,23 @@ internal sealed class SpecScaffold
     /// <summary>
     ///     The csproj, referencing <paramref name="version" /> and targeting <paramref name="framework" />.
     /// </summary>
+    /// <remarks>
+    ///     A Windows framework also enables Windows targeting: off Windows, a versioned Windows framework or a
+    ///     referenced Windows Desktop project otherwise fails the spec's build with NETSDK1100.
+    /// </remarks>
     internal string Project(string version, string framework)
     {
+        var frameworks = $"<TargetFrameworks>{framework}</TargetFrameworks>";
+        if (framework.Contains("-windows", StringComparison.OrdinalIgnoreCase))
+            frameworks += WindowsTargeting;
+
         return ProjectTemplate
             .Replace(ArchPrompts.ScaffoldVersionPlaceholder, $"Version=\"{version}\"")
-            .Replace(FrameworkLiteral, $"<TargetFrameworks>{framework}</TargetFrameworks>");
+            .Replace(FrameworkLiteral, frameworks);
     }
+
+    // The template's property indentation must agree with the recipe's csproj fence.
+    private const string WindowsTargeting = "\n        <EnableWindowsTargeting>true</EnableWindowsTargeting>";
 
     /// <summary>
     ///     The spec class in <paramref name="namespace" />, under <paramref name="header" /> when the repository

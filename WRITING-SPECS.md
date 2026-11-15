@@ -191,7 +191,7 @@ arch.Scope("model/prose-fragments")
 
 ## The spec project
 
-A rule that names a type with `typeof()` needs a spec project that can reference that type's project, so the projects a spec names determine its target framework. The contract package is `netstandard2.0`, so a spec project can target anything from `net48` up. A spec project on `net48` or `netstandard2.0` compiles at C# 7.3 unless it sets `<LangVersion>latest</LangVersion>`.
+A rule that names a type with `typeof()` needs a spec project that can reference that type's project, so the projects a spec names determine its target framework. The contract package is `netstandard2.0`, so a spec project can target anything from `net48` up. A spec project on `net48` or `netstandard2.0` compiles at C# 7.3 unless it sets `<LangVersion>latest</LangVersion>`. A spec over projects on `net11.0` targets `net11.0` too, because a `net10.0` project cannot reference them. The tool runs on the newest .NET runtime installed, so it loads that spec. It refuses a spec built for a newer .NET than the runtime it runs on, with a message naming both versions.
 
 A .NET shared-framework type, such as an ASP.NET Core or WPF type, is never copied into a class library's output. A type that exists only on .NET Framework, such as one from `System.Web`, cannot load in the tool's .NET host. Name either by string or by namespace pattern. A spec that names NuGet package types with `typeof()` sets `<CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>`, which copies the package assemblies next to the spec DLL, where the checker loads them from. Without it, `check` fails to load the spec and names the setting.
 

@@ -95,7 +95,8 @@ internal static class CommandFactory
         {
             Description =
                 "The spec project's target framework. Defaults to the highest .NET Framework one on an estate "
-                + "that targets only .NET Framework, otherwise net10.0, or the pinned SDK's netN.0 under a "
+                + "that targets only .NET Framework, otherwise the newest netN.0 the projects target, at least "
+                + "net10.0 and at most the runtime sliderule runs on, or the pinned SDK's netN.0 under a "
                 + "global.json that pins an SDK below 10."
         };
         Option<string?> outputDirectory = new("--output")

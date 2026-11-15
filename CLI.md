@@ -87,8 +87,9 @@ Options:
                                  refuses (CS0118).
   --framework <framework>        The spec project's target framework. Defaults to the highest .NET
                                  Framework one on an estate that targets only .NET Framework,
-                                 otherwise net10.0, or the pinned SDK's netN.0 under a global.json
-                                 that pins an SDK below 10.
+                                 otherwise the newest netN.0 the projects target, at least net10.0
+                                 and at most the runtime sliderule runs on, or the pinned SDK's
+                                 netN.0 under a global.json that pins an SDK below 10.
   --output <dir>                 The folder the spec project's own folder goes in. Defaults to
                                  arch/ beside the solution.
   --from-graph                   Also write a layer per product project and, for each, a rule that
@@ -104,9 +105,9 @@ Options:
 
 It runs `dotnet sln <solution> add <csproj>`, then writes a [settings file](#the-settings-file) naming the solution and spec project. That file goes at the containing git work-tree root, or in the solution directory outside a work tree. It then builds the spec with `dotnet build` and runs `check` with it, returning the check's exit code. Restore the solution first. The initial survey uses the same loading rules as `graph`; failed loads or restores stop it with exit 2 unless you pass `--allow-workspace-diagnostics`.
 
-The csproj references `SlideRule` at the running tool's informational version before the first `+`. `sliderule --version` prints the full version, which can include a `+<commit>` suffix. The scaffold sets `ManagePackageVersionsCentrally` and `IsPackable` to `false`, and clears an inherited `TargetFramework` before setting `TargetFrameworks`. These settings prevent inherited central versioning, package validation or framework settings from causing NU1008, NU1101 or NETSDK1005. It also sets `GenerateDocumentationFile` to `true` and adds CS1591 to `NoWarn`, so neither an inherited documentation setting (CS1591) nor IDE0005 enforced in the build (EnableGenerateDocumentationFile) fails it. An applicable `.editorconfig`'s `file_header_template` becomes `//` comment lines above the spec class; blank or `unset` values add no header.
+The csproj references `SlideRule` at the running tool's informational version before the first `+`. `sliderule --version` prints the full version, which can include a `+<commit>` suffix. The scaffold sets `ManagePackageVersionsCentrally` and `IsPackable` to `false`, and clears an inherited `TargetFramework` before setting `TargetFrameworks`. These settings prevent inherited central versioning, package validation or framework settings from causing NU1008, NU1101 or NETSDK1005. A Windows framework such as `net11.0-windows` also gets `EnableWindowsTargeting` set to `true`, so the spec builds off Windows (NETSDK1100). It also sets `GenerateDocumentationFile` to `true` and adds CS1591 to `NoWarn`, so neither an inherited documentation setting (CS1591) nor IDE0005 enforced in the build (EnableGenerateDocumentationFile) fails it. An applicable `.editorconfig`'s `file_header_template` becomes `//` comment lines above the spec class; blank or `unset` values add no header.
 
-Without `--framework`, a solution targeting only .NET Framework gets its highest framework, such as `net48`. Other solutions get `net10.0`, subject to the nearest `global.json` at or above the solution directory. If it pins an SDK below 10, the target is that SDK's `netN.0`, unless `rollForward` is `major` or `latestMajor`. In this case, a pin below SDK 6 exits 2 because the class requires C# 10.
+Without `--framework`, a solution targeting only .NET Framework gets its highest framework, such as `net48`. Other solutions get the newest `netN.0` their projects target, at least `net10.0` and at most the major of the runtime the tool runs on, with the platform suffix their projects share, such as `net11.0-windows`. The nearest `global.json` at or above the solution directory also caps it at the pinned SDK's major. If it pins an SDK below 10, the target is that SDK's `netN.0`, unless `rollForward` is `major` or `latestMajor`. In this case, a pin below SDK 6 exits 2 because the class requires C# 10.
 
 `init` exits 2 before writing any file in these cases:
 

@@ -68,6 +68,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The CLI and the MCP server run on the newest .NET runtime installed, 10 or later, where they ran on .NET 10
+  whenever it was installed. Where no `global.json` pins an SDK, the MSBuild they load solutions with in process is
+  therefore the newest SDK's. Without `--framework`, `init` gives the spec project the newest `netN.0` the product
+  projects target, at least `net10.0` and at most the runtime the tool runs on, with the platform suffix the
+  projects share at its highest version (`net11.0-windows`), so a spec on a .NET 11 estate can reference its
+  projects, and sets `EnableWindowsTargeting` on a Windows framework so the spec builds off Windows. The
+  `derive_spec` recipe gives the same framework rule.
+
 - `explain <rule-id>` and `baseline rename` open no workspace when the cache records the spec's resolution, even
   after a source edit leaves some projects to re-extract. They read only the spec, and the record holds only what
   determines which project builds it. A convention or `.csproj` spec used to load the edited projects first.
@@ -100,6 +108,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- A spec project targeting `net11.0` loads and checks on a machine that also holds the .NET 10 runtime, where it
+  failed with "Could not load file or assembly 'System.Runtime, Version=11.0.0.0'" and a remedy that did not apply.
+  A spec built for a newer .NET than the runtime the tool runs on is refused before its types load, with a message
+  naming both versions and the runtime to install.
 - The CLI, the MCP server and the xUnit adapter now read C# 15 code and run the .NET 11 SDK's source
   generators. They carry Microsoft.CodeAnalysis 5.12.0, up from 5.9.0, which read C# 15 as C# 14 and could not
   load a generator built against a newer compiler. A union was left out of the model, and on a machine whose
