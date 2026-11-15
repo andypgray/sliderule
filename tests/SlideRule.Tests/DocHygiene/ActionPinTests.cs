@@ -11,7 +11,8 @@ namespace SlideRule.Tests.DocHygiene;
 ///     A tag or a branch is a pointer its owner can move, so a step that names one runs whatever the owner
 ///     points it at next, with this repository's token in reach. SECURITY.md promises SHA pins, and Scorecard's
 ///     Pinned-Dependencies check reads the workflows for them, but nothing outside this test reads the action
-///     metadata at the root, whose steps run inside every adopter's job.
+///     metadata at the root, whose steps run inside every adopter's job, or the workflows' local actions, whose
+///     calls Scorecard skips.
 /// </remarks>
 public sealed class ActionPinTests
 {
@@ -47,10 +48,11 @@ public sealed class ActionPinTests
             .Order(StringComparer.Ordinal)
             .ToArray();
 
-        // Assert: the arm above passes over a file it cannot read, so the action metadata and the CI workflow are
-        // each held to contributing steps. A rewrite into a form this scan cannot follow, or the metadata
-        // dropping out of the scanned set, fails here.
+        // Assert: the arm above passes over a file it cannot read, so the action metadata, the SDK setup action and
+        // the CI workflow are each held to contributing steps. A rewrite into a form this scan cannot follow, or a
+        // metadata file dropping out of the scanned set, fails here.
         files.ShouldContain(TrackedFiles.ActionMetadata);
+        files.ShouldContain(TrackedFiles.SdkSetupAction);
         files.ShouldContain(TrackedFiles.CiWorkflow);
     }
 

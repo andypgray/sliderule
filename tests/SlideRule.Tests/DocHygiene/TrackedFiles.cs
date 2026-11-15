@@ -39,6 +39,12 @@ internal static class TrackedFiles
     /// <summary>The metadata file of the GitHub Action this repository publishes, at its root.</summary>
     internal const string ActionMetadata = "action.yml";
 
+    /// <summary>The directory the workflows' local actions sit in, one subdirectory each, with its trailing slash.</summary>
+    internal const string LocalActionDirectory = ".github/actions/";
+
+    /// <summary>The metadata file of the local action every CI job installs its .NET SDK through.</summary>
+    internal const string SdkSetupAction = LocalActionDirectory + "setup-sdk/" + ActionMetadata;
+
     // How much of a file the text/binary sniff reads — the same window `git grep -I` looks at.
     private const int SniffBytes = 8192;
 
@@ -66,7 +72,8 @@ internal static class TrackedFiles
             .ToArray());
 
     private static readonly Lazy<IReadOnlyList<string>> LazyActionSteps =
-        new(() => LazyWorkflows.Value.Concat(LazyAll.Value.Where(static path => path == ActionMetadata))
+        new(() => LazyWorkflows.Value
+            .Concat(LazyAll.Value.Where(static path => path == ActionMetadata || IsLocalAction(path)))
             .ToArray());
 
     private static readonly Lazy<IReadOnlyList<string>> LazyProjects =
@@ -98,8 +105,9 @@ internal static class TrackedFiles
     public static IReadOnlyList<string> Workflows => LazyWorkflows.Value;
 
     /// <summary>
-    ///     Every tracked file whose steps GitHub runs: the workflows and the action metadata. Scorecard reads only
-    ///     the workflows, so a gate over the steps reads this set.
+    ///     Every tracked file whose steps GitHub runs: the workflows, the published action's metadata and the
+    ///     workflows' local actions. Scorecard reads only the workflows, and skips a step that calls a local action,
+    ///     so a gate over the steps reads this set.
     /// </summary>
     public static IReadOnlyList<string> ActionSteps => LazyActionSteps.Value;
 
@@ -125,6 +133,12 @@ internal static class TrackedFiles
     private static bool IsProject(string relativePath)
     {
         return relativePath.EndsWith(".csproj", StringComparison.Ordinal);
+    }
+
+    private static bool IsLocalAction(string relativePath)
+    {
+        return relativePath.StartsWith(LocalActionDirectory, StringComparison.Ordinal)
+               && relativePath.EndsWith("/" + ActionMetadata, StringComparison.Ordinal);
     }
 
     // Text or binary the way `git grep -I` decides it — a NUL byte near the start means binary. An

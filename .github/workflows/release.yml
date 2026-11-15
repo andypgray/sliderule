@@ -49,20 +49,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # The SDK comes from a directory of this job's own. setup-dotnet otherwise lets the newest SDK the
-      # runner image preinstalls win over the one asked for here, so an image update alone could change
-      # the SDK a job builds, tests or packs with.
-      - name: Install .NET into a directory of this job's own
-        shell: bash
-        run: echo "DOTNET_INSTALL_DIR=$RUNNER_TEMP/.dotnet" >> "$GITHUB_ENV"
-
-      - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Check that the job runs SDK 10.0 and no other
-        shell: bash
-        run: bash .github/scripts/check-sdk.sh 10.0
+      - uses: ./.github/actions/setup-sdk
 
       # The tag drives publication, so it must agree with every place the version is
       # declared: the single <Version> in Directory.Build.props (declared once for every

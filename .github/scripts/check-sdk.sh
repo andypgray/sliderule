@@ -7,6 +7,8 @@
 # setup-dotnet lets the newest SDK a runner image preinstalls win over the version a job asks for, so each job
 # installs into a directory of its own and runs this right after setup-dotnet. An SDK outside the named bands
 # means that directory is not the only one dotnet reads, and an image update could change the SDK again.
+# DOTNET_INSTALL_DIR names that directory, and every SDK dotnet lists must sit under it, so a job whose image
+# preinstalls only the bands it asks for still fails when setup-dotnet installed somewhere else.
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
@@ -23,6 +25,10 @@ for band in "$@"; do
     exit 2
   fi
 done
+if [[ -z "${DOTNET_INSTALL_DIR:-}" ]]; then
+  echo "::error::check-sdk.sh needs DOTNET_INSTALL_DIR, the directory setup-dotnet was told to install into." >&2
+  exit 2
+fi
 
 band="$1"
 version="$(dotnet --version | tr -d '\r')"
@@ -45,5 +51,25 @@ if [[ -n "$others" ]]; then
     asked="SDK $band, and ${*:2} beside it,"
   fi
   echo "::error::This job asks for $asked and dotnet also lists: ${others//$'\n'/; }" >&2
+  exit 1
+fi
+
+# dotnet writes the directory with backslashes on Windows, and DOTNET_INSTALL_DIR arrives there as RUNNER_TEMP's
+# backslashed spelling with /.dotnet appended. Neither side fixes the drive letter's case, so both are compared with
+# slashes and case folded.
+fold() {
+  printf '%s' "${1//\\//}" | tr '[:upper:]' '[:lower:]'
+}
+expected="$(fold "$DOTNET_INSTALL_DIR/sdk")"
+elsewhere=""
+while IFS= read -r row; do
+  [[ -n "$row" ]] || continue
+  directory="${row#*\[}"
+  if [[ "$(fold "${directory%]}")" != "$expected" ]]; then
+    elsewhere+="${elsewhere:+; }$row"
+  fi
+done <<< "$sdks"
+if [[ -n "$elsewhere" ]]; then
+  echo "::error::This job installs into $DOTNET_INSTALL_DIR, and dotnet lists SDKs outside it: $elsewhere" >&2
   exit 1
 fi

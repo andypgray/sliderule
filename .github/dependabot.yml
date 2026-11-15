@@ -1,10 +1,14 @@
 # Weekly dependency-update PRs: GitHub Actions pins and NuGet packages.
-# SHA-pinned action versions (see .github/workflows/) are kept current by the
-# github-actions ecosystem; the SECURITY.md pinning promise depends on this file.
+# SHA-pinned action versions (see .github/workflows/ and the local actions under .github/actions/) are kept
+# current by the github-actions ecosystem; the SECURITY.md pinning promise depends on this file.
 version: 2
 updates:
+  # The root covers the workflows and the published action.yml only, so each local action's directory is listed
+  # beside it, by the glob that `directories` accepts and `directory` does not.
   - package-ecosystem: github-actions
-    directory: /
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
     # Dependabot treats each action path as its own dependency, so an ungrouped bump raises one PR

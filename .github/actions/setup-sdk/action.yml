@@ -1,0 +1,41 @@
+# Installs the .NET SDK a CI job builds, tests or packs with, and fails the job when dotnet runs any other.
+#
+# The SDK comes from a directory of the job's own. setup-dotnet otherwise lets the newest SDK the runner image
+# preinstalls win over the one asked for, so an image update alone could change the SDK a job runs. The variable
+# goes through GITHUB_ENV, so every later setup-dotnet in the job, the repository's own action included, installs
+# there too.
+name: Set up the .NET SDK
+description: Installs the .NET SDK into a directory of the job's own and checks that dotnet runs that SDK and no other.
+
+inputs:
+  dotnet-version:
+    description: What setup-dotnet is asked for, one version per line.
+    required: false
+    default: '10.0.x'
+  sdk:
+    description: The SDK band the job runs, such as 10.0.
+    required: false
+    default: '10.0'
+  beside:
+    description: The SDK bands installed beside it, space-separated, or empty for none.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - name: Install .NET into a directory of this job's own
+      shell: bash
+      run: echo "DOTNET_INSTALL_DIR=$RUNNER_TEMP/.dotnet" >> "$GITHUB_ENV"
+
+    - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+      with:
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Check that the job runs the SDK band it asked for and no other
+      shell: bash
+      env:
+        SDK_BAND: ${{ inputs.sdk }}
+        SDK_BESIDE: ${{ inputs.beside }}
+      # SDK_BESIDE is unquoted so an empty value passes no argument.
+      run: bash .github/scripts/check-sdk.sh "$SDK_BAND" $SDK_BESIDE

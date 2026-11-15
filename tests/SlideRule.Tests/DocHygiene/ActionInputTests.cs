@@ -6,15 +6,17 @@ using Xunit;
 namespace SlideRule.Tests.DocHygiene;
 
 /// <summary>
-///     The gate that holds every call of the published action, in the operations guide and in this repository's
-///     CI, to inputs the action declares.
+///     The gate that holds every call of an action this repository declares, the published one in the operations
+///     guide and in this repository's CI and the workflows' local actions in CI, to inputs that action declares.
 /// </summary>
 /// <remarks>
 ///     GitHub runs a step that passes an input its action does not declare, and only warns, so a renamed input
-///     leaves the guide's example running with that setting dropped.
+///     leaves the guide's example running with that setting dropped, and a CI job running with its default.
 /// </remarks>
 public sealed class ActionInputTests
 {
+    private const string PublishedReference = "andypgray/sliderule@";
+
     // An input's key in the metadata: two spaces in, under the top-level inputs map.
     private static readonly Regex InputKey = new(@"^  (?<name>[a-z][a-z0-9-]*):\s*$");
 
@@ -25,41 +27,47 @@ public sealed class ActionInputTests
     public void ActionCalls_InTheGuideAndInCi_PassOnlyDeclaredInputs()
     {
         // Arrange
-        IReadOnlyCollection<string> declared = ShouldReadDeclaredInputs();
         QuotedFence guide = QuotedFence.ShouldFindOne(
-            DocPaths.Operating, "uses: andypgray/sliderule@", "the guide's GitHub workflow");
+            DocPaths.Operating, "uses: " + PublishedReference, "the guide's GitHub workflow");
         IReadOnlyList<Call> calls =
         [
-            .. CallsIn(ActionUses.In(DocPaths.Operating, guide.Lines.ToArray(), guide.Line), "andypgray/sliderule@"),
-            .. CallsIn(ActionUses.In(TrackedFiles.CiWorkflow), "./")
+            .. CallsIn(ActionUses.In(DocPaths.Operating, guide.Lines.ToArray(), guide.Line)),
+            .. CallsIn(ActionUses.In(TrackedFiles.CiWorkflow))
         ];
+        Dictionary<string, IReadOnlyCollection<string>> declared = calls
+            .Select(static call => call.Metadata)
+            .Distinct(StringComparer.Ordinal)
+            .ToDictionary(static metadata => metadata, ShouldReadDeclaredInputs, StringComparer.Ordinal);
 
         // Act
         List<string> undeclared = calls
             .SelectMany(static call => call.Inputs.Select(input => (call, input)))
-            .Where(pair => !declared.Contains(pair.input))
-            .Select(static pair => $"  {pair.call.File}:{pair.call.Line}: {pair.input}")
+            .Where(pair => !declared[pair.call.Metadata].Contains(pair.input))
+            .Select(pair => $"  {pair.call.File}:{pair.call.Line}: {pair.input} ({pair.call.Metadata} declares "
+                            + $"{string.Join(", ", declared[pair.call.Metadata])})")
             .Order(StringComparer.Ordinal)
             .ToList();
 
         // Assert
         calls.Where(static call => call.Inputs.Length > 0)
-            .Select(static call => call.File)
+            .Select(static call => $"{call.File} -> {call.Metadata}")
             .Distinct(StringComparer.Ordinal)
             .Order(StringComparer.Ordinal)
             .ToArray()
             .ShouldBe(
-                [TrackedFiles.CiWorkflow, DocPaths.Operating],
-                ignoreOrder: false,
-                customMessage: "each file should call the action with inputs this scan can read");
-        undeclared.ShouldReportNothing(
-            $"Call(s) of the action pass an input {TrackedFiles.ActionMetadata} does not declare (it declares "
-            + $"{string.Join(", ", declared)})");
+                [
+                    $"{TrackedFiles.CiWorkflow} -> {TrackedFiles.SdkSetupAction}",
+                    $"{TrackedFiles.CiWorkflow} -> {TrackedFiles.ActionMetadata}",
+                    $"{DocPaths.Operating} -> {TrackedFiles.ActionMetadata}"
+                ],
+                ignoreOrder: true,
+                customMessage: "each file should call each of these actions with inputs this scan can read");
+        undeclared.ShouldReportNothing("Call(s) of an action pass an input its metadata does not declare");
     }
 
-    private static IReadOnlyCollection<string> ShouldReadDeclaredInputs()
+    private static IReadOnlyCollection<string> ShouldReadDeclaredInputs(string metadata)
     {
-        string[] lines = RepoRoot.ReadLines(TrackedFiles.ActionMetadata);
+        string[] lines = RepoRoot.ReadLines(metadata);
         string[] inputs = lines
             .SkipWhile(static line => line != "inputs:")
             .Skip(1)
@@ -68,17 +76,30 @@ public sealed class ActionInputTests
             .Where(static match => match.Success)
             .Select(static match => match.Groups["name"].Value)
             .ToArray();
-        inputs.ShouldNotBeEmpty($"No inputs were read from {TrackedFiles.ActionMetadata}.");
+        inputs.ShouldNotBeEmpty($"No inputs were read from {metadata}.");
 
         return inputs;
     }
 
-    // Each step whose action reference starts with the prefix, with the keys of the with map in its body.
-    private static IEnumerable<Call> CallsIn(IEnumerable<ActionUse> uses, string reference)
+    // Each step that calls an action declared here, with the metadata file that declares it and the keys of its with
+    // map. A local reference names the directory its metadata sits in, the checkout root for the published action.
+    private static IEnumerable<Call> CallsIn(IEnumerable<ActionUse> uses)
     {
         return uses
-            .Where(use => use.Reference.StartsWith(reference, StringComparison.Ordinal))
-            .Select(static use => new Call(use.File, use.Line, WithKeysOf(use.Body)));
+            .Select(static use => (use, metadata: MetadataOf(use.Reference)))
+            .Where(static pair => pair.metadata is not null)
+            .Select(static pair => new Call(pair.use.File, pair.use.Line, pair.metadata!, WithKeysOf(pair.use.Body)));
+    }
+
+    private static string? MetadataOf(string reference)
+    {
+        if (reference.StartsWith(PublishedReference, StringComparison.Ordinal)) return TrackedFiles.ActionMetadata;
+
+        if (!reference.StartsWith("./", StringComparison.Ordinal)) return null;
+
+        string directory = reference[2..].TrimEnd('/');
+
+        return directory.Length == 0 ? TrackedFiles.ActionMetadata : $"{directory}/{TrackedFiles.ActionMetadata}";
     }
 
     private static string[] WithKeysOf(string[] body)
@@ -97,5 +118,5 @@ public sealed class ActionInputTests
             .ToArray();
     }
 
-    private sealed record Call(string File, int Line, string[] Inputs);
+    private sealed record Call(string File, int Line, string Metadata, string[] Inputs);
 }
