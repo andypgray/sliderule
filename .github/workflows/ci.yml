@@ -35,9 +35,21 @@ jobs:
         with:
           persist-credentials: false
 
+      # The SDK comes from a directory of this job's own. setup-dotnet otherwise lets the newest SDK the
+      # runner image preinstalls win over the one asked for here, so an image update alone could change
+      # the SDK a job builds, tests or packs with. The variable goes through GITHUB_ENV, so every later
+      # setup-dotnet in the job, the repository's own action included, installs there too.
+      - name: Install .NET into a directory of this job's own
+        shell: bash
+        run: echo "DOTNET_INSTALL_DIR=$RUNNER_TEMP/.dotnet" >> "$GITHUB_ENV"
+
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: '10.0.x'
+
+      - name: Check that the job runs SDK 10.0 and no other
+        shell: bash
+        run: bash .github/scripts/check-sdk.sh 10.0
 
       # Relock for Dependabot NuGet PRs, so everything below tests the bump; the script says why. The shell
       # is named so the Windows legs run it under Git Bash, as every Windows step here does, rather than
@@ -198,9 +210,17 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Install .NET into a directory of this job's own
+        shell: bash
+        run: echo "DOTNET_INSTALL_DIR=$RUNNER_TEMP/.dotnet" >> "$GITHUB_ENV"
+
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: '10.0.x'
+
+      - name: Check that the job runs SDK 10.0 and no other
+        shell: bash
+        run: bash .github/scripts/check-sdk.sh 10.0
 
       # Relock for Dependabot NuGet PRs, so the pack below is of the bump rather than of a failed restore.
       - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
@@ -1773,9 +1793,17 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - name: Install .NET into a directory of this job's own
+        shell: bash
+        run: echo "DOTNET_INSTALL_DIR=$RUNNER_TEMP/.dotnet" >> "$GITHUB_ENV"
+
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: '10.0.x'
+
+      - name: Check that the job runs SDK 10.0 and no other
+        shell: bash
+        run: bash .github/scripts/check-sdk.sh 10.0
       # Relock for Dependabot NuGet PRs, so the build below is of the bump. Uncommitted, because the
       # action's SARIF upload names HEAD as the analysed commit, and code scanning refuses a commit that
       # was never pushed.
@@ -1894,9 +1922,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install .NET into a directory of this job's own
+        shell: bash
+        run: echo "DOTNET_INSTALL_DIR=$RUNNER_TEMP/.dotnet" >> "$GITHUB_ENV"
+
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: '10.0.x'
+
+      - name: Check that the job runs SDK 10.0 and no other
+        shell: bash
+        run: bash .github/scripts/check-sdk.sh 10.0
       # A Directory.Build.props and .targets of its own keep the repository's packaging props off the scaffold.
       - name: Scaffold a spec project on the released package, below the repository root
         shell: bash
@@ -1998,9 +2034,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install .NET into a directory of this job's own
+        shell: bash
+        run: echo "DOTNET_INSTALL_DIR=$RUNNER_TEMP/.dotnet" >> "$GITHUB_ENV"
+
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: '10.0.x'
+
+      - name: Check that the job runs SDK 10.0 and no other
+        shell: bash
+        run: bash .github/scripts/check-sdk.sh 10.0
       # Relock for Dependabot NuGet PRs, so the builds below are of the bump.
       - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
         run: bash .github/scripts/relock.sh
@@ -2116,9 +2160,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install .NET into a directory of this job's own
+        shell: bash
+        run: echo "DOTNET_INSTALL_DIR=$RUNNER_TEMP/.dotnet" >> "$GITHUB_ENV"
+
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: '10.0.x'
+
+      - name: Check that the job runs SDK 10.0 and no other
+        shell: bash
+        run: bash .github/scripts/check-sdk.sh 10.0
       # Relock for Dependabot NuGet PRs, so the builds below are of the bump.
       - name: Regenerate NuGet lock files (Dependabot NuGet PRs)
         run: bash .github/scripts/relock.sh
@@ -2166,9 +2218,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Install .NET into a directory of this job's own
+        shell: bash
+        run: echo "DOTNET_INSTALL_DIR=$RUNNER_TEMP/.dotnet" >> "$GITHUB_ENV"
+
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           dotnet-version: '10.0.x'
+
+      - name: Check that the job runs SDK 10.0 and no other
+        shell: bash
+        run: bash .github/scripts/check-sdk.sh 10.0
       # CI: '' for the same reason as .github/scripts/relock.sh empties it: in locked mode this restore
       # would fail rather than rewrite the files this job exists to compare. The remedy is a command
       # rather than an artifact, so the summary carries the fix and nothing is uploaded.
