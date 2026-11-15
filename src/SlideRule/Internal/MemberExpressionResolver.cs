@@ -72,9 +72,16 @@ internal static class MemberExpressionResolver
                 // whose real receiver is Arguments[0], redirected so the parameter check sees it (the §4.5
                 // ReducedFrom parity). In the static form an extension is anchored like any other static call
                 // (its declaring static class), so no redirect.
+                // The compiler refuses an extension property in an expression tree (CS9296), yet compiles a call
+                // spelling its accessor's emitted static method, which anchors the property, or for an extension
+                // indexer is the indexer accessor the SpecialName check refuses.
+                PropertyInfo? extensionProperty = ExtensionGroupings.PropertyImplementedBy(call.Method);
+                if (extensionProperty?.GetIndexParameters().Length > 0) return Poison(owner, SpecialName, location);
+
                 Expression? methodReceiver = instanceForm && IsExtensionCall(call) ? call.Arguments[0] : call.Object;
+                string name = extensionProperty?.Name ?? call.Method.Name;
                 return ClassifyReceiver(owner, methodReceiver, instanceForm, lambda, location)
-                       ?? Anchor(owner, call.Method.DeclaringType!, call.Method.Name, location);
+                       ?? Anchor(owner, call.Method.DeclaringType!, name, location);
 
             case MemberExpression { Member: PropertyInfo or FieldInfo } member:
                 return ClassifyReceiver(owner, member.Expression, instanceForm, lambda, location)

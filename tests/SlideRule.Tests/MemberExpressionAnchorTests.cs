@@ -1,5 +1,10 @@
 using System.Reflection;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
+using SlideRule.Tests.Checking.MemberTargets;
+using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests;
@@ -229,6 +234,96 @@ public class MemberExpressionAnchorTests
         member.DeclaringType.ShouldBe(typeof(AnchorWidgetExtensions));
         member.Name.ShouldBe("Doubled");
         member.IsMethod.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Member_ExtensionBlockMethodCall_AnchorsDeclaringStaticClass()
+    {
+        // A block method's call lowers to the static method the compiler emits for it, carrying [Extension].
+        Member member = new Arch().Member<IEnumerable<int>>(values => values.Total());
+
+        member.DeclaringType.ShouldBe(typeof(Sequences));
+        member.Name.ShouldBe("Total");
+        member.IsMethod.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Member_ExtensionPropertyAccessorCall_AnchorsTheProperty()
+    {
+        // The explicit accessor spelling is the one expression an extension property can appear in, since the
+        // compiler refuses the property's own (CS9296), so it must survive invoke-as-extension cleanup.
+        int[] values = [];
+        // ReSharper disable once InvokeAsExtensionMember
+        Member member = new Arch().Member(() => Sequences.get_Doubled(values));
+
+        member.DeclaringType.ShouldBe(typeof(Sequences));
+        member.Name.ShouldBe("Doubled");
+        member.IsMethod.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Member_GenericExtensionPropertyAccessorCall_AnchorsTheProperty()
+    {
+        int[] values = [];
+        // ReSharper disable once InvokeAsExtensionMember
+        Member member = new Arch().Member(() => AnchorGenericShapes.get_Tally(values));
+
+        member.DeclaringType.ShouldBe(typeof(AnchorGenericShapes));
+        member.Name.ShouldBe("Tally");
+        member.IsMethod.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Member_ExtensionPropertySetterCall_AnchorsTheProperty()
+    {
+        var widget = new AnchorWidget();
+        // ReSharper disable once InvokeAsExtensionMember
+        Member member = new Arch().Member(() => AnchorSetters.set_Level(widget, 1));
+
+        member.DeclaringType.ShouldBe(typeof(AnchorSetters));
+        member.Name.ShouldBe("Level");
+        member.IsMethod.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Member_OrdinaryMethodNamedLikeAnAccessor_AnchorsTheMethod()
+    {
+        // get_Size over int[,] shares the name of Size's accessor over int[] and is a method of its own.
+        var matrix = new int[1, 1];
+        Member member = new Arch().Member(() => AnchorShapes.get_Size(matrix));
+
+        member.DeclaringType.ShouldBe(typeof(AnchorShapes));
+        member.Name.ShouldBe("get_Size");
+        member.IsMethod.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Member_ExtensionPropertyAccess_IsRefusedByTheCompiler()
+    {
+        CSharpCompilation compilation = CompilationFactory.CreateCompilation("Spec", TrustedPlatform.References, ("Spec.cs", """
+                                                                                                                             using System.Collections.Generic;
+                                                                                                                             using SlideRule;
+                                                                                                                             public static class Sequences
+                                                                                                                             {
+                                                                                                                                 extension(IEnumerable<int> values)
+                                                                                                                                 {
+                                                                                                                                     public int Doubled => 0;
+                                                                                                                                 }
+                                                                                                                             }
+                                                                                                                             public static class Spec
+                                                                                                                             {
+                                                                                                                                 public static void Define(Arch arch, IEnumerable<int> captured)
+                                                                                                                                 {
+                                                                                                                                     arch.Member<IEnumerable<int>>(values => values.Doubled);
+                                                                                                                                     arch.Member(() => captured.Doubled);
+                                                                                                                                 }
+                                                                                                                             }
+                                                                                                                             """));
+
+        compilation.GetDiagnostics(Ct)
+            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(diagnostic => $"{diagnostic.Id} at line {diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1}")
+            .ShouldBe(["CS9296 at line 14", "CS9296 at line 15"]);
     }
 
     [Fact]

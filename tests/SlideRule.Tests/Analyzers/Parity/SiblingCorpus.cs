@@ -234,10 +234,11 @@ internal static class SiblingCorpus
     }
 
     /// <summary>
-    ///     The members of extension blocks, each reached from another project: an extension property, a block
-    ///     method by both spellings, a generic block's method and an extension indexer, beside a classic
-    ///     extension method. Each references the static class that declares it, and the block method is a use
-    ///     of the method a member anchor reflects on.
+    ///     The members of extension blocks, each reached from another project: an extension property by both
+    ///     spellings, a block method by both spellings, a generic block's method and an extension indexer, beside
+    ///     a classic extension method. Each references the static class that declares it, the block method is a
+    ///     use of the method a member anchor reflects on, and the property's accessor called as a static method is
+    ///     a use of the property.
     /// </summary>
     /// <remarks>
     ///     The library sits in the member targets' namespace, so the class the anchor's <c>typeof</c> names is
@@ -270,6 +271,7 @@ internal static class SiblingCorpus
                 + "            + Sequences.Total(values)\n"
                 + "            + 5.Echo()\n"
                 + "            + values[2]\n"
+                + "            + Sequences.get_Doubled(values)\n"
                 + "            + values.Second();\n    }\n}",
                 "Seq.Lib")
             .Subject(
@@ -291,6 +293,10 @@ internal static class SiblingCorpus
                     arch.Rule("extensions/app-never-totals")
                         .Enforce(arch.Namespace("App").MustNotUse(arch.Member(typeof(Sequences), nameof(Sequences.Total))))
                         .Because("A total is the library's to compute, and the app asks the library for one.");
+
+                    arch.Rule("extensions/app-never-doubles")
+                        .Enforce(arch.Namespace("App").MustNotUse(arch.Member(typeof(Sequences), "Doubled")))
+                        .Because("A doubling is the library's to compute, and the app asks the library for one.");
                 });
     }
 

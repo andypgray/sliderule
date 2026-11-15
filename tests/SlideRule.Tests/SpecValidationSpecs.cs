@@ -1713,3 +1713,37 @@ internal sealed class BlankCarriedNameSpec : IArchitectureSpec
             .Because("Reason.");
     }
 }
+
+internal sealed class ExtensionPropertyMemberSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member(typeof(ExtensionTargets), "Doubled"))).Because("Reason.");
+    }
+}
+
+internal sealed class TypoExtensionPropertySpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member(typeof(ExtensionTargets), "Doubles"))).Because("Reason.");
+    }
+}
+
+internal sealed class ExtensionAccessorMemberSpec : IArchitectureSpec
+{
+    public void Define(Arch arch)
+    {
+        arch.Rule("area/rule").Enforce(arch.Types.MustNotUse(arch.Member(typeof(ExtensionTargets), "get_Doubled"))).Because("Reason.");
+    }
+}
+
+// An extension property, which the compiler emits on a nested grouping type, beside the static method it emits for
+// the accessor.
+internal static class ExtensionTargets
+{
+    extension(IEnumerable<int> values)
+    {
+        public int Doubled => 0;
+    }
+}

@@ -435,7 +435,10 @@ internal static class ReferenceWalker
     ///     still rides. Constructors, operators, conversions, local functions and accessors are not uses; a
     ///     reduced extension call is a use of the declaring static class's method, a method declared in an
     ///     extension block is a use of the static method the compiler emits for it (so <c>s.M()</c> and
-    ///     <c>Ext.M(s)</c> are one member), and an accessor already resolves to its property or event.
+    ///     <c>Ext.M(s)</c> are one member), and an accessor already resolves to its property or event. A call
+    ///     spelling the static method emitted for an extension property's accessor (<c>Ext.get_Size(s)</c>) is a use
+    ///     of that property, as <c>s.Size</c> is, and one emitted for an extension indexer's is no use, as no indexer
+    ///     access is.
     /// </summary>
     private static ISymbol? MemberUseOf(ISymbol? symbol, SyntaxNode node)
     {
@@ -448,7 +451,12 @@ internal static class ReferenceWalker
                 if (normalized.ContainingType?.IsExtensionBlock() == true)
                     return ExtensionBlocks.ImplementationOf(normalized) ?? normalized;
 
-                return normalized;
+                return ExtensionBlocks.PropertyImplementedBy(normalized) switch
+                {
+                    null => normalized,
+                    { IsIndexer: true } => null,
+                    var property => property.OriginalDefinition
+                };
 
             case IPropertySymbol property:
                 return property.OriginalDefinition;

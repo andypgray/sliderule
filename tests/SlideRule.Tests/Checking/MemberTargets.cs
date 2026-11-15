@@ -33,11 +33,13 @@ public sealed class Gauge : IGauge
 }
 
 // The compiler emits each method of an extension block as a static method of the declaring class, which is
-// what a member anchor reflects on. MemberUseVerbTests and the parity corpus each re-declare this class.
+// what a member anchor reflects on, and the extension property Doubled on a nested grouping type. MemberUseVerbTests and the parity corpus each re-declare this class.
 public static class Sequences
 {
     extension(IEnumerable<int> values)
     {
+        public int Doubled => 0;
+
         public int Total()
         {
             return 0;

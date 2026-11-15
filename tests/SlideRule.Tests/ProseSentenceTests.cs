@@ -1,5 +1,6 @@
 using Shouldly;
 using SlideRule.Tests.Checking;
+using SlideRule.Tests.Checking.MemberTargets;
 using Xunit;
 
 namespace SlideRule.Tests;
@@ -102,6 +103,13 @@ public class ProseSentenceTests
         // An expression-minted property anchor renders with no parens — identical to the typeof form.
         Checker.Sentence(arch => arch.Types.MustNotUse(arch.Member(() => DateTime.Now)))
             .ShouldBe("Types must not use `DateTime.Now`.");
+    }
+
+    [Fact]
+    public void MustNotUse_ExtensionProperty_RendersNoParens()
+    {
+        Checker.Sentence(arch => arch.Types.MustNotUse(arch.Member(typeof(Sequences), "Doubled")))
+            .ShouldBe("Types must not use `Sequences.Doubled`.");
     }
 
     [Fact]

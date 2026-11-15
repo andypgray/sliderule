@@ -166,15 +166,46 @@ public sealed class CodebaseExtractorMemberEdgeTests
         CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors("""
                                                                             namespace N;
                                                                             public static class Ext { extension(string s) { public int Size => s.Length; } }
-                                                                            public class Caller { public int Go(string t) => t.Size; }
+                                                                            public class Caller
+                                                                            {
+                                                                                public int Go(string t) => t.Size;
+                                                                                public int Again(string t) => Ext.get_Size(t);
+                                                                            }
                                                                             """);
 
-        // A property keeps its own ID, the block's, which the static class's inventory carries too.
+        // A property keeps its own ID, the block's, which the static class's inventory carries too. A call spelling
+        // the static method emitted for its accessor is a use of the property.
         MemberEdge edge = model.MemberEdges("N.Caller")
             .ShouldHaveSingleItem();
         edge.Member.Kind.ShouldBe(MemberKind.Property);
         edge.Member.ContainingType.FullName.ShouldBe("N.Ext");
+        edge.Member.Name.ShouldBe("Size");
         edge.Member.SymbolId.ShouldBe(model.Type("N.Ext").MemberNamed("Size").SymbolId);
+        edge.Sites.Lines()
+            .ShouldBe([5, 6]);
+    }
+
+    [Fact]
+    public void ExtractFromCompilations_ExtensionBlockSetterCalledAsItsStaticMethod_IsAUseOfTheProperty()
+    {
+        CodebaseModel model = CompilationFactory.ShouldExtractWithoutErrors("""
+                                                                            namespace N;
+                                                                            public class Box {}
+                                                                            public static class Ext { extension(Box b) { public int Level { set {} } } }
+                                                                            public class Caller
+                                                                            {
+                                                                                public void Go(Box b) => b.Level = 1;
+                                                                                public void Again(Box b) => Ext.set_Level(b, 1);
+                                                                            }
+                                                                            """);
+
+        MemberEdge edge = model.MemberEdges("N.Caller")
+            .ShouldHaveSingleItem();
+        edge.Member.Kind.ShouldBe(MemberKind.Property);
+        edge.Member.Name.ShouldBe("Level");
+        edge.Member.SymbolId.ShouldBe(model.Type("N.Ext").MemberNamed("Level").SymbolId);
+        edge.Sites.Lines()
+            .ShouldBe([6, 7]);
     }
 
     [Fact]
@@ -404,10 +435,15 @@ public sealed class CodebaseExtractorMemberEdgeTests
                                                                             namespace N;
                                                                             public class Box {}
                                                                             public static class Ext { extension(Box b) { public int this[int i] => i; } }
-                                                                            public class User { public int Go(Box b) => b[0]; }
+                                                                            public class User
+                                                                            {
+                                                                                public int Go(Box b) => b[0];
+                                                                                public int Again(Box b) => Ext.get_Item(b, 0);
+                                                                            }
                                                                             """);
 
-        // An extension indexer references its static class and, as every indexer, is no member use.
+        // An extension indexer references its static class and, as every indexer, is no member use, spelled as an
+        // element access or as the static method emitted for its accessor.
         model.ShouldHaveEdge("N.User", "N.Ext");
         model.MemberEdges("N.User")
             .ShouldBeEmpty();

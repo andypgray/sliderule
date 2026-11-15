@@ -891,10 +891,15 @@ express them: members as constraint **targets**. Member *subjects* are §4.6.
   above); in the static form an extension is anchored like any other static call, so `() => Ext.M(arg)`
   and `() => captured.M()` both name `Ext.M`. A method declared in an extension block is anchored
   as `arch.Member(typeof(Ext), nameof(Ext.M))`, since the class carries the method the compiler
-  emits for it; an extension property leaves no member of its own name on the class, so no anchor
-  reaches it. What the **compiler** already refuses
+  emits for it. An extension property is anchored as `arch.Member(typeof(Ext), "Name")`: it counts
+  as declared on the class whose block declares it, and the static method the compiler emits for its
+  accessor does not, so `arch.Member(typeof(Ext), "get_Name")` is refused. A call spelling that
+  method, `Ext.get_Name(s)`, is a use of the property, as `s.Name` is, and `() => Ext.get_Name(s)`
+  anchors the property. An extension indexer stays outside the surface under either name, and a
+  call spelling its accessor is no use. What the **compiler** already refuses
   needs no runtime handling: events (CS0070), inaccessible members (CS0122), `ref`-returns
-  (CS8153), `ref struct` receivers (CS8640), and statics accessed through an instance (CS0176); a
+  (CS8153), `ref struct` receivers (CS8640), statics accessed through an instance (CS0176), and an
+  extension property in an expression anchor (CS9296); a
   method-group body (`x => x.M` or `() => T.M`) warns CS8974 and is steered to the invocation form
   (`x => x.M()` or `() => T.M()`) at spec build.
 

@@ -190,23 +190,27 @@ public sealed class SiblingCorpusParityTests
     {
         ParitySubject subject = SiblingCorpus.ExtensionMembers();
         const string total = "M:SlideRule.Tests.Checking.MemberTargets.Sequences.Total(System.Collections.Generic.IEnumerable{System.Int32})";
+        const string doubled = "P:SlideRule.Tests.Checking.MemberTargets.Sequences.<G>$1B6B98BEA96E1F36BBDE0BA49FC46705.Doubled";
         const string sequences = "T:SlideRule.Tests.Checking.MemberTargets.Sequences";
 
         // One line per access: the property, the block method reduced and static, the generic block's method,
-        // the indexer and the classic extension method.
+        // the indexer, the property's accessor called as a static method and the classic extension method.
         subject.Expectation.Keys.Describe()
             .ShouldBe(
                 [
+                    $"extensions/app-never-doubles [MemberUse] T:App.Reader -> {doubled} at App.Site.cs:10",
+                    $"extensions/app-never-doubles [MemberUse] T:App.Reader -> {doubled} at App.Site.cs:15",
                     $"extensions/app-never-totals [MemberUse] T:App.Reader -> {total} at App.Site.cs:11",
                     $"extensions/app-never-totals [MemberUse] T:App.Reader -> {total} at App.Site.cs:12",
                     $"extensions/app-not-through-sequences [Reference] T:App.Reader -> {sequences} at App.Site.cs:10",
                     $"extensions/app-not-through-sequences [Reference] T:App.Reader -> {sequences} at App.Site.cs:11",
                     $"extensions/app-not-through-sequences [Reference] T:App.Reader -> {sequences} at App.Site.cs:12",
                     $"extensions/app-not-through-sequences [Reference] T:App.Reader -> {sequences} at App.Site.cs:13",
-                    "extensions/app-not-through-the-helpers [Reference] T:App.Reader -> T:SlideRule.Tests.Checking.MemberTargets.SequenceHelpers at App.Site.cs:15",
+                    $"extensions/app-not-through-sequences [Reference] T:App.Reader -> {sequences} at App.Site.cs:15",
+                    "extensions/app-not-through-the-helpers [Reference] T:App.Reader -> T:SlideRule.Tests.Checking.MemberTargets.SequenceHelpers at App.Site.cs:16",
                     "extensions/app-not-through-the-indexer [Reference] T:App.Reader -> T:SlideRule.Tests.Checking.MemberTargets.SequenceIndexer at App.Site.cs:14"
                 ],
-                "a reference from every extension member access and one use of the block method, both spellings");
+                "a reference from every extension member access, and one use each of the property and the block method, both spellings");
 
         await subject.ShouldHoldOnBothLegsAsync(Ct);
     }

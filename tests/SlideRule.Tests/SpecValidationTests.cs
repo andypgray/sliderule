@@ -372,6 +372,29 @@ public class SpecValidationTests
     }
 
     [Fact]
+    public void MemberNotDeclared_TypoExtensionPropertyName_IsReported()
+    {
+        SpecValidationException ex = ShouldFailToBuild(new TypoExtensionPropertySpec());
+
+        ex.ShouldHaveError(Code.MemberNotDeclared, "area/rule")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1729: 'SlideRule.Tests.ExtensionTargets' does not declare a member named " +
+                      "'Doubles' (used by 'area/rule').");
+    }
+
+    [Fact]
+    public void MemberNotDeclared_ExtensionPropertyAccessorName_IsReported()
+    {
+        // The static method emitted for the accessor is not a member of its own: a use of it is a use of Doubled.
+        SpecValidationException ex = ShouldFailToBuild(new ExtensionAccessorMemberSpec());
+
+        ex.ShouldHaveError(Code.MemberNotDeclared, "area/rule")
+            .Message
+            .ShouldBe("SpecValidationSpecs.cs:1737: 'SlideRule.Tests.ExtensionTargets' does not declare a member named " +
+                      "'get_Doubled' (used by 'area/rule').");
+    }
+
+    [Fact]
     public void MemberNotDeclared_MemberOnBaseType_NamesBaseAndTypeof()
     {
         SpecValidationException ex = ShouldFailToBuild(new BaseTypeMemberSpec());
@@ -466,6 +489,12 @@ public class SpecValidationTests
     public void ValidMemberUse_MustNotUseSpec_BuildsWithoutError()
     {
         Should.NotThrow(() => ArchModelBuilder.Build(new ValidMemberUseSpec()));
+    }
+
+    [Fact]
+    public void ValidMemberUse_ExtensionProperty_BuildsWithoutError()
+    {
+        Should.NotThrow(() => ArchModelBuilder.Build(new ExtensionPropertyMemberSpec()));
     }
 
     [Fact]

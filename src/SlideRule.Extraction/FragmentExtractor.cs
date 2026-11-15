@@ -387,12 +387,6 @@ internal static class FragmentExtractor
         return [implementation.Parameters[0].Type];
     }
 
-    private static IEnumerable<INamedTypeSymbol> ExtensionBlocksOf(INamedTypeSymbol type)
-    {
-        return type.GetTypeMembers()
-            .Where(nested => nested.IsExtensionBlock());
-    }
-
     // Effective visibility (GRAMMAR §4.9): a public member of an internal type is not surface, so it mints
     // nothing.
     private static bool IsEffectivelyPublicMember(ISymbol member)
@@ -768,7 +762,7 @@ internal static class FragmentExtractor
             foreach (SyntaxReference reference in symbol.DeclaringSyntaxReferences)
                 yield return reference;
 
-            foreach (INamedTypeSymbol block in ExtensionBlocksOf(symbol))
+            foreach (INamedTypeSymbol block in ExtensionBlocks.BlocksOf(symbol))
             foreach (SyntaxReference reference in block.DeclaringSyntaxReferences)
                 yield return reference;
         }
@@ -1108,7 +1102,7 @@ internal static class FragmentExtractor
         // records (ReferenceWalker.MemberUseOf) must agree with the one recorded here.
         private static IEnumerable<ISymbol> ExtensionBlockMembersOf(INamedTypeSymbol type)
         {
-            foreach (INamedTypeSymbol block in ExtensionBlocksOf(type))
+            foreach (INamedTypeSymbol block in ExtensionBlocks.BlocksOf(type))
             foreach (ISymbol member in block.GetMembers())
             {
                 if (!IsInventoried(member)) continue;

@@ -86,3 +86,40 @@ internal readonly struct AnchorFahrenheit(double value)
 {
     public double Value { get; } = value;
 }
+
+// An extension property over int[], beside an ordinary method that shares its accessor's name over an array of
+// another rank.
+internal static class AnchorShapes
+{
+    extension(int[] values)
+    {
+        public int Size => values.Length;
+    }
+
+    public static int get_Size(int[,] matrix)
+    {
+        return matrix.Length;
+    }
+}
+
+// A generic block, whose emitted accessor is generic over the block's type parameter.
+internal static class AnchorGenericShapes
+{
+    extension<T>(IEnumerable<T> values)
+    {
+        public int Tally => 0;
+    }
+}
+
+// A setter-only extension property, whose setter exists to be named, never called.
+internal static class AnchorSetters
+{
+    extension(AnchorWidget widget)
+    {
+        public int Level
+        {
+            // ReSharper disable once ValueParameterNotUsed
+            set { }
+        }
+    }
+}

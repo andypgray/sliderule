@@ -131,6 +131,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A registration wrapper declared in an `extension(IServiceCollection services)` block is now followed, so the
   registrations made through it are recorded at each call, whether the call is `services.AddX<T>()` or
   `Ext.AddX<T>(services)`. A wrapper in a block with type parameters is still not followed.
+- `arch.Member(typeof(Ext), "Name")` now names an extension property, so `MustNotUse` can ban one, and a call to
+  its accessor written as `Ext.get_Name(s)` is the same use as `s.Name`. Validation used to refuse the anchor.
+  `arch.Member(typeof(Ext), "get_Name")` is refused instead, and `arch.Member(() => Ext.get_Name(s))` anchors the
+  property. The compiler refuses an extension property in an expression anchor (CS9296).
 - `--spec` given the DLL a declared project builds now checks the solution as `--spec` given that project's
   `.csproj` does. The spec project is left out of the check and its sources are compared with its build, on a
   cold run, a cache hit and in the MCP server. The DLL form used to check the spec project's own code against

@@ -29,6 +29,12 @@ internal static class ExtensionBlocks
         return (int)type.TypeKind == ExtensionTypeKind;
     }
 
+    /// <summary>The extension blocks <paramref name="type" /> declares.</summary>
+    internal static IEnumerable<INamedTypeSymbol> BlocksOf(INamedTypeSymbol type)
+    {
+        return type.GetTypeMembers().Where(IsExtensionBlock);
+    }
+
     /// <summary>
     ///     The definition of the static method the compiler emits for <paramref name="method" />, a method
     ///     declared in an extension block: static, with the receiver, if any, as its first parameter. Null where
@@ -38,6 +44,31 @@ internal static class ExtensionBlocks
     internal static IMethodSymbol? ImplementationOf(IMethodSymbol method)
     {
         return AssociatedImplementation?.Invoke(method.OriginalDefinition)?.OriginalDefinition;
+    }
+
+    /// <summary>
+    ///     The extension-block property that <paramref name="method" /> is the emitted static method of an accessor
+    ///     for, such as the <c>get_Name</c> a caller may spell in place of <c>Name</c>, an extension indexer included,
+    ///     as its definition; null for any other method.
+    /// </summary>
+    internal static IPropertySymbol? PropertyImplementedBy(IMethodSymbol method)
+    {
+        IMethodSymbol definition = method.OriginalDefinition;
+
+        // A screen ahead of the block walk, which a use of every static method would otherwise pay: an emitted
+        // accessor is a static method of a static class, named as its accessor is. The match itself is by symbol.
+        if (AssociatedImplementation is null || definition is not { IsStatic: true, ContainingType.IsStatic: true }) return null;
+        if (!definition.Name.StartsWith("get_", StringComparison.Ordinal) && !definition.Name.StartsWith("set_", StringComparison.Ordinal))
+            return null;
+
+        return BlocksOf(definition.ContainingType)
+            .SelectMany(block => block.GetMembers().OfType<IPropertySymbol>())
+            .FirstOrDefault(property => Implements(property.GetMethod, definition) || Implements(property.SetMethod, definition));
+    }
+
+    private static bool Implements(IMethodSymbol? accessor, IMethodSymbol definition)
+    {
+        return accessor is not null && SymbolEqualityComparer.Default.Equals(ImplementationOf(accessor), definition);
     }
 
     private static Func<IMethodSymbol, IMethodSymbol?>? ImplementationAccessor()
