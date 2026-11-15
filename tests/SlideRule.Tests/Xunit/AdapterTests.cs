@@ -154,6 +154,10 @@ public sealed class AdapterTests
         failure.Message.ShouldContain("BrokenApp.Contracts.csproj");
         failure.Message.ShouldContain("1 project file the solution declares is not on disk");
         failure.Message.ShouldContain("AllowWorkspaceDiagnostics");
+        failure.Message.ShouldContainInOrder(
+            "The workspace load reported:",
+            "BrokenApp.Web.csproj' with message: The referenced project ",
+            "BrokenApp.Contracts.csproj does not exist.");
     }
 
     [Fact]

@@ -80,6 +80,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Workspace_LoadedCompletely` fails. `--allow-workspace-diagnostics` overrides it. Such a project used to lose that
   code from the model with nothing reported. The extraction cache's format changes, so the first run after the
   update extracts every project again.
+- The xUnit adapter's `Workspace_LoadedCompletely` failure, and its skip under `AllowWorkspaceDiagnostics`, list
+  the messages the load reported beneath the projects, under `The workspace load reported:`. These are the lines
+  `check` prints as warnings: why a project failed to load, the NuGet error a restore recorded, the C# version a
+  project asked for, the source generator the compiler could not load. NuGet audit advisories are left out. The
+  test report used to name only the projects.
 - `explain <rule-id>` and `baseline rename` open no workspace when the cache records the spec's resolution, even
   after a source edit leaves some projects to re-extract. They read only the spec, and the record holds only what
   determines which project builds it. A convention or `.csproj` spec used to load the edited projects first.

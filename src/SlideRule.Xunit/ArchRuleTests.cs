@@ -55,8 +55,8 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
     ///     failure fails <see cref="Workspace_LoadedCompletely" /> and every rule case skips, because a
     ///     rule measured over a codebase missing whole projects reports a verdict it never reached.
     ///     Override it to <see langword="true" /> to take the verdicts the partial model does support;
-    ///     <see cref="Workspace_LoadedCompletely" /> then skips, still naming the projects that failed,
-    ///     rather than pass under a name the run cannot vouch for.
+    ///     <see cref="Workspace_LoadedCompletely" /> then skips, still naming the projects that failed and
+    ///     the messages the load reported, rather than pass under a name the run cannot vouch for.
     /// </summary>
     protected virtual bool AllowWorkspaceDiagnostics => false;
 
@@ -186,8 +186,10 @@ public abstract class ArchRuleTests<TSpec> where TSpec : IArchitectureSpec, new(
 
     /// <summary>
     ///     The named answer to a solution that did not load completely. It fails, naming the projects that
-    ///     failed to load, and every rule case then skips rather than report a verdict reached over a
-    ///     partial model. It skips, naming the same projects, when
+    ///     did not load whole and, beneath them, the messages the load reported (the warnings the
+    ///     <c>sliderule</c> command prints, NuGet audit advisories left out), and every rule case then skips
+    ///     rather than report a verdict reached over a partial model. It skips, naming the same projects and
+    ///     messages, when
     ///     <see cref="AllowWorkspaceDiagnostics" /> opted into checking the model as it loaded, and it
     ///     passes silently on a clean load. It also skips on the two runs that are smaller rather than
     ///     wrong (one through a <c>.slnf</c> solution filter, one over a solution declaring projects the

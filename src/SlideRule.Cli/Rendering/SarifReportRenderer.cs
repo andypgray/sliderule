@@ -241,13 +241,10 @@ internal static class SarifReportRenderer
     // never a change to the solution.
     private static SarifNotification CompilerLagNotification(IReadOnlyList<string> laggingProjects)
     {
-        string subject = Plurals.Counted(laggingProjects.Count, "project");
-
         return new SarifNotification(
             new SarifMessage(
-                $"The model is incomplete: the C# {CompilerLagFailures.CarriedHighestLanguageVersion} compiler this "
-                + $"tool carries cannot read all the code of {subject}, so these results were reached against a "
-                + "codebase missing that code: " + string.Join(", ", laggingProjects)),
+                $"The model is incomplete: {IncompleteModelGate.LagClause(laggingProjects.Count)}, so these results "
+                + "were reached against a codebase missing that code: " + string.Join(", ", laggingProjects)),
             ErrorLevel);
     }
 

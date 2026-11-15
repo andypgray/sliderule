@@ -34,6 +34,17 @@ public sealed class IncompleteModelGateAdapterMessagesTests
 
     private const string LaggingProject = "C:/repo/App.Newer/App.Newer.csproj";
 
+    private const string LagEvidence =
+        $"{LaggingProject}: C# version '99' is one the C# 15 compiler this tool carries does not know.";
+
+    private const string OtherLoadLine =
+        "Msbuild failed when processing the file 'C:/repo/App.Broken/App.Broken.csproj' with message: boom";
+
+    private const string AuditAdvisory =
+        "Msbuild failed when processing the file 'C:/repo/App.Broken/App.Broken.csproj' with message: Warning "
+        + "NU1903: Package 'Acme.Json' 1.0.0 has a known high severity vulnerability, "
+        + "https://github.com/advisories/GHSA-0000-0000-0000";
+
     private const string LagLede =
         "the model is incomplete — the C# 15 compiler this tool carries cannot read all the code of 1 project";
 
@@ -154,6 +165,65 @@ public sealed class IncompleteModelGateAdapterMessagesTests
     }
 
     [Fact]
+    public void AdapterRefusal_WithLoadLines_WritesThemBeneathTheCauseBlocksWithNoSecondSelectionNote()
+    {
+        // A test report has no stderr above it, so the lines the CLI prints as warnings ride the failure itself,
+        // after the remedy. The cause block already carries the selection note, so the load lines add none.
+        string refusal = IncompleteModelGate.AdapterRefusal(
+            Diagnostics(lagging: [LaggingProject], loadFailures: [LagEvidence, OtherLoadLine]));
+
+        refusal.ShouldBe(
+            LagLede + ", so every rule test was skipped:\n"
+                    + $"  {LaggingProject}\n"
+                    + $"  {MsBuildBootstrap.SelectionNote()}\n"
+                    + "Every rule would be measured over a codebase missing the code the compiler cannot read — a green "
+                    + "run against a partial model would sign verdicts that were never reached. Update SlideRule to a "
+                    + "release whose compiler reads it (dotnet tool update -g SlideRule.Cli, or a newer SlideRule.Xunit "
+                    + "package), then retry. To check the partial model as it loaded, override AllowWorkspaceDiagnostics "
+                    + "to true on the test class.\n"
+                    + "The workspace load reported:\n"
+                    + $"  {LagEvidence}\n"
+                    + $"  {OtherLoadLine}");
+    }
+
+    [Fact]
+    public void AdapterOptedIn_WithLoadLines_WritesThemBeneathTheCauseBlock()
+    {
+        string skip = IncompleteModelGate.AdapterOptedIn(
+            Diagnostics(lagging: [LaggingProject], loadFailures: [LagEvidence]));
+
+        skip.ShouldBe(
+            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
+            + "the C# 15 compiler this tool carries not reading all the code of 1 project:\n"
+            + $"  {LaggingProject}\n"
+            + "The workspace load reported:\n"
+            + $"  {LagEvidence}");
+    }
+
+    [Fact]
+    public void AdapterRefusal_AuditAdvisoriesOnly_WritesNoLoadBlock()
+    {
+        // An advisory says nothing about how the codebase loaded, and an empty block under a colon lede reads as
+        // truncated output, so a load whose only lines are advisories adds nothing beneath the causes.
+        string refusal = IncompleteModelGate.AdapterRefusal(
+            Diagnostics(failed: [BrokenProject], loadFailures: [AuditAdvisory]));
+
+        refusal.ShouldBe(IncompleteModelGate.AdapterRefusal(Diagnostics(failed: [BrokenProject])));
+    }
+
+    [Fact]
+    public void AdapterRefusal_AuditAdvisoryBesideALoadLine_CarriesOnlyTheLoadLine()
+    {
+        string refusal = IncompleteModelGate.AdapterRefusal(
+            Diagnostics(failed: [BrokenProject], loadFailures: [AuditAdvisory, OtherLoadLine]));
+
+        refusal.ShouldEndWith(
+            "on the test class.\n"
+            + "The workspace load reported:\n"
+            + $"  {OtherLoadLine}");
+    }
+
+    [Fact]
     public void AdapterSkipReason_NamesEveryCauseInTheOnePlaceTheProjectsCanBeRead()
     {
         // Deliberately constant and deliberately short: the projects themselves ride
@@ -166,10 +236,12 @@ public sealed class IncompleteModelGateAdapterMessagesTests
 
     private static WorkspaceDiagnostics Diagnostics(
         IReadOnlyList<string>? failed = null, IReadOnlyList<string>? restoreFailed = null,
-        IReadOnlyList<string>? missing = null, IReadOnlyList<string>? lagging = null)
+        IReadOnlyList<string>? missing = null, IReadOnlyList<string>? lagging = null,
+        IReadOnlyList<string>? loadFailures = null)
     {
         return WorkspaceDiagnostics.None with
         {
+            LoadFailures = loadFailures ?? [],
             FailedProjects = failed ?? [],
             RestoreFailedProjects = restoreFailed ?? [],
             MissingProjects = missing ?? [],

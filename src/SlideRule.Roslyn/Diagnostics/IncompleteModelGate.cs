@@ -54,21 +54,25 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             false,
-            $"error: the model is incomplete — {Missing(diagnostics)}, so check cannot pass:",
-            $"{MissingRemedy}, then retry. To check against the partial model anyway, pass "
-            + "--allow-workspace-diagnostics.",
-            $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so check cannot pass:",
-            "See the warnings above for why, then restore and build the solution (dotnet build). To check "
-            + "against the partial model anyway, pass --allow-workspace-diagnostics.",
-            $"error: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
-            + "so check cannot pass: package references that resolved to nothing produce no edges, so a rule "
-            + "about a package is measured against a model that never saw it:",
-            "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
-            + "warnings above. To check against the partial model anyway, pass --allow-workspace-diagnostics.",
-            $"error: the model is incomplete — {Lagging(diagnostics)}, so check cannot pass: code the compiler "
-            + "cannot read is missing from the model:",
-            $"See the warnings above for why. {LagRemedy}. To check against the partial model anyway, pass "
-            + "--allow-workspace-diagnostics.");
+            new CauseText(
+                $"error: the model is incomplete — {Missing(diagnostics)}, so check cannot pass:",
+                $"{MissingRemedy}, then retry. To check against the partial model anyway, pass "
+                + "--allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so check cannot pass:",
+                "See the warnings above for why, then restore and build the solution (dotnet build). To check "
+                + "against the partial model anyway, pass --allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
+                + "so check cannot pass: package references that resolved to nothing produce no edges, so a rule "
+                + "about a package is measured against a model that never saw it:",
+                "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
+                + "warnings above. To check against the partial model anyway, pass --allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — {Lagging(diagnostics)}, so check cannot pass: code the compiler "
+                + "cannot read is missing from the model:",
+                $"See the warnings above for why. {LagRemedy}. To check against the partial model anyway, pass "
+                + "--allow-workspace-diagnostics."));
     }
 
     /// <summary>
@@ -81,24 +85,28 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             false,
-            $"error: the model is incomplete — {Missing(diagnostics)}, so no baseline was written: a baseline "
-            + "captured from a partial model signs off debt that was never measured:",
-            $"{MissingRemedy}, then retry. To baseline against the partial model anyway, pass "
-            + "--allow-workspace-diagnostics.",
-            $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so no baseline was "
-            + "written: a baseline captured from a partial model signs off debt that was never measured:",
-            "See the warnings above for why, then restore and build the solution (dotnet build). To baseline "
-            + "against the partial model anyway, pass --allow-workspace-diagnostics.",
-            $"error: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
-            + "so no baseline was written: every violation resting on a package edge is absent from this "
-            + "model, so the baseline would sign off debt it could not see:",
-            "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
-            + "warnings above. To baseline against the partial model anyway, pass "
-            + "--allow-workspace-diagnostics.",
-            $"error: the model is incomplete — {Lagging(diagnostics)}, so no baseline was written: a baseline "
-            + "captured from a partial model signs off debt that was never measured:",
-            $"See the warnings above for why. {LagRemedy}. To baseline against the partial model anyway, pass "
-            + "--allow-workspace-diagnostics.");
+            new CauseText(
+                $"error: the model is incomplete — {Missing(diagnostics)}, so no baseline was written: a baseline "
+                + "captured from a partial model signs off debt that was never measured:",
+                $"{MissingRemedy}, then retry. To baseline against the partial model anyway, pass "
+                + "--allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so no baseline was "
+                + "written: a baseline captured from a partial model signs off debt that was never measured:",
+                "See the warnings above for why, then restore and build the solution (dotnet build). To baseline "
+                + "against the partial model anyway, pass --allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
+                + "so no baseline was written: every violation resting on a package edge is absent from this "
+                + "model, so the baseline would sign off debt it could not see:",
+                "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
+                + "warnings above. To baseline against the partial model anyway, pass "
+                + "--allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — {Lagging(diagnostics)}, so no baseline was written: a baseline "
+                + "captured from a partial model signs off debt that was never measured:",
+                $"See the warnings above for why. {LagRemedy}. To baseline against the partial model anyway, pass "
+                + "--allow-workspace-diagnostics."));
     }
 
     /// <summary>The stderr lines <c>status</c> emits before exit 2, after rendering the burndown it has.</summary>
@@ -107,24 +115,28 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             false,
-            $"error: the model is incomplete — {Missing(diagnostics)}, so status cannot report the burndown: "
-            + "a project that is not there contributes no violations, so every count reads low:",
-            $"{MissingRemedy}, then retry. To report against the partial model anyway, pass "
-            + "--allow-workspace-diagnostics.",
-            $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so status cannot report "
-            + "the burndown: unloaded projects contribute no violations, so every count reads low:",
-            "See the warnings above for why, then restore and build the solution (dotnet build). To report "
-            + "against the partial model anyway, pass --allow-workspace-diagnostics.",
-            $"error: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
-            + "so status cannot report the burndown: a rule about a package the model never saw contributes "
-            + "no violations, so every count reads low:",
-            "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
-            + "warnings above. To report against the partial model anyway, pass "
-            + "--allow-workspace-diagnostics.",
-            $"error: the model is incomplete — {Lagging(diagnostics)}, so status cannot report the burndown: "
-            + "code the compiler cannot read contributes no violations, so every count reads low:",
-            $"See the warnings above for why. {LagRemedy}. To report against the partial model anyway, pass "
-            + "--allow-workspace-diagnostics.");
+            new CauseText(
+                $"error: the model is incomplete — {Missing(diagnostics)}, so status cannot report the burndown: "
+                + "a project that is not there contributes no violations, so every count reads low:",
+                $"{MissingRemedy}, then retry. To report against the partial model anyway, pass "
+                + "--allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so status cannot report "
+                + "the burndown: unloaded projects contribute no violations, so every count reads low:",
+                "See the warnings above for why, then restore and build the solution (dotnet build). To report "
+                + "against the partial model anyway, pass --allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
+                + "so status cannot report the burndown: a rule about a package the model never saw contributes "
+                + "no violations, so every count reads low:",
+                "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
+                + "warnings above. To report against the partial model anyway, pass "
+                + "--allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — {Lagging(diagnostics)}, so status cannot report the burndown: "
+                + "code the compiler cannot read contributes no violations, so every count reads low:",
+                $"See the warnings above for why. {LagRemedy}. To report against the partial model anyway, pass "
+                + "--allow-workspace-diagnostics."));
     }
 
     /// <summary>
@@ -136,25 +148,29 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             false,
-            $"error: the model is incomplete — {Missing(diagnostics)}, so nothing was rendered: a card whose "
-            + "project is not on disk cannot be placed and would be dropped from the committed files, and "
-            + "--diagram would draw a survey missing whole projects:",
-            $"{MissingRemedy}, then retry. To render from the partial model anyway, pass "
-            + "--allow-workspace-diagnostics.",
-            $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so nothing was rendered: "
-            + "a card whose project failed to load cannot be placed and would be dropped from the committed "
-            + "files, and --diagram would draw a survey missing whole projects:",
-            "See the warnings above for why, then restore and build the solution (dotnet build). To render "
-            + "from the partial model anyway, pass --allow-workspace-diagnostics.",
-            $"error: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
-            + "so nothing was rendered: a card would be committed describing dependencies the model never "
-            + "resolved, and --diagram would draw a survey with the external edges missing:",
-            "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
-            + "warnings above. To render from the partial model anyway, pass --allow-workspace-diagnostics.",
-            $"error: the model is incomplete — {Lagging(diagnostics)}, so nothing was rendered: a card would be "
-            + "committed describing a model missing the code the compiler cannot read:",
-            $"See the warnings above for why. {LagRemedy}. To render from the partial model anyway, pass "
-            + "--allow-workspace-diagnostics.");
+            new CauseText(
+                $"error: the model is incomplete — {Missing(diagnostics)}, so nothing was rendered: a card whose "
+                + "project is not on disk cannot be placed and would be dropped from the committed files, and "
+                + "--diagram would draw a survey missing whole projects:",
+                $"{MissingRemedy}, then retry. To render from the partial model anyway, pass "
+                + "--allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so nothing was rendered: "
+                + "a card whose project failed to load cannot be placed and would be dropped from the committed "
+                + "files, and --diagram would draw a survey missing whole projects:",
+                "See the warnings above for why, then restore and build the solution (dotnet build). To render "
+                + "from the partial model anyway, pass --allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
+                + "so nothing was rendered: a card would be committed describing dependencies the model never "
+                + "resolved, and --diagram would draw a survey with the external edges missing:",
+                "Restore the solution (dotnet restore) — any NuGet errors behind a restore that ran are in the "
+                + "warnings above. To render from the partial model anyway, pass --allow-workspace-diagnostics."),
+            new CauseText(
+                $"error: the model is incomplete — {Lagging(diagnostics)}, so nothing was rendered: a card would be "
+                + "committed describing a model missing the code the compiler cannot read:",
+                $"See the warnings above for why. {LagRemedy}. To render from the partial model anyway, pass "
+                + "--allow-workspace-diagnostics."));
     }
 
     /// <summary>
@@ -171,19 +187,19 @@ internal static class IncompleteModelGate
         const string optOut = "--allow-workspace-diagnostics renders the block and the cards from the partial "
                               + "model, but never the model file; drop --model to do that.";
         return Message(
-            diagnostics with { RestoreFailedProjects = [], CompilerLagProjects = [] },
+            diagnostics,
             false,
-            $"error: the model is incomplete — {Missing(diagnostics)}, so --model was refused and nothing "
-            + "was rendered: the model file names every project the spec governs, and one written now would "
-            + "leave out exactly the projects that are not there:",
-            $"{MissingRemedy}, then retry. {optOut}",
-            $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so --model was refused "
-            + "and nothing was rendered: the model file names every project the spec governs, and one "
-            + "written now would leave out exactly the projects that failed:",
-            $"See the warnings above for why, then restore and build the solution (dotnet build). {optOut}",
-            "",
+            new CauseText(
+                $"error: the model is incomplete — {Missing(diagnostics)}, so --model was refused and nothing "
+                + "was rendered: the model file names every project the spec governs, and one written now would "
+                + "leave out exactly the projects that are not there:",
+                $"{MissingRemedy}, then retry. {optOut}"),
+            new CauseText(
+                $"error: the model is incomplete — {Failed(diagnostics)} failed to load, so --model was refused "
+                + "and nothing was rendered: the model file names every project the spec governs, and one "
+                + "written now would leave out exactly the projects that failed:",
+                $"See the warnings above for why, then restore and build the solution (dotnet build). {optOut}"),
             null,
-            "",
             null);
     }
 
@@ -217,21 +233,25 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             true,
-            $"the model is incomplete — {Missing(diagnostics)}, so graph cannot survey the codebase:",
-            $"{MissingRemedy}, then retry. To survey the partial model as it loaded, pass "
-            + "--allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph).",
-            $"the model is incomplete — {Failed(diagnostics)} failed to load, so graph cannot survey the "
-            + "codebase:",
-            "Restore and build the solution first (dotnet build), then retry. To survey the partial model as it "
-            + "loaded, pass --allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph).",
-            $"the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, so graph "
-            + "cannot survey the codebase: the external references a survey exists to show are exactly what "
-            + "did not resolve:",
-            "Restore the solution first (dotnet restore), then retry. To survey the partial model as it "
-            + "loaded, pass --allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph).",
-            $"the model is incomplete — {Lagging(diagnostics)}, so graph cannot survey the codebase:",
-            $"{LagRemedy}, then retry. To survey the partial model as it loaded, pass "
-            + "--allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph).");
+            new CauseText(
+                $"the model is incomplete — {Missing(diagnostics)}, so graph cannot survey the codebase:",
+                $"{MissingRemedy}, then retry. To survey the partial model as it loaded, pass "
+                + "--allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph)."),
+            new CauseText(
+                $"the model is incomplete — {Failed(diagnostics)} failed to load, so graph cannot survey the "
+                + "codebase:",
+                "Restore and build the solution first (dotnet build), then retry. To survey the partial model as it "
+                + "loaded, pass --allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph)."),
+            new CauseText(
+                $"the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, so graph "
+                + "cannot survey the codebase: the external references a survey exists to show are exactly what "
+                + "did not resolve:",
+                "Restore the solution first (dotnet restore), then retry. To survey the partial model as it "
+                + "loaded, pass --allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph)."),
+            new CauseText(
+                $"the model is incomplete — {Lagging(diagnostics)}, so graph cannot survey the codebase:",
+                $"{LagRemedy}, then retry. To survey the partial model as it loaded, pass "
+                + "--allow-workspace-diagnostics (CLI) or allowWorkspaceDiagnostics: true (arch_graph)."));
     }
 
     /// <summary>
@@ -257,18 +277,22 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             true,
-            $"No spec project found: {Missing(diagnostics)}, so a project that references SlideRule.dll may "
-            + "be among them:",
-            $"{MissingRemedy}, then retry.",
-            $"No spec project found: {Failed(diagnostics)} failed to load, so a project that references "
-            + "SlideRule.dll may be among them:",
-            "Restore and build the solution first (dotnet restore, dotnet build), then retry.",
-            $"No spec project found: NuGet packages did not resolve for {Unrestored(diagnostics)}, so a "
-            + "project that references SlideRule.dll may have failed to resolve it:",
-            "Restore the solution first (dotnet restore), then retry.",
-            $"No spec project found: {Lagging(diagnostics)}, so a type that marks the spec may be among the code "
-            + "it could not read:",
-            $"{LagRemedy}, then retry.");
+            new CauseText(
+                $"No spec project found: {Missing(diagnostics)}, so a project that references SlideRule.dll may "
+                + "be among them:",
+                $"{MissingRemedy}, then retry."),
+            new CauseText(
+                $"No spec project found: {Failed(diagnostics)} failed to load, so a project that references "
+                + "SlideRule.dll may be among them:",
+                "Restore and build the solution first (dotnet restore, dotnet build), then retry."),
+            new CauseText(
+                $"No spec project found: NuGet packages did not resolve for {Unrestored(diagnostics)}, so a "
+                + "project that references SlideRule.dll may have failed to resolve it:",
+                "Restore the solution first (dotnet restore), then retry."),
+            new CauseText(
+                $"No spec project found: {Lagging(diagnostics)}, so a type that marks the spec may be among the code "
+                + "it could not read:",
+                $"{LagRemedy}, then retry."));
     }
 
     /// <summary>
@@ -284,19 +308,23 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             true,
-            $"caveat: the model is incomplete — {Missing(diagnostics)}, so scope cards from them cannot be "
-            + "placed and \"no architecture scope covers\" cannot be trusted for paths under them:",
-            $"{MissingRemedy}, then retry for a whole answer.",
-            $"caveat: the model is incomplete — {Failed(diagnostics)} failed to load, so scope cards from "
-            + "them cannot be placed and \"no architecture scope covers\" cannot be trusted for paths under "
-            + "them:",
-            "Restore and build the solution first (dotnet build), then retry for a whole answer.",
-            $"caveat: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
-            + "so a rule about a package cannot be trusted to have been measured for paths under them:",
-            "Restore the solution first (dotnet restore), then retry for a whole answer.",
-            $"caveat: the model is incomplete — {Lagging(diagnostics)}, so a rule cannot be trusted to have "
-            + "been measured for paths under them:",
-            $"{LagRemedy}, then retry for a whole answer.");
+            new CauseText(
+                $"caveat: the model is incomplete — {Missing(diagnostics)}, so scope cards from them cannot be "
+                + "placed and \"no architecture scope covers\" cannot be trusted for paths under them:",
+                $"{MissingRemedy}, then retry for a whole answer."),
+            new CauseText(
+                $"caveat: the model is incomplete — {Failed(diagnostics)} failed to load, so scope cards from "
+                + "them cannot be placed and \"no architecture scope covers\" cannot be trusted for paths under "
+                + "them:",
+                "Restore and build the solution first (dotnet build), then retry for a whole answer."),
+            new CauseText(
+                $"caveat: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
+                + "so a rule about a package cannot be trusted to have been measured for paths under them:",
+                "Restore the solution first (dotnet restore), then retry for a whole answer."),
+            new CauseText(
+                $"caveat: the model is incomplete — {Lagging(diagnostics)}, so a rule cannot be trusted to have "
+                + "been measured for paths under them:",
+                $"{LagRemedy}, then retry for a whole answer."));
     }
 
     /// <summary>
@@ -309,17 +337,21 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             false,
-            $"caveat: the model is incomplete — {Missing(diagnostics)}, so nothing declared there is drawn:",
-            $"{MissingRemedy}, then retry for a whole diagram.",
-            $"caveat: the model is incomplete — {Failed(diagnostics)} failed to load, so nothing declared there "
-            + "is drawn:",
-            "Restore and build the solution first (dotnet build), then retry for a whole diagram.",
-            $"caveat: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
-            + "so a reference that resolves through a package may be missing from the diagram:",
-            "Restore the solution first (dotnet restore), then retry for a whole diagram.",
-            $"caveat: the model is incomplete — {Lagging(diagnostics)}, so code the compiler cannot read is "
-            + "missing from the diagram:",
-            $"{LagRemedy}, then retry for a whole diagram.");
+            new CauseText(
+                $"caveat: the model is incomplete — {Missing(diagnostics)}, so nothing declared there is drawn:",
+                $"{MissingRemedy}, then retry for a whole diagram."),
+            new CauseText(
+                $"caveat: the model is incomplete — {Failed(diagnostics)} failed to load, so nothing declared there "
+                + "is drawn:",
+                "Restore and build the solution first (dotnet build), then retry for a whole diagram."),
+            new CauseText(
+                $"caveat: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
+                + "so a reference that resolves through a package may be missing from the diagram:",
+                "Restore the solution first (dotnet restore), then retry for a whole diagram."),
+            new CauseText(
+                $"caveat: the model is incomplete — {Lagging(diagnostics)}, so code the compiler cannot read is "
+                + "missing from the diagram:",
+                $"{LagRemedy}, then retry for a whole diagram."));
     }
 
     /// <summary>
@@ -350,75 +382,104 @@ internal static class IncompleteModelGate
         return Message(
             diagnostics,
             true,
-            $"caveat: the model is incomplete — {Missing(diagnostics)}, so a type declared only there reads as "
-            + "unknown and a path under them as declaring no type:",
-            $"{MissingRemedy}, then retry for a whole answer.",
-            $"caveat: the model is incomplete — {Failed(diagnostics)} failed to load, so a type declared only "
-            + "there reads as unknown and a path under them as declaring no type:",
-            "Restore and build the solution first (dotnet build), then retry for a whole answer.",
-            $"caveat: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
-            + "so a selection that reads a package's base types, interfaces or attributes cannot be trusted "
-            + "for the types they declare:",
-            "Restore the solution first (dotnet restore), then retry for a whole answer.",
-            $"caveat: the model is incomplete — {Lagging(diagnostics)}, so a type declared in code the compiler "
-            + "cannot read reads as unknown:",
-            $"{LagRemedy}, then retry for a whole answer.");
+            new CauseText(
+                $"caveat: the model is incomplete — {Missing(diagnostics)}, so a type declared only there reads as "
+                + "unknown and a path under them as declaring no type:",
+                $"{MissingRemedy}, then retry for a whole answer."),
+            new CauseText(
+                $"caveat: the model is incomplete — {Failed(diagnostics)} failed to load, so a type declared only "
+                + "there reads as unknown and a path under them as declaring no type:",
+                "Restore and build the solution first (dotnet build), then retry for a whole answer."),
+            new CauseText(
+                $"caveat: the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, "
+                + "so a selection that reads a package's base types, interfaces or attributes cannot be trusted "
+                + "for the types they declare:",
+                "Restore the solution first (dotnet restore), then retry for a whole answer."),
+            new CauseText(
+                $"caveat: the model is incomplete — {Lagging(diagnostics)}, so a type declared in code the compiler "
+                + "cannot read reads as unknown:",
+                $"{LagRemedy}, then retry for a whole answer."));
     }
 
     /// <summary>
     ///     The <c>Workspace_LoadedCompletely</c> failure body, the CLI gate transposed to a test report: as
-    ///     <c>check</c> emits no verdict, the adapter emits no rule verdicts. A test report has nothing above it.
+    ///     <c>check</c> emits no verdict, the adapter emits no rule verdicts. A test report has nothing above it, so
+    ///     the body carries the cause blocks and then the load's own lines (<see cref="WithLoadLines" />).
     /// </summary>
     internal static string AdapterRefusal(WorkspaceDiagnostics diagnostics)
     {
-        return Message(
+        string causes = Message(
             diagnostics,
             true,
-            $"the model is incomplete — {Missing(diagnostics)}, so every rule test was skipped:",
-            "Every rule would be measured over a codebase missing whole projects — a green run against a "
-            + $"partial model would sign verdicts that were never reached. {MissingRemedy}, then retry. To check "
-            + "the partial model as it loaded, override AllowWorkspaceDiagnostics to true on the test class.",
-            $"the model is incomplete — {Failed(diagnostics)} failed to load, so every rule test was skipped:",
-            "Every rule would be measured over a codebase missing whole projects — a green run against a "
-            + "partial model would sign verdicts that were never reached. Restore and build the solution "
-            + "first (dotnet build), then retry. To check the partial model as it loaded, override "
-            + "AllowWorkspaceDiagnostics to true on the test class.",
-            $"the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, so every "
-            + "rule test was skipped:",
-            "Every rule about a package would be measured over a codebase where that package resolved to "
-            + "nothing — a green run against a partial model would sign verdicts that were never reached. "
-            + "Restore the solution first (dotnet restore), then retry. To check the partial model as it "
-            + "loaded, override AllowWorkspaceDiagnostics to true on the test class.",
-            $"the model is incomplete — {Lagging(diagnostics)}, so every rule test was skipped:",
-            "Every rule would be measured over a codebase missing the code the compiler cannot read — a green "
-            + $"run against a partial model would sign verdicts that were never reached. {LagRemedy}, then "
-            + "retry. To check the partial model as it loaded, override AllowWorkspaceDiagnostics to true on "
-            + "the test class.");
+            new CauseText(
+                $"the model is incomplete — {Missing(diagnostics)}, so every rule test was skipped:",
+                "Every rule would be measured over a codebase missing whole projects — a green run against a "
+                + $"partial model would sign verdicts that were never reached. {MissingRemedy}, then retry. To check "
+                + "the partial model as it loaded, override AllowWorkspaceDiagnostics to true on the test class."),
+            new CauseText(
+                $"the model is incomplete — {Failed(diagnostics)} failed to load, so every rule test was skipped:",
+                "Every rule would be measured over a codebase missing whole projects — a green run against a "
+                + "partial model would sign verdicts that were never reached. Restore and build the solution "
+                + "first (dotnet build), then retry. To check the partial model as it loaded, override "
+                + "AllowWorkspaceDiagnostics to true on the test class."),
+            new CauseText(
+                $"the model is incomplete — NuGet packages did not resolve for {Unrestored(diagnostics)}, so every "
+                + "rule test was skipped:",
+                "Every rule about a package would be measured over a codebase where that package resolved to "
+                + "nothing — a green run against a partial model would sign verdicts that were never reached. "
+                + "Restore the solution first (dotnet restore), then retry. To check the partial model as it "
+                + "loaded, override AllowWorkspaceDiagnostics to true on the test class."),
+            new CauseText(
+                $"the model is incomplete — {Lagging(diagnostics)}, so every rule test was skipped:",
+                "Every rule would be measured over a codebase missing the code the compiler cannot read — a green "
+                + $"run against a partial model would sign verdicts that were never reached. {LagRemedy}, then "
+                + "retry. To check the partial model as it loaded, override AllowWorkspaceDiagnostics to true on "
+                + "the test class."));
+
+        return WithLoadLines(causes, diagnostics);
     }
 
     /// <summary>
     ///     The <c>Workspace_LoadedCompletely</c> skip reason under <c>AllowWorkspaceDiagnostics</c>: the rule
     ///     verdicts are live again, but a test by that name cannot pass while the load failures it is named
-    ///     for are real — so it skips, and the failed projects ride the skip reason.
+    ///     for are real — so it skips, and the projects and the load's own lines ride the skip reason.
     /// </summary>
     internal static string AdapterOptedIn(WorkspaceDiagnostics diagnostics)
     {
-        return Message(
+        string causes = Message(
             diagnostics,
             false,
-            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
-            + $"{MissingFiles(diagnostics)} the solution declares not being on disk:",
-            null,
-            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
-            + $"{Failed(diagnostics)} failing to load:",
-            null,
-            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
-            + $"NuGet packages not resolving for {Unrestored(diagnostics)}:",
-            null,
-            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
-            + $"the C# {CompilerLagFailures.CarriedHighestLanguageVersion} compiler this tool carries not reading all "
-            + $"the code of {Plurals.Counted(diagnostics.CompilerLagProjects.Count, "project")}:",
-            null);
+            new CauseText(
+                "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
+                + $"{MissingFiles(diagnostics)} the solution declares not being on disk:",
+                null),
+            new CauseText(
+                "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
+                + $"{Failed(diagnostics)} failing to load:",
+                null),
+            new CauseText(
+                "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
+                + $"NuGet packages not resolving for {Unrestored(diagnostics)}:",
+                null),
+            new CauseText(
+                "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
+                + $"the C# {CompilerLagFailures.CarriedHighestLanguageVersion} compiler this tool carries not "
+                + $"reading all the code of {Plurals.Counted(diagnostics.CompilerLagProjects.Count, "project")}:",
+                null));
+
+        return WithLoadLines(causes, diagnostics);
+    }
+
+    // The adapter's cause blocks, then every line the load reported that is not a NuGet audit advisory, uncapped:
+    // the text the CLI prints as warnings above its refusal, which a test report has no channel for. The selection
+    // note is not repeated, because a refusal's cause blocks already carry it and a skip carries none.
+    private static string WithLoadLines(string causes, WorkspaceDiagnostics diagnostics)
+    {
+        IReadOnlyList<string> lines = diagnostics.ActionableDiagnostics;
+        if (lines.Count == 0) return causes;
+
+        string loadLines = EvidenceBlock.Compose("The workspace load reported:", lines);
+        return causes + "\n" + loadLines;
     }
 
     /// <summary>
@@ -503,47 +564,55 @@ internal static class IncompleteModelGate
         return Plurals.Counted(diagnostics.RestoreFailedProjects.Count, "project");
     }
 
-    // "the C# 15 compiler this tool carries cannot read all the code of 1 project".
-    private static string Lagging(WorkspaceDiagnostics diagnostics)
+    /// <summary>
+    ///     "the C# 15 compiler this tool carries cannot read all the code of 1 project": the lag cause as every
+    ///     surface states it.
+    /// </summary>
+    internal static string LagClause(int count)
     {
         return $"the C# {CompilerLagFailures.CarriedHighestLanguageVersion} compiler this tool carries cannot read "
-               + $"all the code of {Plurals.Counted(diagnostics.CompilerLagProjects.Count, "project")}";
+               + $"all the code of {Plurals.Counted(count, "project")}";
+    }
+
+    private static string Lagging(WorkspaceDiagnostics diagnostics)
+    {
+        return LagClause(diagnostics.CompilerLagProjects.Count);
     }
 
     // A surface's whole refusal: one EvidenceBlock per cause it has, missing files, then failed loads, restores and
     // compiler lags.
-    // Every lede is built by the caller and the unused ones are dropped, so a single-cause message carries that
-    // cause's block alone, with no branch in the caller and no conditional in any literal. The missing block never
-    // carries the MSBuild selection note, because no MSBuild could have opened a file that is not there.
+    // Every cause's text is built by the caller and the unused ones are dropped, so a single-cause message carries
+    // that cause's block alone, with no branch in the caller and no conditional in any literal. A null cause is one
+    // the surface never states, whatever the diagnostics hold. The missing block never carries the MSBuild
+    // selection note, because no MSBuild could have opened a file that is not there.
     private static string Message(
         WorkspaceDiagnostics diagnostics,
         bool withSelectionNote,
-        string missingLede,
-        string? missingTail,
-        string loadLede,
-        string? loadTail,
-        string restoreLede,
-        string? restoreTail,
-        string lagLede,
-        string? lagTail)
+        CauseText missing,
+        CauseText load,
+        CauseText? restore,
+        CauseText? lag)
     {
         var blocks = new List<string>();
 
         if (diagnostics.MissingProjects.Count > 0)
-            blocks.Add(EvidenceBlock.Compose(missingLede, diagnostics.MissingProjects, missingTail));
+            blocks.Add(EvidenceBlock.Compose(missing.Lede, diagnostics.MissingProjects, missing.Tail));
 
         if (diagnostics.FailedProjects.Count > 0)
-            blocks.Add(EvidenceBlock.Compose(loadLede, diagnostics.FailedProjects, loadTail, withSelectionNote));
+            blocks.Add(EvidenceBlock.Compose(load.Lede, diagnostics.FailedProjects, load.Tail, withSelectionNote));
 
-        if (diagnostics.RestoreFailedProjects.Count > 0)
+        if (restore is { } restoreText && diagnostics.RestoreFailedProjects.Count > 0)
             blocks.Add(
                 EvidenceBlock.Compose(
-                    restoreLede, diagnostics.RestoreFailedProjects, restoreTail, withSelectionNote));
+                    restoreText.Lede, diagnostics.RestoreFailedProjects, restoreText.Tail, withSelectionNote));
 
-        if (diagnostics.CompilerLagProjects.Count > 0)
+        if (lag is { } lagText && diagnostics.CompilerLagProjects.Count > 0)
             blocks.Add(
-                EvidenceBlock.Compose(lagLede, diagnostics.CompilerLagProjects, lagTail, withSelectionNote));
+                EvidenceBlock.Compose(lagText.Lede, diagnostics.CompilerLagProjects, lagText.Tail, withSelectionNote));
 
         return string.Join("\n", blocks);
     }
+
+    // One cause's block text: the lede above its project list and the tail below it, which a skip reason leaves out.
+    private readonly record struct CauseText(string Lede, string? Tail);
 }
