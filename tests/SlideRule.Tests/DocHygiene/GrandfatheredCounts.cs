@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using SlideRule.Baselines;
@@ -381,13 +382,13 @@ internal static class GrandfatheredCounts
     private static GrandfatheredCount Split(string doc, int number, string ruleId, Match match)
     {
         int total = match.Groups["count"]
-            .Captures.Sum(capture => int.Parse(capture.Value));
+            .Captures.Sum(capture => int.Parse(capture.Value, CultureInfo.InvariantCulture));
         return new GrandfatheredCount(doc, number, ruleId, total, null);
     }
 
     private static GrandfatheredCount Count(string doc, int number, string ruleId, Match match)
     {
-        int count = int.Parse(match.Groups["count"].Value);
+        int count = int.Parse(match.Groups["count"].Value, CultureInfo.InvariantCulture);
         // A group the pattern does not define reads as one that did not participate: a shape that prints no
         // stale count yields none, and the second unmatched term, which only the Burndown line can carry, reads
         // as zero wherever it is absent. Both are summed, because the identity is over every entry no violation
@@ -395,7 +396,7 @@ internal static class GrandfatheredCounts
         Group stale = match.Groups["stale"];
         Group unmeasured = match.Groups["unmeasured"];
         int? staleTotal = stale.Success
-            ? int.Parse(stale.Value) + (unmeasured.Success ? int.Parse(unmeasured.Value) : 0)
+            ? int.Parse(stale.Value, CultureInfo.InvariantCulture) + (unmeasured.Success ? int.Parse(unmeasured.Value, CultureInfo.InvariantCulture) : 0)
             : null;
         return new GrandfatheredCount(doc, number, ruleId, count, staleTotal);
     }

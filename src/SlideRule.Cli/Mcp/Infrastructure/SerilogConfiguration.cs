@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
@@ -43,7 +44,8 @@ internal static class SerilogConfiguration
                 // Concurrent server processes write to the same daily file (a shared mutex serialises
                 // writes); the [{SessionId}] field then disambiguates interleaved lines.
                 shared: true,
-                outputTemplate: OutputTemplate)
+                outputTemplate: OutputTemplate,
+                formatProvider: CultureInfo.InvariantCulture)
             .CreateLogger();
     }
 

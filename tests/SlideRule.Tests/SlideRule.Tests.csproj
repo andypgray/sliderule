@@ -42,6 +42,10 @@
     <ItemGroup>
         <GlobalAnalyzerConfigFiles Include="$(MSBuildThisFileDirectory)../../analyzers.globalconfig" />
     </ItemGroup>
+    <!-- The IDE severities in that file report in the build only with this on. -->
+    <PropertyGroup>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    </PropertyGroup>
 
     <!-- Microsoft.Testing.Platform, not VSTest. xunit.v3 4.0.0 ships MTP 2.x, which the .NET 10 SDK
          declines to drive through the VSTest target, so the version bump forces a change of runner. The

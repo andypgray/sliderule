@@ -43,6 +43,8 @@ internal sealed class AnchorWidget
     {
     }
 
+    // The overload pair exists to be named by a member expression, so its parameters are never read.
+#pragma warning disable IDE0060
     public void Over(int value)
     {
     }
@@ -50,6 +52,7 @@ internal sealed class AnchorWidget
     public void Over(string value)
     {
     }
+#pragma warning restore IDE0060
 
     public T Echo<T>(T value)
     {

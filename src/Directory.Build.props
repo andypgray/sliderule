@@ -48,6 +48,13 @@
         <EnableNETAnalyzers>true</EnableNETAnalyzers>
     </PropertyGroup>
 
+    <!-- IDE rules report in the build only when this is on, so without it the IDE severities
+         analyzers.globalconfig promotes stay editor-only. AnalyzerEnablementTests holds every project
+         naming that file to it. -->
+    <PropertyGroup>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    </PropertyGroup>
+
     <!-- Analyzer severities, from the repo-root analyzers.globalconfig (which explains what it promotes,
          why, and why it is not named .globalconfig). Naming it here is what scopes it to src/, the way
          the policies above are scoped: nothing auto-discovers it, so the fixture copies staged under

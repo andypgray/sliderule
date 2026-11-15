@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace SlideRule.Tests.DocHygiene;
@@ -54,7 +55,7 @@ internal static class SourceAnchors
             if (!match.Success) continue;
 
             string file = match.Groups[1].Value;
-            int sourceLine = int.Parse(match.Groups[2].Value);
+            int sourceLine = int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture);
             string message = match.Groups[3]
                 .Value.Trim();
             anchors.Add(new SourceAnchor(doc, number, file, sourceLine, message));

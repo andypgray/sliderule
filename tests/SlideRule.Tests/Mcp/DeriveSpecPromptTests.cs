@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using ModelContextProtocol.Client;
@@ -559,6 +560,6 @@ public sealed class DeriveSpecPromptTests
 
     private static int NumberIn(Match line, string group)
     {
-        return int.Parse(line.Groups[group].Value);
+        return int.Parse(line.Groups[group].Value, CultureInfo.InvariantCulture);
     }
 }

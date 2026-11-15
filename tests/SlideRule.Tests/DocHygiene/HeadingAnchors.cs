@@ -221,7 +221,7 @@ internal static class HeadingAnchors
         string decoded = WebUtility.HtmlDecode(withoutTags);
         string withoutEmphasis = EdgeUnderscores.Replace(decoded, string.Empty);
 
-        return CodePlaceholder.Replace(withoutEmphasis, placeholder => spans[int.Parse(placeholder.Groups["index"].Value)]);
+        return CodePlaceholder.Replace(withoutEmphasis, placeholder => spans[int.Parse(placeholder.Groups["index"].Value, CultureInfo.InvariantCulture)]);
     }
 
     // A code span loses one space from each end when it has one at both and is not all spaces.

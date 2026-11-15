@@ -46,3 +46,22 @@ dotnet_diagnostic.CA1310.severity = warning
 # to its end with nobody waiting for it. Passing CancellationToken.None states that a call is not
 # abandonable, and the rule accepts that.
 dotnet_diagnostic.CA2016.severity = warning
+
+# Enumerating one IEnumerable twice runs its producer twice: a LINQ chain is recomputed, a lazy read of a
+# file or a directory happens again and can answer differently the second time, and an iterator over a
+# disposable source can run after the source has gone. Materialize once and enumerate that.
+dotnet_diagnostic.CA1851.severity = warning
+
+# int.ToString(), string.Format and their kin read the current culture when no IFormatProvider is passed,
+# so a number in a report, a cache key or a pinned message comes out differently on a machine whose culture
+# differs from CI's. The same argument as CA1310's, for formatting rather than comparison: pass
+# CultureInfo.InvariantCulture for anything a machine reads.
+dotnet_diagnostic.CA1305.severity = warning
+
+# A value assigned and never read, and a parameter no path reads, are each either dead code or a bug where
+# the value was meant to be used. IDE rules are silent in a build unless EnforceCodeStyleInBuild is on, which
+# every project that names this file sets. Parameters of non-public members only: a public signature is a
+# contract a consumer compiles against.
+dotnet_diagnostic.IDE0059.severity = warning
+dotnet_diagnostic.IDE0060.severity = warning
+dotnet_code_quality_unused_parameters = non_public

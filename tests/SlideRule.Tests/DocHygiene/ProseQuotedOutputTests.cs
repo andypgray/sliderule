@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.RegularExpressions;
 using SlideRule.Tests.DocHygiene.Walkthroughs;
 using SlideRule.Tests.TestSupport;
@@ -172,6 +173,6 @@ public sealed class ProseQuotedOutputTests
     private static int Group(Match match, string name)
     {
         return int.Parse(match.Groups[name]
-            .Value);
+            .Value, CultureInfo.InvariantCulture);
     }
 }
