@@ -229,7 +229,8 @@ public sealed class GuidanceAnalyzerTests(ParityBeds beds) : IClassFixture<Parit
         {
             DiagnosticDescriptor descriptor = GuidanceDiagnostics.ByRule[rule.Id];
             descriptor.HelpLinkUri.ShouldBe(rule.Citation, $"{descriptor.Id} links the page {rule.Id} cites.");
-            descriptor.Description.ToString().ShouldBe(rule.Because, $"{descriptor.Id} describes {rule.Id}.");
+            descriptor.Description.ToString(CultureInfo.InvariantCulture)
+                .ShouldBe(rule.Because, $"{descriptor.Id} describes {rule.Id}.");
         }
     }
 
