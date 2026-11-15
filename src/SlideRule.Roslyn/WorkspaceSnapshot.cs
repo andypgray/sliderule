@@ -48,4 +48,10 @@ internal sealed record WorkspaceSnapshot(Solution Solution, WorkspaceDiagnostics
     ///     Each loaded project's canonical <c>.csproj</c> path, resolved once for <see cref="Generation" />.
     /// </summary>
     internal required CanonicalProjectFiles ProjectFiles { get; init; }
+
+    /// <summary>
+    ///     The compiler assemblies the load of <see cref="Generation" /> stamps for each C# project, keyed by
+    ///     <see cref="ProjectId" /> (<see cref="LoadedSolution.CompilerAssemblies" />).
+    /// </summary>
+    internal required IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> CompilerAssemblies { get; init; }
 }

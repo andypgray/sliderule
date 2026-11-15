@@ -1,5 +1,7 @@
 using System.Reflection;
 using System.Text.Json.Nodes;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Shouldly;
 using SlideRule.Extraction.Fragments;
 using SlideRule.Roslyn.Caching;
@@ -418,6 +420,30 @@ public sealed class ExtractionCacheStoreTests
         record.SpecResolutions.Select(r => r.SpecProjectName)
             .ShouldBe(["Spec"]);
         record.LoadDiagnostics.LoadFailures.ShouldBe(["diag"]);
+    }
+
+    [Fact]
+    public void ReadAndValidate_SdkInstalledBesideTheLoadsSdk_MissesForAProjectJudgedAgainstACompilerPackage()
+    {
+        // A compiler package lies in no SDK, and the cache finds SDK installations only beside a stamp that lies in
+        // one, so a project judged against a package still has to carry a stamp in the SDK the load read it with.
+
+        // Arrange
+        using var solution = new SyntheticSolution();
+        solution.AddProject("A", [], ("A.cs", "class A {}"));
+        solution.BuildWithCompilerPackage("A", "10.0.100");
+        solution.BackdateAll();
+        ExtractionCacheStore store = solution.NewStore();
+        store.ShouldWrite(solution.Projects, TrivialExtraction(solution));
+        store.ReadAndValidate(Ct)
+            .Outcome.ShouldBe(CacheOutcome.Hit, "nothing has changed yet");
+
+        // Act
+        Directory.CreateDirectory(solution.SdkDirectory("11.0.100"));
+        CacheReadResult result = store.ReadAndValidate(Ct);
+
+        // Assert
+        result.Outcome.ShouldBe(CacheOutcome.Miss);
     }
 
     [Fact]
@@ -1367,9 +1393,35 @@ public sealed class ExtractionCacheStoreTests
         public void BuildWithSdk(string name, string sdkVersion)
         {
             string compiler = toolchain.WriteFile(
-                ["dotnet", "sdk", sdkVersion, "Roslyn", "bincore", "Microsoft.CodeAnalysis.CSharp.dll"], "compiler\n");
+                ["dotnet", .. StubAnalyzers.SdkCompilerSegments(sdkVersion)], "compiler\n");
             int at = projects.FindIndex(project => project.ProjectName == name);
             projects[at] = projects[at] with { CompilerAssemblyPaths = [compiler] };
+        }
+
+        // Points an added project's build at a compiler package outside any SDK, while the load took the project's
+        // analyzers from an SDK of the given version, and hands the stores the compilers the load's compiler map
+        // stamps for it.
+        public void BuildWithCompilerPackage(string name, string sdkVersion)
+        {
+            toolchain.WriteFile(["dotnet", .. StubAnalyzers.SdkCompilerSegments(sdkVersion)], "compiler\n");
+            string sdkAnalyzer = toolchain.WriteFile(
+                ["dotnet", .. StubAnalyzers.SdkAnalyzerSegments(sdkVersion)], "analyzer\n");
+            string package = toolchain.WriteFile(
+                ["packages", "compiler", StubAnalyzers.CompilerAssemblyName], "package compiler\n");
+            int at = projects.FindIndex(project => project.ProjectName == name);
+            var projectId = ProjectId.CreateNewId();
+            using var workspace = new AdhocWorkspace();
+            Solution loaded = workspace.CurrentSolution.AddProject(ProjectInfo.Create(
+                projectId, VersionStamp.Default, name, name, LanguageNames.CSharp, filePath: projects[at].CsprojPath,
+                analyzerReferences: [new AnalyzerImageReference([], sdkAnalyzer)]));
+            var judged = new Dictionary<ProjectId, CompilerLagFailures.ProjectLanguage>
+            {
+                [projectId] = new("latest", package)
+            };
+
+            IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> compilers =
+                CompilerLagFailures.CompilerAssemblies(loaded, judged, anchorToSdk: true);
+            projects[at] = projects[at] with { CompilerAssemblyPaths = compilers[projectId] };
         }
 
         public string CompilerAssemblyOf(string name)

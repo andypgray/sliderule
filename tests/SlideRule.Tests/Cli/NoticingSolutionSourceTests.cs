@@ -81,9 +81,12 @@ public sealed class NoticingSolutionSourceTests
 
         private SolutionHandle Handle(bool isClosure)
         {
+            Solution solution = workspace.CurrentSolution;
+            IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> compilers = CompilerLagFailures.CompilerAssemblies(
+                solution, new Dictionary<ProjectId, CompilerLagFailures.ProjectLanguage>(), anchorToSdk: true);
             return new SolutionHandle(
-                workspace.CurrentSolution, WorkspaceDiagnostics.None, null,
-                CanonicalProjectFiles.Of(workspace.CurrentSolution), isClosure: isClosure);
+                solution, WorkspaceDiagnostics.None, null, CanonicalProjectFiles.Of(solution), compilers,
+                isClosure: isClosure);
         }
     }
 }

@@ -215,11 +215,12 @@ internal static class ProjectCone
 
         // The compiler a project's build reads C# with decides whether the carried one lags it, so an SDK updated in
         // place is a structural change.
+        var listed = new HashSet<string>(paths, PathComparison.Comparer);
         IEnumerable<string> compilers = csharpProjects
             .SelectMany(project => project.CompilerAssemblyPaths ?? [])
             .Select(Path.GetFullPath)
-            .Where(compiler => !paths.Contains(compiler, PathComparison.Comparer))
             .Distinct(PathComparison.Comparer)
+            .Where(compiler => !listed.Contains(compiler))
             .OrderBy(compiler => compiler, StringComparer.Ordinal);
         return [.. paths, .. compilers];
     }

@@ -71,29 +71,23 @@ public sealed class CheckCacheClosureE2ETests
     ///     load of the edited tree reports too.
     /// </summary>
     [Theory]
-    [InlineData("restore-failed")]
-    [InlineData("compiler-lag")]
-    [InlineData("failed")]
-    public async Task Check_CleanProjectOutsideTheClosureRecordedAsBroken_StillReportedOnAClosurePartial(string verdict)
+    [InlineData(DiagnosticInjectingSolutionSource.RestoreFailedSlot)]
+    [InlineData(DiagnosticInjectingSolutionSource.CompilerLagSlot)]
+    [InlineData(DiagnosticInjectingSolutionSource.FailedSlot)]
+    public async Task Check_CleanProjectOutsideTheClosureRecordedAsBroken_StillReportedOnAClosurePartial(string slot)
     {
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("check-closure");
-        ISolutionSource broken = BrokenDomain(workspace, verdict);
+        ISolutionSource broken = BrokenDomain(workspace, slot);
         await RunCheckAsync(workspace.SolutionPath, cache.Root, source: new CountingSolutionSource(broken));
         EditWebBody(workspace);
 
         CacheRun partial = await RunCheckAsync(workspace.SolutionPath, cache.Root);
         CacheRun noCache = await RunCheckAsync(
-            workspace.SolutionPath, cache.Root, true, new CountingSolutionSource(BrokenDomain(workspace, verdict)));
+            workspace.SolutionPath, cache.Root, true, new CountingSolutionSource(BrokenDomain(workspace, slot)));
 
         partial.Outcome.ShouldBe(CodebaseSourceOutcome.Partial);
         partial.Source.ShouldHaveLoadedOnly(true, Web, Billing);
-        string slot = verdict switch
-        {
-            "restore-failed" => "restoreFailedProjects",
-            "compiler-lag" => "compilerLagProjects",
-            _ => "failedProjects"
-        };
         CheckJson.Strings(partial.Result.Out, slot)
             .ShouldHaveSingleItem(partial.Result.Transcript())
             .ShouldEndWith($"{Domain}/{Domain}.csproj");
@@ -102,16 +96,16 @@ public sealed class CheckCacheClosureE2ETests
     }
 
     [Theory]
-    [InlineData("failed")]
-    [InlineData("restore-failed")]
-    [InlineData("compiler-lag")]
-    public async Task Check_ClosureThatFindsAFailureTheRecordDoesNotHold_LoadsTheWholeSolution(string verdict)
+    [InlineData(DiagnosticInjectingSolutionSource.FailedSlot)]
+    [InlineData(DiagnosticInjectingSolutionSource.RestoreFailedSlot)]
+    [InlineData(DiagnosticInjectingSolutionSource.CompilerLagSlot)]
+    public async Task Check_ClosureThatFindsAFailureTheRecordDoesNotHold_LoadsTheWholeSolution(string slot)
     {
         using var workspace = new TempFixtureWorkspace();
         using var cache = new TempCacheRoot("check-closure");
         await RunCheckAsync(workspace.SolutionPath, cache.Root, source: CountingSolutionSource.OverWarmPool());
         EditWebBody(workspace);
-        var closureFails = new CountingSolutionSource(new ClosureFailingSolutionSource(verdict));
+        var closureFails = new CountingSolutionSource(new ClosureFailingSolutionSource(slot));
 
         CacheRun partial = await RunCheckAsync(workspace.SolutionPath, cache.Root, source: closureFails);
         CacheRun noCache = await RunCheckAsync(workspace.SolutionPath, cache.Root, true);
@@ -186,18 +180,11 @@ public sealed class CheckCacheClosureE2ETests
 
     // A whole cold load that reports Domain as restore-failed, as lagging the carried compiler, or as failed to
     // load, beside a workspace message: a verdict only a whole load can have measured.
-    private static ISolutionSource BrokenDomain(TempFixtureWorkspace workspace, string verdict)
+    private static ISolutionSource BrokenDomain(TempFixtureWorkspace workspace, string slot)
     {
         string domain = workspace.PathOf(Domain, $"{Domain}.csproj");
-        string[] load = [DiagnosticInjectingSolutionSource.SimulatedLoadFailure];
-        return verdict switch
-        {
-            "restore-failed" => new DiagnosticInjectingSolutionSource(
-                load, restoreFailedProjects: [domain], inner: new ColdSolutionSource()),
-            "compiler-lag" => new DiagnosticInjectingSolutionSource(
-                load, compilerLagProjects: [domain], inner: new ColdSolutionSource()),
-            _ => new DiagnosticInjectingSolutionSource(load, [domain], inner: new ColdSolutionSource())
-        };
+        return DiagnosticInjectingSolutionSource.ForGateInput(
+            slot, [DiagnosticInjectingSolutionSource.SimulatedLoadFailure], [domain], new ColdSolutionSource());
     }
 
     private static Task<CacheRun> RunCheckAsync(
@@ -211,7 +198,7 @@ public sealed class CheckCacheClosureE2ETests
 
     // A cold source whose closure loads report a project that failed to load, restore-failed or lagged the carried
     // compiler, which no recorded verdict holds.
-    private sealed class ClosureFailingSolutionSource(string verdict) : ISolutionSource
+    private sealed class ClosureFailingSolutionSource(string slot) : ISolutionSource
     {
         private readonly ColdSolutionSource cold = new();
 
@@ -224,24 +211,12 @@ public sealed class CheckCacheClosureE2ETests
             string solutionPath, IReadOnlyCollection<string> projectFiles, CancellationToken ct)
         {
             SolutionHandle real = await cold.AcquireClosureAsync(solutionPath, projectFiles, ct);
-            WorkspaceDiagnostics failed = verdict switch
-            {
-                "restore-failed" => real.LoadDiagnostics with
-                {
-                    RestoreFailedProjects = [DiagnosticInjectingSolutionSource.SimulatedRestoreFailedProject]
-                },
-                "compiler-lag" => real.LoadDiagnostics with
-                {
-                    CompilerLagProjects = [DiagnosticInjectingSolutionSource.SimulatedCompilerLagProject]
-                },
-                _ => real.LoadDiagnostics with
-                {
-                    FailedProjects = [DiagnosticInjectingSolutionSource.SimulatedFailedProject]
-                }
-            };
+            string project = DiagnosticInjectingSolutionSource.SimulatedProjectFor(slot);
+            WorkspaceDiagnostics failed = DiagnosticInjectingSolutionSource.WithGateInput(
+                real.LoadDiagnostics, slot, [project]);
             return new SolutionHandle(
-                real.Solution, failed, real, real.ProjectFiles, targetFrameworks: real.TargetFrameworks,
-                isClosure: real.IsClosure);
+                real.Solution, failed, real, real.ProjectFiles, real.CompilerAssemblies,
+                targetFrameworks: real.TargetFrameworks, isClosure: real.IsClosure);
         }
     }
 }

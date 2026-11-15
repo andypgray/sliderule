@@ -16,18 +16,18 @@ internal sealed class SolutionHandle(
     WorkspaceDiagnostics loadDiagnostics,
     IDisposable? owned,
     CanonicalProjectFiles projectFiles,
+    IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> compilerAssemblies,
     Func<IReadOnlyCollection<string>, IReadOnlySet<string>?, CancellationToken, Task<SessionCodebase>>? warmCodebase = null,
     Func<string, Func<SessionSpecResolution>, SessionSpecResolution>? warmSpecResolution = null,
     IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
     bool isClosure = false,
-    Func<IReadOnlySet<string>?>? warmDeclaredMembers = null,
-    IReadOnlyDictionary<ProjectId, string>? compilerAssemblies = null) : IDisposable
+    Func<IReadOnlySet<string>?>? warmDeclaredMembers = null) : IDisposable
 {
     /// <summary>
-    ///     The compiler assembly each replayed project's recorded compiler call ran, keyed by <see cref="ProjectId" />,
-    ///     for the cache to stamp; null on a load, whose compilers the cache finds from the load itself.
+    ///     The compiler assemblies the cache stamps for each C# project, keyed by <see cref="ProjectId" />, as the
+    ///     load or replay that produced <see cref="Solution" /> found them.
     /// </summary>
-    public IReadOnlyDictionary<ProjectId, string>? CompilerAssemblies { get; } = compilerAssemblies;
+    public IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> CompilerAssemblies { get; } = compilerAssemblies;
 
     /// <summary>
     ///     Whether <see cref="Solution" /> holds only the projects a caller asked

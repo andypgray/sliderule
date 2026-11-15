@@ -40,12 +40,11 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
     // of its own for the same reason, and its remedy is a newer tool rather than anything done to the solution.
     private const string CompilerLagProject = DiagnosticInjectingSolutionSource.SimulatedCompilerLagProject;
 
-    // The document slots the gate inputs ride, which the rows below also use to say which input they inject.
-    private const string MissingSlot = "missingProjects";
+    private const string MissingSlot = DiagnosticInjectingSolutionSource.MissingSlot;
 
-    private const string RestoreFailedSlot = "restoreFailedProjects";
+    private const string RestoreFailedSlot = DiagnosticInjectingSolutionSource.RestoreFailedSlot;
 
-    private const string CompilerLagSlot = "compilerLagProjects";
+    private const string CompilerLagSlot = DiagnosticInjectingSolutionSource.CompilerLagSlot;
 
     // The NU1510 pruning advisory, captured verbatim. An ordinary restore warning that says nothing about
     // whether the model built — and it refused a solution whose one rule passed, the defect the "no message
@@ -774,20 +773,14 @@ public sealed class WorkspaceDiagnosticsGateE2ETests
         string slot, string spec, bool allowWorkspaceDiagnostics, bool json, string? sarif = null,
         string? annotationsSummary = null, CancellationToken? cancellationToken = null)
     {
-        return slot switch
-        {
-            MissingSlot => RunWithInjectedDiagnosticAsync(
-                [], spec, allowWorkspaceDiagnostics, json, sarif, cancellationToken: cancellationToken,
-                missingProjects: [DiagnosticInjectingSolutionSource.SimulatedMissingProject],
-                annotationsSummary: annotationsSummary),
-            RestoreFailedSlot => RunWithInjectedDiagnosticAsync(
-                [], spec, allowWorkspaceDiagnostics, json, sarif, restoreFailedProjects: [RestoreFailedProject],
-                cancellationToken: cancellationToken, annotationsSummary: annotationsSummary),
-            CompilerLagSlot => RunWithInjectedDiagnosticAsync(
-                [], spec, allowWorkspaceDiagnostics, json, sarif, cancellationToken: cancellationToken,
-                annotationsSummary: annotationsSummary, compilerLagProjects: [CompilerLagProject]),
-            _ => throw new ArgumentOutOfRangeException(nameof(slot), slot, "no gate input rides that slot")
-        };
+        string project = DiagnosticInjectingSolutionSource.SimulatedProjectFor(slot);
+        WorkspaceDiagnostics input = DiagnosticInjectingSolutionSource.WithGateInput(
+            WorkspaceDiagnostics.None, slot, [project]);
+        return RunWithInjectedDiagnosticAsync(
+            [], spec, allowWorkspaceDiagnostics, json, sarif, input.FailedProjects,
+            restoreFailedProjects: input.RestoreFailedProjects, cancellationToken: cancellationToken,
+            missingProjects: input.MissingProjects, annotationsSummary: annotationsSummary,
+            compilerLagProjects: input.CompilerLagProjects);
     }
 
     private static async Task<CliResult> RunWithInjectedDiagnosticAsync(

@@ -23,7 +23,7 @@ internal static class SolutionCacheInputs
     ///     <see cref="SolutionProjects.Collect" /> takes it.
     /// </summary>
     internal static IReadOnlyList<ProjectInputs> Collect(
-        Solution solution, IReadOnlyDictionary<ProjectId, string>? compilerAssemblies = null)
+        Solution solution, IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> compilerAssemblies)
     {
         var buildOutput = new BuildOutputDirectories();
         return SolutionProjects.Collect(

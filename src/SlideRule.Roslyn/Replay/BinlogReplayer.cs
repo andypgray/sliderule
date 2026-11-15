@@ -179,19 +179,18 @@ internal static class BinlogReplayer
             }
 
             IReadOnlyList<RecordedCompile> compiles = await recordedCompiles.ConfigureAwait(false);
-            Dictionary<ProjectId, CompilerLagFailures.RecordedLanguage> recordedLanguage = RecordedCompiles
+            Dictionary<ProjectId, CompilerLagFailures.ProjectLanguage> recordedLanguage = RecordedCompiles
                 .ByProject(settled.Solution, settled.TargetFrameworks, compiles)
                 .ToDictionary(
                     pair => pair.Key,
-                    pair => new CompilerLagFailures.RecordedLanguage(
+                    pair => new CompilerLagFailures.ProjectLanguage(
                         pair.Value.LangVersion, CompilerLagFailures.CompilerAssemblyBeside(pair.Value.CompilerFilePath)));
-            IReadOnlyList<CompilerLagFailures.Finding> languageLag = CompilerLagFailures.DetectRecordedLanguage(
+            IReadOnlyList<CompilerLagFailures.Finding> languageLag = CompilerLagFailures.DetectLanguage(
                 settled.Solution, recordedLanguage, settled.Report.Failed);
             IReadOnlyList<string> compilerLag = CompilerLagFailures.LaggingProjects(
                 [.. generatorLag, .. languageLag], settled.Report.Failed, diagnosticSink);
-            Dictionary<ProjectId, string> compilerAssemblies = recordedLanguage
-                .Where(pair => pair.Value.CompilerAssemblyPath is not null)
-                .ToDictionary(pair => pair.Key, pair => pair.Value.CompilerAssemblyPath!);
+            IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> compilerAssemblies =
+                CompilerLagFailures.CompilerAssemblies(settled.Solution, recordedLanguage, anchorToSdk: false);
 
             return new ReplayedSolution(
                 workspace, reader, settled.Solution, settled.TargetFrameworks, settled.ProjectFiles, settled.Report,

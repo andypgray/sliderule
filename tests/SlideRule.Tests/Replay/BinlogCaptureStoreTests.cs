@@ -348,7 +348,8 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         var report = new ProjectLoadReport([], [], [], []);
         return new ReplayedSolution(
             workspace, reader, solution: null!, new Dictionary<ProjectId, string>(), projectFiles, report,
-            new Dictionary<string, IReadOnlyList<string>>(), [], [], new Dictionary<ProjectId, string>());
+            new Dictionary<string, IReadOnlyList<string>>(), [], [],
+            new Dictionary<ProjectId, IReadOnlyList<string>>());
     }
 
     [Fact]

@@ -50,9 +50,7 @@ internal sealed class LazyCaptureReplaySource(UsableCapture capture) : ISolution
         }
 
         _replayed = replayed;
-        var source = new ReplayedSolutionSource(
-            replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), replayed.TargetFrameworks,
-            replayed.ProjectFiles, replayed.CompilerAssemblies);
+        var source = new ReplayedSolutionSource(replayed, replayed.LoadDiagnosticsWith(diagnostics));
         return await source.AcquireAsync(solutionPath, ct);
     }
 }

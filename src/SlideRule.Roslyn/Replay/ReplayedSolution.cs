@@ -39,7 +39,7 @@ internal sealed class ReplayedSolution : IDisposable
         IReadOnlyDictionary<string, IReadOnlyList<string>> otherLanguageReferences,
         IReadOnlyList<string> compilerLagProjects,
         IReadOnlyList<RecordedCompile> recordedCompiles,
-        IReadOnlyDictionary<ProjectId, string> compilerAssemblies)
+        IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> compilerAssemblies)
     {
         _workspace = workspace;
         _reader = reader;
@@ -90,11 +90,11 @@ internal sealed class ReplayedSolution : IDisposable
     public IReadOnlyList<RecordedCompile> RecordedCompiles { get; }
 
     /// <summary>
-    ///     The compiler assembly beside the compiler each replayed project's recorded call ran, keyed by
-    ///     <see cref="ProjectId" />; absent for a project whose call could not be told apart or whose compiler is not
-    ///     on disk. The caches stamp it, because it decides whether the carried compiler lags.
+    ///     The compiler assembly the caches stamp for each replayed C# project, keyed by <see cref="ProjectId" />: the one
+    ///     beside the compiler its recorded call ran, else, for a project whose call could not be told apart, the one
+    ///     found from the replayed load. The caches stamp it, because it decides whether the carried compiler lags.
     /// </summary>
-    public IReadOnlyDictionary<ProjectId, string> CompilerAssemblies { get; }
+    public IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> CompilerAssemblies { get; }
 
     /// <summary>The <c>.csproj</c> paths of the projects that failed to load.</summary>
     /// <remarks>

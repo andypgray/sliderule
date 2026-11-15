@@ -131,14 +131,19 @@ internal static class WorkspaceLoader
             // only its assets file can.
             IReadOnlyList<string> restoreFailed = RestoreFailures.Detect(inspected, settled.Report.Failed);
 
+            IReadOnlyDictionary<ProjectId, CompilerLagFailures.ProjectLanguage> languages =
+                CompilerLagFailures.EvaluatedLanguages(
+                    inspected, settled.TargetFrameworks, settled.Report.Failed, inspected.FilePath, ct);
             IReadOnlyList<CompilerLagFailures.Finding> languageLag = CompilerLagFailures.DetectLanguage(
-                inspected, settled.TargetFrameworks, settled.Report.Failed, inspected.FilePath, ct);
+                inspected, languages, settled.Report.Failed);
             IReadOnlyList<string> compilerLag = CompilerLagFailures.LaggingProjects(
                 [.. generatorLag, .. languageLag], [.. settled.Report.Failed, .. restoreFailed], diagnosticLog);
+            IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> compilerAssemblies =
+                CompilerLagFailures.CompilerAssemblies(inspected, languages, anchorToSdk: true);
 
             return new LoadedSolution(
                 workspace, inspected, settled.TargetFrameworks, settled.ProjectFiles, settled.Report,
-                restoreFailed, compilerLag);
+                restoreFailed, compilerLag, compilerAssemblies);
         }
         catch
         {

@@ -1,11 +1,11 @@
 using System.Text.Json.Nodes;
-using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SlideRule.Roslyn;
 using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Replay;
+using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.Replay;
 using SlideRule.Tests.TestSupport;
 using Xunit;
@@ -118,11 +118,11 @@ public sealed class CompilerLagFailuresTests
     public async Task LoadAsync_ABedTheCarriedCompilerReads_ListsNothing(string bed)
     {
         string solution = bed == "RazorApp" ? FixtureBeds.RazorAppSolution : FixtureBeds.CSharp15AppSolution;
-        var diagnostics = new List<string>();
 
-        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solution, diagnostics.Add, ct: Ct);
+        WorkspaceSnapshot snapshot = await WarmWorkspacePool.GetCurrentAsync(solution, Ct);
 
-        loaded.LoadDiagnosticsWith(diagnostics).CompilerLagProjects.ShouldBeEmpty(string.Join("\n", diagnostics));
+        WorkspaceDiagnostics verdict = snapshot.LoadDiagnostics;
+        verdict.CompilerLagProjects.ShouldBeEmpty(string.Join("\n", verdict.LoadFailures));
     }
 
     [Theory]
@@ -166,16 +166,13 @@ public sealed class CompilerLagFailuresTests
     {
         using TempDirectory temp = TestTempRoot.Fresh("lag-solution-sdk");
         string sdkAnalyzer = StubAnalyzers.EmptyAssembly(
-            temp.PathOf("dotnet", "sdk", "99.0.100", "Sdks", "Fake.Sdk", "analyzers", "Fake.Analyzer.dll"));
-        StubAnalyzers.CompilerDeclaring(
-            temp.PathOf("dotnet", "sdk", "99.0.100", "Roslyn", "bincore", "Microsoft.CodeAnalysis.CSharp.dll"), 16);
+            temp.PathOf(["dotnet", .. StubAnalyzers.SdkAnalyzerSegments("99.0.100")]));
+        StubAnalyzers.CompilerDeclaring(temp.PathOf(["dotnet", .. StubAnalyzers.SdkCompilerSegments("99.0.100")]), 16);
         const string noSdkAnalyzers = "<EnableNETAnalyzers>false</EnableNETAnalyzers>";
         string latest = WriteProject(temp, "Latest", $"{noSdkAnalyzers}<LangVersion>latest</LangVersion>");
         WriteProject(temp, "Pinned", noSdkAnalyzers, sdkAnalyzer);
         string solution = temp.WriteFile(
-            ["App.slnx"],
-            "<Solution>\n  <Project Path=\"Latest/Latest.csproj\" />\n  <Project Path=\"Pinned/Pinned.csproj\" />\n"
-            + "</Solution>\n");
+            ["App.slnx"], ScratchProjects.Solution("Latest/Latest.csproj", "Pinned/Pinned.csproj"));
 
         (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ShouldLoadRestoredAsync(solution);
 
@@ -212,19 +209,10 @@ public sealed class CompilerLagFailuresTests
         string generator = StubAnalyzers.NewerCompilerGenerator(temp);
         string csproj = WriteProject(
             temp, "App", "", generator, """<ProjectReference Include="../Legacy/Legacy.vbproj" />""");
-        temp.WriteFile(
-            ["Legacy", "Legacy.vbproj"],
-            """
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <TargetFramework>net10.0</TargetFramework>
-              </PropertyGroup>
-            </Project>
-            """);
+        temp.WriteFile(["Legacy", "Legacy.vbproj"], ScratchProjects.ClassLibrary());
         temp.WriteFile(["Legacy", "Ledger.vb"], "Public Class Ledger\nEnd Class\n");
         string solution = temp.WriteFile(
-            ["App.slnx"],
-            "<Solution>\n  <Project Path=\"App/App.csproj\" />\n  <Project Path=\"Legacy/Legacy.vbproj\" />\n</Solution>\n");
+            ["App.slnx"], ScratchProjects.Solution("App/App.csproj", "Legacy/Legacy.vbproj"));
 
         (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ShouldReadAsync(solution, replay);
 
@@ -320,7 +308,8 @@ public sealed class CompilerLagFailuresTests
         Assert.SkipUnless(OperatingSystem.IsWindows(), "The stand-in compiler is a Windows executable.");
         using TempDirectory temp = TestTempRoot.Fresh("lag-replay-stamp");
         using TempDirectory cache = TestTempRoot.Fresh("lag-replay-stamp-cache");
-        string compilerAssembly = Path.Combine(StubAnalyzers.StandInCompiler(temp, 15), CompilerAssemblyName);
+        string compilerAssembly = Path.Combine(
+            StubAnalyzers.StandInCompiler(temp, 15), StubAnalyzers.CompilerAssemblyName);
         WriteProject(temp, "App", "");
         string solution = WriteSolution(temp, "App");
         string binlog = BuildWithBinlog(
@@ -343,8 +332,10 @@ public sealed class CompilerLagFailuresTests
         Assert.SkipUnless(OperatingSystem.IsWindows(), "The stand-in compiler is a Windows executable.");
         using TempDirectory temp = TestTempRoot.Fresh("lag-replay-stamp-frameworks");
         using TempDirectory cache = TestTempRoot.Fresh("lag-replay-stamp-frameworks-cache");
-        string modern = Path.Combine(StubAnalyzers.StandInCompiler(temp, 15, "modern"), CompilerAssemblyName);
-        string legacy = Path.Combine(StubAnalyzers.StandInCompiler(temp, 15, "legacy"), CompilerAssemblyName);
+        string modern = Path.Combine(
+            StubAnalyzers.StandInCompiler(temp, 15, "modern"), StubAnalyzers.CompilerAssemblyName);
+        string legacy = Path.Combine(
+            StubAnalyzers.StandInCompiler(temp, 15, "legacy"), StubAnalyzers.CompilerAssemblyName);
         temp.WriteFile(
             ["App", "App.csproj"],
             $"""
@@ -372,7 +363,37 @@ public sealed class CompilerLagFailuresTests
             .CompilerAssemblyPaths.ShouldBe([legacy, modern]);
     }
 
-    private const string CompilerAssemblyName = "Microsoft.CodeAnalysis.CSharp.dll";
+    [Fact]
+    public async Task LoadAsync_ACompilerPackageTheVerdictReads_IsWhatTheCacheStamps()
+    {
+        // A RoslynTargetsPath outside any SDK names the compiler the build reads C# with, so the verdict is judged
+        // against it, and a cache that stamped only the SDK's compiler would miss a change to the one judged. The
+        // SDK's is stamped beside it, because the cache finds SDKs installed beside the load's through it.
+        using TempDirectory temp = TestTempRoot.Fresh("lag-compiler-package");
+        string probe = WriteProject(temp, "Probe", "");
+        CompilerFacts sdkCompiler = ProjectFactsEvaluator
+            .EvaluateCompilerFacts([new ProjectEvaluationRequest(probe, null)], null, Ct)
+            .ShouldHaveSingleItem()
+            .ShouldNotBeNull();
+        string package = StubAnalyzers.CompilerPackage(temp, sdkCompiler.RoslynTargetsPath, 16);
+        string compilerAssembly = Path.Combine(package, StubAnalyzers.CompilerAssemblyName);
+        string sdkCompilerAssembly = Path.Combine(
+            Path.GetFullPath(sdkCompiler.RoslynTargetsPath), "bincore", StubAnalyzers.CompilerAssemblyName);
+        string csproj = WriteProject(
+            temp, "App",
+            "<LangVersion>latest</LangVersion><RoslynCompilerType>Custom</RoslynCompilerType>"
+            + $"<RoslynTargetsPath>{package}</RoslynTargetsPath>");
+        string solution = WriteSolution(temp, "App");
+        FixtureRestorer.Restore(solution);
+        var diagnostics = new List<string>();
+
+        using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solution, diagnostics.Add, ct: Ct);
+
+        loaded.LoadDiagnosticsWith(diagnostics).CompilerLagProjects.ShouldBe([csproj], string.Join("\n", diagnostics));
+        SolutionCacheInputs.Collect(loaded.Solution, loaded.CompilerAssemblies)
+            .ShouldHaveSingleItem()
+            .CompilerAssemblyPaths.ShouldBe(new[] { compilerAssembly, sdkCompilerAssembly }.Order(StringComparer.Ordinal));
+    }
 
     private static string WriteProject(
         TempDirectory temp, string name, string properties, string? analyzer = null, string items = "")
@@ -380,25 +401,15 @@ public sealed class CompilerLagFailuresTests
         string analyzerItem = analyzer is null ? "" : $"<Analyzer Include=\"{analyzer}\" />";
         string csproj = temp.WriteFile(
             [name, $"{name}.csproj"],
-            $"""
-             <Project Sdk="Microsoft.NET.Sdk">
-               <PropertyGroup>
-                 <TargetFramework>net10.0</TargetFramework>
-                 {properties}
-               </PropertyGroup>
-               <ItemGroup>
-                 {analyzerItem}
-                 {items}
-               </ItemGroup>
-             </Project>
-             """);
+            ScratchProjects.ClassLibrary(
+                $"  <PropertyGroup>{properties}</PropertyGroup>\n  <ItemGroup>{analyzerItem}{items}</ItemGroup>"));
         temp.WriteFile([name, "Widget.cs"], $"namespace {name} {{ public sealed class Widget {{ }} }}\n");
         return csproj;
     }
 
     private static string WriteSolution(TempDirectory temp, string name)
     {
-        return temp.WriteFile([$"{name}.slnx"], $"<Solution>\n  <Project Path=\"{name}/{name}.csproj\" />\n</Solution>\n");
+        return temp.WriteFile([$"{name}.slnx"], ScratchProjects.Solution($"{name}/{name}.csproj"));
     }
 
     // The verdict and the load's lines from a load of the solution, or from a replay of the binlog a build of it wrote.
@@ -439,115 +450,5 @@ public sealed class CompilerLagFailuresTests
         WorkspaceDiagnostics verdict = loaded.LoadDiagnosticsWith(diagnostics);
         verdict.RestoreFailedProjects.ShouldBeEmpty(string.Join("\n", diagnostics));
         return (verdict, diagnostics);
-    }
-}
-
-/// <summary>
-///     Analyzer assemblies the carried compiler cannot load, compiled per test into its temp directory: one built against
-///     a stand-in <c>Microsoft.CodeAnalysis</c> at version 99.0.0.0, and one whose generator's base class sits in an
-///     assembly left out of the directory.
-/// </summary>
-internal static class StubAnalyzers
-{
-    private const string NewerCompilerContract = """
-                                                 [assembly: System.Reflection.AssemblyVersion("99.0.0.0")]
-                                                 namespace Microsoft.CodeAnalysis
-                                                 {
-                                                     [System.AttributeUsage(System.AttributeTargets.Class)]
-                                                     public sealed class GeneratorAttribute : System.Attribute { }
-                                                     public interface IIncrementalGenerator { }
-                                                 }
-                                                 namespace Microsoft.CodeAnalysis.Diagnostics
-                                                 {
-                                                     [System.AttributeUsage(System.AttributeTargets.Class)]
-                                                     public sealed class DiagnosticAnalyzerAttribute : System.Attribute
-                                                     {
-                                                         public DiagnosticAnalyzerAttribute(string firstLanguage, params string[] additionalLanguages) { }
-                                                     }
-                                                     public abstract class DiagnosticAnalyzer { }
-                                                 }
-                                                 """;
-
-    internal static string NewerCompilerGenerator(TempDirectory temp)
-    {
-        return Emit(
-            temp, "Gen99",
-            "[Microsoft.CodeAnalysis.Generator] public sealed class G99 : Microsoft.CodeAnalysis.IIncrementalGenerator { }",
-            NewerContract());
-    }
-
-    internal static string NewerCompilerAnalyzer(TempDirectory temp)
-    {
-        return Emit(
-            temp, "Ana99",
-            "[Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer(\"C#\")] "
-            + "public sealed class A99 : Microsoft.CodeAnalysis.Diagnostics.DiagnosticAnalyzer { }",
-            NewerContract());
-    }
-
-    internal static string GeneratorMissingItsDependency(TempDirectory temp)
-    {
-        byte[] baseImage = SpecAssemblyCompiler.EmitImage(
-            "public abstract class BaseGen : Microsoft.CodeAnalysis.IIncrementalGenerator "
-            + "{ public void Initialize(Microsoft.CodeAnalysis.IncrementalGeneratorInitializationContext c) { } }",
-            "GenDepBase", WithCompiler(MetadataReference.CreateFromFile(typeof(Compilation).Assembly.Location)));
-        MetadataReference baseReference = MetadataReference.CreateFromImage(baseImage);
-        return Emit(
-            temp, "GenDep", "[Microsoft.CodeAnalysis.Generator] public sealed class GD : BaseGen { }",
-            MetadataReference.CreateFromFile(typeof(Compilation).Assembly.Location), baseReference);
-    }
-
-    internal static string EmptyAssembly(string path)
-    {
-        return Write(path, SpecAssemblyCompiler.EmitImage("public static class Empty { }", "Fake.Analyzer", WithCompiler()));
-    }
-
-    // A compiler assembly whose LanguageVersion enum declares C# up to highestMajor, the one fact a yardstick reads.
-    internal static string CompilerDeclaring(string path, int highestMajor)
-    {
-        var source =
-            $"namespace Microsoft.CodeAnalysis.CSharp {{ public enum LanguageVersion {{ CSharp{highestMajor} = {highestMajor * 100} }} }}";
-        return Write(path, SpecAssemblyCompiler.EmitImage(source, "Microsoft.CodeAnalysis.CSharp", WithCompiler()));
-    }
-
-    // A directory a build's CscToolPath can name: an executable that starts and fails, so the build records its call
-    // and compiles nothing, beside a compiler assembly declaring C# up to highestMajor.
-    internal static string StandInCompiler(TempDirectory temp, int highestMajor, string name = "compiler")
-    {
-        string directory = temp.PathOf(name);
-        Directory.CreateDirectory(directory);
-        File.Copy(Environment.ProcessPath!, Path.Combine(directory, "csc.exe"));
-        CompilerDeclaring(Path.Combine(directory, "Microsoft.CodeAnalysis.CSharp.dll"), highestMajor);
-        return directory;
-    }
-
-    private static string Write(string path, byte[] image)
-    {
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllBytes(path, image);
-        return path;
-    }
-
-    private static MetadataReference NewerContract()
-    {
-        byte[] image = SpecAssemblyCompiler.EmitImage(NewerCompilerContract, "Microsoft.CodeAnalysis", WithCompiler());
-        return MetadataReference.CreateFromImage(image);
-    }
-
-    private static string Emit(TempDirectory temp, string name, string source, params MetadataReference[] references)
-    {
-        byte[] image = SpecAssemblyCompiler.EmitImage(source, name, WithCompiler(references));
-        string path = temp.PathOf("analyzers", $"{name}.dll");
-        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        File.WriteAllBytes(path, image);
-        return path;
-    }
-
-    // The platform closure without the carried compiler, so a stand-in contract never meets the real one.
-    private static IReadOnlyList<MetadataReference> WithCompiler(params MetadataReference[] references)
-    {
-        IEnumerable<MetadataReference> platform = SpecAssemblyCompiler.PlatformReferences
-            .Where(reference => !Path.GetFileName(reference.Display ?? "").StartsWith("Microsoft.CodeAnalysis", StringComparison.Ordinal));
-        return [.. platform, .. references];
     }
 }

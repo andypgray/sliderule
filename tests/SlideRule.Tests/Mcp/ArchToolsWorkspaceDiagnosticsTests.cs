@@ -46,11 +46,9 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
 
     private const string LaggingProject = DiagnosticInjectingSolutionSource.SimulatedCompilerLagProject;
 
-    // The document slots the two loaded-but-incomplete causes ride, which the rows below also use to say which
-    // cause they inject.
-    private const string RestoreFailedSlot = "restoreFailedProjects";
+    private const string RestoreFailedSlot = DiagnosticInjectingSolutionSource.RestoreFailedSlot;
 
-    private const string CompilerLagSlot = "compilerLagProjects";
+    private const string CompilerLagSlot = DiagnosticInjectingSolutionSource.CompilerLagSlot;
 
     // How many frameworks each advisory-raising project restores on, and so how many times the load repeats
     // that project's line.
@@ -121,7 +119,7 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
         // graph carries its evidence inline because there is nothing above it here — this tool discards its
         // error writer — and it is the entry point a stranger reaches for first, so the refusal names the
         // remedy and the opt-out in both dialects rather than assuming which surface asked.
-        ArchTools tools = ToolsWith([], restoreFailedProjects: [UnrestoredProject]);
+        ArchTools tools = ToolsWithCause(RestoreFailedSlot);
 
         var error = await Should.ThrowAsync<UserErrorException>(() => tools.GraphAsync(cancellationToken: Ct));
 
@@ -291,30 +289,23 @@ public sealed class ArchToolsWorkspaceDiagnosticsTests
             .ShouldBeEmpty();
     }
 
-    // The tools over the clean spec, with diagnostics and any restore-failed or compiler-lag projects injected into
-    // an otherwise healthy load.
-    private static ArchTools ToolsWith(
-        IReadOnlyList<string> diagnostics,
-        IReadOnlyList<string>? restoreFailedProjects = null,
-        IReadOnlyList<string>? compilerLagProjects = null)
+    // The tools over the clean spec, with diagnostics injected into an otherwise healthy load.
+    private static ArchTools ToolsWith(IReadOnlyList<string> diagnostics)
     {
-        return new ArchTools(
-            McpServerBindings.MyAppWithCleanSpec(),
-            new DiagnosticInjectingSolutionSource(
-                diagnostics, restoreFailedProjects: restoreFailedProjects, compilerLagProjects: compilerLagProjects),
-            new SystemEnvironment(),
-            ResponseFitter.FirstRung);
+        return ToolsOver(new DiagnosticInjectingSolutionSource(diagnostics));
     }
 
     // The tools with one loaded-but-incomplete project alone, named by the document slot it rides.
     private static ArchTools ToolsWithCause(string slot)
     {
-        return slot switch
-        {
-            RestoreFailedSlot => ToolsWith([], restoreFailedProjects: [UnrestoredProject]),
-            CompilerLagSlot => ToolsWith([], compilerLagProjects: [LaggingProject]),
-            _ => throw new ArgumentOutOfRangeException(nameof(slot), slot, "no gate input rides that slot")
-        };
+        string project = DiagnosticInjectingSolutionSource.SimulatedProjectFor(slot);
+        return ToolsOver(DiagnosticInjectingSolutionSource.ForGateInput(slot, [], [project]));
+    }
+
+    private static ArchTools ToolsOver(ISolutionSource source)
+    {
+        return new ArchTools(
+            McpServerBindings.MyAppWithCleanSpec(), source, new SystemEnvironment(), ResponseFitter.FirstRung);
     }
 
     // Fixed width, so every project's line is the same length and the count that overruns the budget is exact.

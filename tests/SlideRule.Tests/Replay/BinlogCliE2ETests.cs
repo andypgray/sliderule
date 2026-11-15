@@ -6,7 +6,6 @@ using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Replay;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.Mcp.TestDoubles;
-using SlideRule.Tests.Roslyn;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -117,12 +116,9 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
         Assert.SkipUnless(OperatingSystem.IsWindows(), "The stand-in compiler is a Windows executable.");
         using TempDirectory bed = TestTempRoot.Fresh("binlog-cli-compiler");
         string compilerDirectory = StubAnalyzers.StandInCompiler(bed, 15);
-        bed.WriteFile(
-            ["App", "App.csproj"],
-            "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n"
-            + "  </PropertyGroup>\n</Project>\n");
+        bed.WriteFile(["App", "App.csproj"], ScratchProjects.ClassLibrary());
         bed.WriteFile(["App", "Widget.cs"], "namespace App { public sealed class Widget { } }\n");
-        string solution = bed.WriteFile(["App.slnx"], "<Solution>\n  <Project Path=\"App/App.csproj\" />\n</Solution>\n");
+        string solution = bed.WriteFile(["App.slnx"], ScratchProjects.Solution("App/App.csproj"));
         string binlog = bed.PathOf("App.binlog");
         DotnetCli.RunExpectingFailure(
             $"build \"{solution}\" -bl:LogFile=\"{binlog}\" -p:CscToolPath=\"{compilerDirectory}\"", bed.Path);
@@ -131,7 +127,7 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
 
         CliResult untimed = await RunAsync(cache, check);
         CliResult hit = await RunAsync(cache, [.. check, "--timings"]);
-        string compiler = Path.Combine(compilerDirectory, "Microsoft.CodeAnalysis.CSharp.dll");
+        string compiler = Path.Combine(compilerDirectory, StubAnalyzers.CompilerAssemblyName);
         DateTime written = File.GetLastWriteTimeUtc(compiler);
         StubAnalyzers.CompilerDeclaring(compiler, 14);
         File.SetLastWriteTimeUtc(compiler, written.AddHours(-1));

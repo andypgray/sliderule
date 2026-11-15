@@ -72,6 +72,60 @@ internal sealed class DiagnosticInjectingSolutionSource(
     /// <summary>The project file the gate rows inject as declared and not on disk.</summary>
     internal const string SimulatedMissingProject = "C:/repo/MyApp.Vendor/MyApp.Vendor.csproj";
 
+    /// <summary>
+    ///     The document slots the gate inputs ride, which the rows also use to name the input they inject.
+    /// </summary>
+    internal const string FailedSlot = "failedProjects";
+
+    /// <inheritdoc cref="FailedSlot" />
+    internal const string RestoreFailedSlot = "restoreFailedProjects";
+
+    /// <inheritdoc cref="FailedSlot" />
+    internal const string CompilerLagSlot = "compilerLagProjects";
+
+    /// <inheritdoc cref="FailedSlot" />
+    internal const string MissingSlot = "missingProjects";
+
+    /// <summary>
+    ///     <paramref name="diagnostics" /> with <paramref name="projects" /> as the gate input that rides
+    ///     <paramref name="slot" />; throws for a slot no gate input rides.
+    /// </summary>
+    internal static WorkspaceDiagnostics WithGateInput(
+        WorkspaceDiagnostics diagnostics, string slot, IReadOnlyList<string> projects)
+    {
+        return slot switch
+        {
+            FailedSlot => diagnostics with { FailedProjects = projects },
+            RestoreFailedSlot => diagnostics with { RestoreFailedProjects = projects },
+            CompilerLagSlot => diagnostics with { CompilerLagProjects = projects },
+            MissingSlot => diagnostics with { MissingProjects = projects },
+            _ => throw new ArgumentOutOfRangeException(nameof(slot), slot, "no gate input rides that slot")
+        };
+    }
+
+    /// <summary>The simulated project the gate rows inject into <paramref name="slot" />.</summary>
+    internal static string SimulatedProjectFor(string slot)
+    {
+        return slot switch
+        {
+            FailedSlot => SimulatedFailedProject,
+            RestoreFailedSlot => SimulatedRestoreFailedProject,
+            CompilerLagSlot => SimulatedCompilerLagProject,
+            MissingSlot => SimulatedMissingProject,
+            _ => throw new ArgumentOutOfRangeException(nameof(slot), slot, "no gate input rides that slot")
+        };
+    }
+
+    /// <summary>A source injecting <paramref name="projects" /> into <paramref name="slot" />, beside the diagnostics.</summary>
+    internal static DiagnosticInjectingSolutionSource ForGateInput(
+        string slot, IReadOnlyList<string> diagnostics, IReadOnlyList<string> projects, ISolutionSource? inner = null)
+    {
+        WorkspaceDiagnostics input = WithGateInput(WorkspaceDiagnostics.None, slot, projects);
+        return new DiagnosticInjectingSolutionSource(
+            diagnostics, input.FailedProjects, restoreFailedProjects: input.RestoreFailedProjects, inner: inner,
+            missingProjects: input.MissingProjects, compilerLagProjects: input.CompilerLagProjects);
+    }
+
     public async Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
         SolutionHandle real = await (inner ?? WarmWorkspacePool.Source).AcquireAsync(solutionPath, ct);
@@ -88,7 +142,8 @@ internal sealed class DiagnosticInjectingSolutionSource(
         // exercise today: this double re-wraps a real handle, so anything it drops silently sends the run
         // down the cold path and quietly changes what the gate is being tested against.
         return new SolutionHandle(
-            real.Solution, injected, real, real.ProjectFiles, real.WarmCodebase, real.WarmSpecResolution,
+            real.Solution, injected, real, real.ProjectFiles, real.CompilerAssemblies, real.WarmCodebase,
+            real.WarmSpecResolution,
             real.TargetFrameworks, warmDeclaredMembers: real.WarmDeclaredMembers);
     }
 }

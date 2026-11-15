@@ -72,6 +72,8 @@ internal static class ProjectFactsEvaluator
     // past four shards it slows by as much as evaluation speeds up.
     private const int MaxShards = 4;
 
+    private static int DefaultShardCount => Math.Clamp(Environment.ProcessorCount / 2, 1, MaxShards);
+
     /// <summary>
     ///     Evaluates <paramref name="requests" />, returning one result per request by index, null where that
     ///     project could not be evaluated at all.
@@ -84,8 +86,7 @@ internal static class ProjectFactsEvaluator
     internal static IReadOnlyList<ProjectArtifactFacts?> EvaluateAll(
         IReadOnlyList<ProjectEvaluationRequest> requests, string? solutionFile, CancellationToken ct)
     {
-        int shardCount = Math.Clamp(Environment.ProcessorCount / 2, 1, MaxShards);
-        return EvaluateAll(requests, solutionFile, shardCount, ct);
+        return EvaluateAll(requests, solutionFile, DefaultShardCount, ct);
     }
 
     /// <summary>
@@ -115,9 +116,8 @@ internal static class ProjectFactsEvaluator
     internal static IReadOnlyList<CompilerFacts?> EvaluateCompilerFacts(
         IReadOnlyList<ProjectEvaluationRequest> requests, string? solutionFile, CancellationToken ct)
     {
-        int shardCount = Math.Clamp(Environment.ProcessorCount / 2, 1, MaxShards);
         return EvaluateEach<CompilerFacts>(
-            requests, solutionFile, shardCount,
+            requests, solutionFile, DefaultShardCount,
             () => (project, _) => new CompilerFacts(
                 project.GetPropertyValue("LangVersion"), project.GetPropertyValue("RoslynTargetsPath")),
             ct);

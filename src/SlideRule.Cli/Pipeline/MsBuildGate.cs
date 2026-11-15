@@ -205,9 +205,7 @@ internal static class MsBuildGate
         using ReplayedSolution replayed = await ReplayAndIngestAsync(
             request, binlogFullPath, solutionPath, binlog, diagnostics, environment, ct);
 
-        var source = new ReplayedSolutionSource(
-            replayed.Solution, replayed.LoadDiagnosticsWith(diagnostics), replayed.TargetFrameworks,
-            replayed.ProjectFiles, replayed.CompilerAssemblies);
+        var source = new ReplayedSolutionSource(replayed, replayed.LoadDiagnosticsWith(diagnostics));
         return await invokeRunner(solutionPath, source);
     }
 

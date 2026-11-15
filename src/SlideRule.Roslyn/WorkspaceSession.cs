@@ -103,6 +103,9 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     // Set with every load, and read only through a snapshot, which is minted after one.
     private CanonicalProjectFiles? projectFiles;
 
+    // Set with every load, as projectFiles is.
+    private IReadOnlyDictionary<ProjectId, IReadOnlyList<string>>? compilerAssemblies;
+
     /// <summary>
     ///     Creates a session with nothing loaded. <paramref name="diagnosticSink" /> receives the session's own
     ///     commentary (why a call reloaded, a file the reconcile could not read), never the load's failures, which
@@ -253,6 +256,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         loadVerdict = WorkspaceDiagnostics.None;
         targetFrameworks = TargetFrameworkMaps.None;
         projectFiles = null;
+        compilerAssemblies = null;
         documentFingerprints.Clear();
         documentIds.Clear();
         structuralFingerprints.Clear();
@@ -278,9 +282,10 @@ internal sealed class WorkspaceSession : IAsyncDisposable
         loadVerdict = freshlyLoaded.LoadDiagnosticsWith(collected);
         targetFrameworks = freshlyLoaded.TargetFrameworks;
         projectFiles = freshlyLoaded.ProjectFiles;
+        compilerAssemblies = freshlyLoaded.CompilerAssemblies;
         generation++;
         SeedEditVersions(current);
-        RecordAllFingerprints(solutionPath, current, statsBeforeRead!);
+        RecordAllFingerprints(solutionPath, current, compilerAssemblies, statsBeforeRead!);
         snapshot = MintSnapshot();
         FullReloadCount++;
         Volatile.Write(ref readySolutionPath, solutionPath);
@@ -432,7 +437,8 @@ internal sealed class WorkspaceSession : IAsyncDisposable
             Generation = generation,
             ProjectEditVersions = new Dictionary<string, int>(projectEditVersions, StringComparer.Ordinal),
             TargetFrameworks = targetFrameworks,
-            ProjectFiles = projectFiles!
+            ProjectFiles = projectFiles!,
+            CompilerAssemblies = compilerAssemblies!
         };
     }
 
@@ -473,7 +479,9 @@ internal sealed class WorkspaceSession : IAsyncDisposable
     ///     per project directory, because where the restore assets file lands follows the project's own evaluated
     ///     output paths and not its directory.
     /// </remarks>
-    private void RecordAllFingerprints(string solutionPath, Solution solution, IReadOnlyDictionary<string, FileFreshness> statsBeforeRead)
+    private void RecordAllFingerprints(
+        string solutionPath, Solution solution, IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> compilers,
+        IReadOnlyDictionary<string, FileFreshness> statsBeforeRead)
     {
         foreach (Project project in solution.Projects)
         foreach (Document document in project.Documents)
@@ -508,7 +516,7 @@ internal sealed class WorkspaceSession : IAsyncDisposable
             RecordStructural(path);
 
         // A compiler the load read C# against is structural: an SDK updated in place can change the lag verdict.
-        foreach (string compiler in CompilerLagFailures.CompilerAssembliesOf(solution))
+        foreach (string compiler in compilers.Values.SelectMany(projectCompilers => projectCompilers))
             RecordStructural(compiler);
 
         foreach ((string projectDirectory, string suffix) in coneRoots)

@@ -97,7 +97,7 @@ internal sealed class WarmSolutionSource(
     private SolutionHandle HandleFor(WorkspaceSnapshot snapshot, string solutionPath)
     {
         return new SolutionHandle(
-            snapshot.Solution, snapshot.LoadDiagnostics, null, snapshot.ProjectFiles,
+            snapshot.Solution, snapshot.LoadDiagnostics, null, snapshot.ProjectFiles, snapshot.CompilerAssemblies,
             (exclude, declaredMembers, token) => store.GetCodebaseAsync(snapshot, exclude, declaredMembers, token),
             (normalizedSpec, resolveFully) => resolutions.Resolve(normalizedSpec, snapshot.Generation, resolveFully),
             snapshot.TargetFrameworks,

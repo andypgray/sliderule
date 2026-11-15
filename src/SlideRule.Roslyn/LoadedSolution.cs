@@ -20,12 +20,14 @@ internal sealed class LoadedSolution : IDisposable
         CanonicalProjectFiles projectFiles,
         ProjectLoadReport report,
         IReadOnlyList<string> restoreFailedProjects,
-        IReadOnlyList<string> compilerLagProjects)
+        IReadOnlyList<string> compilerLagProjects,
+        IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> compilerAssemblies)
     {
         _workspace = workspace;
         Solution = solution;
         TargetFrameworks = targetFrameworks;
         ProjectFiles = projectFiles;
+        CompilerAssemblies = compilerAssemblies;
         _loadVerdict = WorkspaceDiagnostics.OfLoad(
             loadFailures: [],
             failedProjects: report.Failed,
@@ -51,6 +53,13 @@ internal sealed class LoadedSolution : IDisposable
 
     /// <summary>Each loaded project's canonical <c>.csproj</c> path, resolved once for the load.</summary>
     public CanonicalProjectFiles ProjectFiles { get; }
+
+    /// <summary>
+    ///     The compiler assemblies the caches stamp for each loaded C# project, keyed by <see cref="ProjectId" />: the
+    ///     one its compiler-lag verdict was judged against, and the SDK's beside it when that one lies outside the
+    ///     SDK, so that a change to either invalidates them.
+    /// </summary>
+    public IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> CompilerAssemblies { get; }
 
     /// <summary>
     ///     This load's verdict as the one value every surface reads. <paramref name="loadFailures" /> are the

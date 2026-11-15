@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.Reflection.Metadata;
 using System.Reflection.PortableExecutable;
 using System.Security;
@@ -55,10 +54,11 @@ internal static class CompilerLagFailures
     internal readonly record struct Finding(string ProjectPath, string Evidence);
 
     /// <summary>
-    ///     What a recorded compiler call says about one project: the <c>/langversion</c> it passed, null when it passed
-    ///     none, and the compiler assembly beside the compiler it ran, null when none is on disk.
+    ///     What one project asks its build's compiler for: the C# version its evaluation or its recorded compiler
+    ///     call names (<see cref="Asked" />, null when a recorded call passed no <c>/langversion</c>), and the compiler
+    ///     assembly that reads it (<see cref="CompilerAssemblyPath" />, null when there is no path).
     /// </summary>
-    internal readonly record struct RecordedLanguage(string? Asked, string? CompilerAssemblyPath);
+    internal readonly record struct ProjectLanguage(string? Asked, string? CompilerAssemblyPath);
 
     /// <summary>
     ///     Whether a project lags, from what its evaluation asks for (<paramref name="asked" />, null when the
@@ -73,8 +73,7 @@ internal static class CompilerLagFailures
         // The rejection needs no yardstick, so it is decided before one is consulted.
         if (specified == LanguageVersion.Default && !AsksForNothing(asked)) return CompilerLag.UnknownVersion;
 
-        bool alias = specified is LanguageVersion.Default or LanguageVersion.Latest or LanguageVersion.LatestMajor
-            or LanguageVersion.Preview;
+        bool alias = IsAlias(specified);
         if (!alias || yardstickHighest <= 0) return null;
 
         return yardstickHighest > carriedHighest ? CompilerLag.NewerDefault : null;
@@ -172,63 +171,11 @@ internal static class CompilerLagFailures
 
     /// <summary>
     ///     The C# projects whose C# version the carried compiler cannot read, with one evidence line each, less
-    ///     <paramref name="alreadyFailed" />. <paramref name="solutionFile" /> is the file the load derived its
-    ///     solution properties from, as the artifact facts' evaluation takes it.
+    ///     <paramref name="alreadyFailed" />, judged from what <paramref name="languages" /> says each project asks
+    ///     for and which compiler reads it. A project with no entry is not judged.
     /// </summary>
     internal static IReadOnlyList<Finding> DetectLanguage(
-        Solution solution,
-        IReadOnlyDictionary<ProjectId, string> targetFrameworks,
-        IReadOnlyList<string> alreadyFailed,
-        string? solutionFile,
-        CancellationToken ct)
-    {
-        var skip = new HashSet<string>(alreadyFailed, PathComparison.Comparer);
-        List<Project> projects = solution.Projects
-            .Where(project => ProjectLanguages.IsCSharp(project) && project.FilePath is not null)
-            .Where(project => !skip.Contains(Path.GetFullPath(project.FilePath!)))
-            .Where(project => project.ParseOptions is CSharpParseOptions)
-            .ToList();
-        if (projects.Count == 0) return [];
-
-        List<ProjectEvaluationRequest> requests = projects
-            .Select(project => new ProjectEvaluationRequest(
-                project.FilePath, targetFrameworks.GetValueOrDefault(project.Id)))
-            .ToList();
-        IReadOnlyList<CompilerFacts?> facts = ProjectFactsEvaluator.EvaluateCompilerFacts(requests, solutionFile, ct);
-
-        string? solutionSdk = LoadSdkOf(solution);
-        var highestByAssembly = new ConcurrentDictionary<string, int>(PathComparison.Comparer);
-        var findings = new SortedDictionary<string, Finding>(StringComparer.Ordinal);
-        for (var i = 0; i < projects.Count; i++)
-        {
-            Project project = projects[i];
-            string projectPath = Path.GetFullPath(project.FilePath!);
-            if (findings.ContainsKey(projectPath)) continue;
-
-            var parseOptions = (CSharpParseOptions)project.ParseOptions!;
-            string? yardstick = YardstickOf(project, facts[i]?.RoslynTargetsPath, solutionSdk);
-            int yardstickHighest = yardstick is null
-                ? 0
-                : highestByAssembly.GetOrAdd(yardstick, HighestLanguageVersion);
-
-            CompilerLag? lag = Judge(
-                facts[i]?.LangVersion, parseOptions.SpecifiedLanguageVersion, yardstickHighest,
-                CarriedHighestLanguageVersion);
-            if (lag is { } kind)
-                findings[projectPath] = new Finding(
-                    projectPath, LanguageEvidence(projectPath, kind, facts[i]!.LangVersion, yardstickHighest));
-        }
-
-        return findings.Values.ToList();
-    }
-
-    /// <summary>
-    ///     <see cref="DetectLanguage" /> for a replayed solution, from the compiler call each project's build recorded
-    ///     (<paramref name="recorded" />) in place of an evaluation: the version it asked for is the one its command
-    ///     line passed, and its yardstick is the compiler it ran. A project with no recorded call is not judged.
-    /// </summary>
-    internal static IReadOnlyList<Finding> DetectRecordedLanguage(
-        Solution solution, IReadOnlyDictionary<ProjectId, RecordedLanguage> recorded,
+        Solution solution, IReadOnlyDictionary<ProjectId, ProjectLanguage> languages,
         IReadOnlyList<string> alreadyFailed)
     {
         var skip = new HashSet<string>(alreadyFailed, PathComparison.Comparer);
@@ -238,7 +185,7 @@ internal static class CompilerLagFailures
         {
             if (!ProjectLanguages.IsCSharp(project) || project.FilePath is null) continue;
             if (project.ParseOptions is not CSharpParseOptions parseOptions) continue;
-            if (!recorded.TryGetValue(project.Id, out RecordedLanguage call)) continue;
+            if (!languages.TryGetValue(project.Id, out ProjectLanguage call)) continue;
 
             string projectPath = Path.GetFullPath(project.FilePath);
             if (skip.Contains(projectPath) || findings.ContainsKey(projectPath)) continue;
@@ -260,6 +207,48 @@ internal static class CompilerLagFailures
         }
 
         return findings.Values.ToList();
+    }
+
+    /// <summary>
+    ///     What an in-process evaluation says each C# project of <paramref name="solution" /> asks for, less
+    ///     <paramref name="alreadyFailed" /> and the projects <see cref="Judge" /> cannot find lagging at the version
+    ///     the load parsed them at. A project the evaluation could not read has no entry. <paramref name="solutionFile" />
+    ///     is the file the load derived its solution properties from, as the artifact facts' evaluation takes it.
+    /// </summary>
+    internal static IReadOnlyDictionary<ProjectId, ProjectLanguage> EvaluatedLanguages(
+        Solution solution,
+        IReadOnlyDictionary<ProjectId, string> targetFrameworks,
+        IReadOnlyList<string> alreadyFailed,
+        string? solutionFile,
+        CancellationToken ct)
+    {
+        var languages = new Dictionary<ProjectId, ProjectLanguage>();
+        var skip = new HashSet<string>(alreadyFailed, PathComparison.Comparer);
+        List<Project> projects = solution.Projects
+            .Where(project => ProjectLanguages.IsCSharp(project) && project.FilePath is not null)
+            .Where(project => !skip.Contains(Path.GetFullPath(project.FilePath!)))
+            .Where(project => project.ParseOptions is CSharpParseOptions { SpecifiedLanguageVersion: var specified }
+                              && IsAlias(specified))
+            .ToList();
+        if (projects.Count == 0) return languages;
+
+        List<ProjectEvaluationRequest> requests = projects
+            .Select(project => new ProjectEvaluationRequest(
+                project.FilePath, targetFrameworks.GetValueOrDefault(project.Id)))
+            .ToList();
+        IReadOnlyList<CompilerFacts?> facts = ProjectFactsEvaluator.EvaluateCompilerFacts(requests, solutionFile, ct);
+
+        string? solutionSdk = LoadSdkOf(solution);
+        for (var i = 0; i < projects.Count; i++)
+        {
+            if (facts[i] is not { } projectFacts) continue;
+
+            Project project = projects[i];
+            string? yardstick = YardstickOf(project, projectFacts.RoslynTargetsPath, solutionSdk);
+            languages[project.Id] = new ProjectLanguage(projectFacts.LangVersion, yardstick);
+        }
+
+        return languages;
     }
 
     /// <summary>
@@ -342,19 +331,37 @@ internal static class CompilerLagFailures
     }
 
     /// <summary>
-    ///     The distinct compiler assemblies <see cref="YardstickOf" /> finds for the C# projects of
-    ///     <paramref name="solution" /> from the load alone, ordinal-sorted.
+    ///     The compiler assemblies the caches stamp for each C# project of <paramref name="solution" /> that has a
+    ///     file, keyed by <see cref="ProjectId" />, ordinal-distinct: the one <paramref name="languages" /> names, else
+    ///     the SDK one <see cref="YardstickOf" /> finds from the load alone, and with <paramref name="anchorToSdk" />
+    ///     that SDK one beside a named one that differs. A project with neither has no entry.
     /// </summary>
-    internal static IReadOnlyList<string> CompilerAssembliesOf(Solution solution)
+    /// <remarks>
+    ///     Must name the compiler <see cref="DetectLanguage" /> judged a project against wherever it judged one, so
+    ///     that a change to that compiler invalidates what the caches hold. A load anchors to its SDK because the
+    ///     extraction cache notices an SDK installed beside the load's only through a stamp inside that SDK. A replay
+    ///     does not: its input is the binlog, whose capture refuses any stamp newer than it, as a local SDK installed
+    ///     after another machine's build is.
+    /// </remarks>
+    internal static IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> CompilerAssemblies(
+        Solution solution, IReadOnlyDictionary<ProjectId, ProjectLanguage> languages, bool anchorToSdk)
     {
         string? solutionSdk = LoadSdkOf(solution);
-        return solution.Projects
-            .Where(ProjectLanguages.IsCSharp)
-            .Select(project => YardstickOf(project, null, solutionSdk))
-            .OfType<string>()
-            .Distinct(PathComparison.Comparer)
-            .OrderBy(path => path, StringComparer.Ordinal)
-            .ToList();
+        var compilers = new Dictionary<ProjectId, IReadOnlyList<string>>();
+        foreach (Project project in solution.Projects)
+        {
+            if (!ProjectLanguages.IsCSharp(project) || project.FilePath is null) continue;
+
+            string? judged = languages.GetValueOrDefault(project.Id).CompilerAssemblyPath;
+            string? sdkCompiler = judged is null || anchorToSdk ? YardstickOf(project, null, solutionSdk) : null;
+            List<string> stamped = new[] { judged, sdkCompiler }
+                .OfType<string>()
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (stamped.Count > 0) compilers[project.Id] = stamped;
+        }
+
+        return compilers;
     }
 
     /// <summary>
@@ -424,11 +431,16 @@ internal static class CompilerLagFailures
         {
             return Path.GetFullPath(path);
         }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException
-                                       or SecurityException)
+        catch (Exception ex) when (IsReadFault(ex))
         {
             return null;
         }
+    }
+
+    private static bool IsAlias(LanguageVersion version)
+    {
+        return version is LanguageVersion.Default or LanguageVersion.Latest or LanguageVersion.LatestMajor
+            or LanguageVersion.Preview;
     }
 
     private static bool AsksForNothing(string asked)

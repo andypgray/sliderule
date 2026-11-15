@@ -3,8 +3,8 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Roslyn;
-using SlideRule.Roslyn.Diagnostics;
 using SlideRule.Roslyn.Sessions;
+using SlideRule.Roslyn.Solutions;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -282,10 +282,8 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         // Arrange
         using var fixture = new TempFixtureWorkspace();
         using TempDirectory dotnetRoot = TestTempRoot.Fresh("session-sdk");
-        string compiler = dotnetRoot.WriteFile(
-            ["sdk", "99.0.100", "Roslyn", "bincore", "Microsoft.CodeAnalysis.CSharp.dll"], "compiler\n");
-        string analyzer = dotnetRoot.WriteFile(
-            ["sdk", "99.0.100", "Sdks", "Fake.Sdk", "analyzers", "Fake.Analyzer.dll"], "analyzer\n");
+        string compiler = dotnetRoot.WriteFile(StubAnalyzers.SdkCompilerSegments("99.0.100"), "compiler\n");
+        string analyzer = dotnetRoot.WriteFile(StubAnalyzers.SdkAnalyzerSegments("99.0.100"), "analyzer\n");
         FixtureEdits.EditOnDisk(
             fixture.PathOf(Domain, $"{Domain}.csproj"),
             content => content.Replace(
@@ -298,7 +296,8 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
             .Where(project => project.Name == Domain)
             .SelectMany(project => project.AnalyzerReferences)
             .Select(reference => reference.FullPath);
-        CompilerLagFailures.CompilerAssembliesOf(before.Solution)
+        before.CompilerAssemblies.Values
+            .SelectMany(compilers => compilers)
             .ShouldContain(
                 compiler,
                 "the analyzer item must point the session at the temp SDK's compiler; Domain's analyzers are:\n"
@@ -308,13 +307,55 @@ public sealed class WorkspaceSessionTests(SharedWorkspaceSession shared) : IClas
         session.FullReloadCount.ShouldBe(reloadsBefore, "nothing has changed yet, so nothing may reload");
 
         // Act
-        File.WriteAllText(compiler, "an updated compiler\n");
-        FixtureEdits.StampForward(compiler);
+        FixtureEdits.EditOnDisk(compiler, _ => "an updated compiler\n");
         WorkspaceSnapshot after = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
 
         // Assert
         (session.FullReloadCount - reloadsBefore).ShouldBe(1);
         after.Generation.ShouldBeGreaterThan(before.Generation);
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_CompilerPackageRewritten_ReloadsWithTheNewVerdict()
+    {
+        // A RoslynTargetsPath outside any SDK names the compiler a project's build reads C# with, so the session
+        // judges the project against that package's compiler and has to watch it: the SDK's compiler alone does not
+        // change when the package is updated. Its own session over its own copy, because the project file is edited.
+
+        // Arrange
+        using var fixture = new TempFixtureWorkspace();
+        using TempDirectory packageRoot = TestTempRoot.Fresh("session-compiler-package");
+        string domainProject = fixture.PathOf(Domain, $"{Domain}.csproj");
+        CompilerFacts sdkCompiler = ProjectFactsEvaluator
+            .EvaluateCompilerFacts([new ProjectEvaluationRequest(domainProject, null)], null, Ct)
+            .ShouldHaveSingleItem()
+            .ShouldNotBeNull();
+        string package = StubAnalyzers.CompilerPackage(packageRoot, sdkCompiler.RoslynTargetsPath, 15);
+        string compiler = Path.Combine(package, StubAnalyzers.CompilerAssemblyName);
+        FixtureEdits.EditOnDisk(
+            domainProject,
+            content => content.Replace(
+                "</Project>",
+                "    <PropertyGroup>\n        <LangVersion>latest</LangVersion>\n"
+                + "        <RoslynCompilerType>Custom</RoslynCompilerType>\n"
+                + $"        <RoslynTargetsPath>{package}</RoslynTargetsPath>\n    </PropertyGroup>\n</Project>"));
+        await using var session = new WorkspaceSession();
+        WorkspaceSnapshot before = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+        before.LoadDiagnostics.CompilerLagProjects.ShouldBeEmpty(
+            "the carried compiler reads the C# 15 the package declares; the load said:\n"
+            + string.Join("\n", before.LoadDiagnostics.LoadFailures));
+        long reloadsBefore = session.FullReloadCount;
+
+        // Act
+        StubAnalyzers.CompilerDeclaring(compiler, 16);
+        FixtureEdits.StampForward(compiler);
+        WorkspaceSnapshot after = await session.GetCurrentAsync(fixture.SolutionPath, Ct);
+
+        // Assert
+        (session.FullReloadCount - reloadsBefore).ShouldBe(1);
+        after.ShouldSatisfyAllConditions(
+            () => after.Generation.ShouldBeGreaterThan(before.Generation),
+            () => after.LoadDiagnostics.CompilerLagProjects.ShouldBe([Path.GetFullPath(domainProject)]));
     }
 
     [Fact]

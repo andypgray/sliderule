@@ -403,7 +403,7 @@ internal sealed class BinlogCaptureStore
     // SolutionProjects' answer and the fragment cache's too. The recorded compilers join the structural stamps, so a
     // compiler changed in place invalidates the capture.
     private static IReadOnlyList<ProjectInputs> CollectProjects(
-        Solution solution, IReadOnlyDictionary<ProjectId, string> compilerAssemblies)
+        Solution solution, IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> compilerAssemblies)
     {
         return SolutionProjects.Collect(solution, static (_, _) => true, compilerAssemblies);
     }

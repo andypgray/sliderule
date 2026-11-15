@@ -33,15 +33,14 @@ internal static class SolutionProjects
     ///     replayed, in ordinal name order. <paramref name="includeDocument" /> decides whether to track a
     ///     document, given the directory of the project it was found under and the document's absolute path; it
     ///     is asked per <see cref="Project" />, so a multi-targeted project answers it against the framework the
-    ///     document came from. <paramref name="compilerAssemblies" /> is the compiler assembly a replay read off each
-    ///     project's recorded call, which outranks the one found from the load.
+    ///     document came from. <paramref name="compilerAssemblies" /> are the compiler assemblies to stamp for each
+    ///     project, as the load or replay of <paramref name="solution" /> found them; a project with no entry stamps none.
     /// </summary>
     internal static IReadOnlyList<ProjectInputs> Collect(
         Solution solution, Func<string, string, bool> includeDocument,
-        IReadOnlyDictionary<ProjectId, string>? compilerAssemblies = null)
+        IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> compilerAssemblies)
     {
         var byName = new Dictionary<string, Accumulator>(StringComparer.Ordinal);
-        string? solutionSdk = CompilerLagFailures.LoadSdkOf(solution);
 
         foreach (Project project in solution.Projects)
         {
@@ -62,9 +61,8 @@ internal static class SolutionProjects
             }
 
             // Every framework's, because a change to any one of them can make the carried compiler lag that framework.
-            string? compiler = compilerAssemblies?.GetValueOrDefault(project.Id)
-                               ?? CompilerLagFailures.YardstickOf(project, null, solutionSdk);
-            if (compiler is not null) accumulator.Compilers.Add(compiler);
+            if (compilerAssemblies.TryGetValue(project.Id, out IReadOnlyList<string>? compilers))
+                accumulator.Compilers.UnionWith(compilers);
 
             AddDocuments(project, projectDirectory, includeDocument, accumulator.Documents);
 
