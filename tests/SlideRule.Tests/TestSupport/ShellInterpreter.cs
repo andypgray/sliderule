@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Xunit;
 
 namespace SlideRule.Tests.TestSupport;
@@ -55,6 +56,25 @@ internal static class ShellInterpreter
                 UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
                 | UnixFileMode.GroupRead | UnixFileMode.GroupExecute
                 | UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
+    }
+
+    /// <summary>
+    ///     The start info that runs the committed script at <paramref name="repoRelativeScript" /> with
+    ///     <paramref name="arguments" /> under bash, as every CI step runs it, from
+    ///     <paramref name="workingDirectory" /> with <paramref name="stubDirectory" /> in front of the
+    ///     <c>PATH</c>. The caller adds any further environment before running it.
+    /// </summary>
+    internal static ProcessStartInfo CommittedScript(
+        string repoRelativeScript, string workingDirectory, string stubDirectory, IEnumerable<string> arguments)
+    {
+        var startInfo = new ProcessStartInfo(Require()) { WorkingDirectory = workingDirectory };
+        startInfo.ArgumentList.Add("-c");
+        startInfo.ArgumentList.Add("exec bash \"$0\" \"$@\"");
+        startInfo.ArgumentList.Add(Posix(RepoRoot.Absolute(repoRelativeScript)));
+        foreach (string argument in arguments) startInfo.ArgumentList.Add(argument);
+        startInfo.Environment["PATH"] = PrependedPath(stubDirectory);
+
+        return startInfo;
     }
 
     /// <summary>

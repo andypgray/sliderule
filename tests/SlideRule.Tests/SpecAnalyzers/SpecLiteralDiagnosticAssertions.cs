@@ -27,13 +27,8 @@ internal static class SpecLiteralDiagnosticAssertions
     /// <summary>The same over the compiler's own diagnostics, already taken.</summary>
     internal static void ShouldHaveNothingToCompileAbout(this IEnumerable<Diagnostic> diagnostics)
     {
-        List<string> errors = diagnostics
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(diagnostic => diagnostic.ToString())
-            .ToList();
-
-        errors.ShouldBeEmpty("The snippet has to compile before anything the analyzer says about it means "
-                             + "something, because an unbound call is silence rather than a diagnostic.");
+        diagnostics.ShouldHaveNoErrors("The snippet has to compile before anything the analyzer says about it means "
+                                       + "something, because an unbound call is silence rather than a diagnostic.");
     }
 
     /// <summary>

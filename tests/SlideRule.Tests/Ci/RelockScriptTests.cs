@@ -128,14 +128,8 @@ public sealed class RelockScriptTests
         /// </summary>
         internal ChildProcess.ProcessResult Relock(params string[] arguments)
         {
-            string shell = ShellInterpreter.Require();
-            var startInfo = new ProcessStartInfo(shell) { WorkingDirectory = Root };
-            startInfo.ArgumentList.Add("-c");
-            startInfo.ArgumentList.Add("exec bash \"$0\" \"$@\"");
-            startInfo.ArgumentList.Add(ShellInterpreter.Posix(RepoRoot.Absolute(".github/scripts/relock.sh")));
-            foreach (string argument in arguments) startInfo.ArgumentList.Add(argument);
-
-            startInfo.Environment["PATH"] = ShellInterpreter.PrependedPath(_stubDirectory);
+            ProcessStartInfo startInfo = ShellInterpreter.CommittedScript(
+                ".github/scripts/relock.sh", Root, _stubDirectory, arguments);
             startInfo.Environment["GITHUB_HEAD_REF"] = DependabotNuGetRef;
             // The script's commit takes the identity it writes, but a host's global signing setting would still
             // reach it.

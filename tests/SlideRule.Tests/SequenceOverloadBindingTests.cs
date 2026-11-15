@@ -109,8 +109,8 @@ public sealed class SequenceOverloadBindingTests
     {
         (CSharpCompilation compilation, SyntaxTree tree) = Compile(version, statements);
         compilation.GetDiagnostics(Ct)
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .ShouldBeEmpty();
+            .ShouldHaveNoErrors("The statements have to compile before the overload they bind means anything: "
+                                + string.Join(" ", statements));
 
         List<InvocationExpressionSyntax> calls = tree.GetRoot(Ct)
             .DescendantNodes()

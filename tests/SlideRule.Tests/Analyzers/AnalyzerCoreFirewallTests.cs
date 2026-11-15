@@ -302,11 +302,7 @@ public sealed class AnalyzerCoreFirewallTests
 
         using var stream = new MemoryStream();
         EmitResult result = compilation.Emit(stream);
-        List<string> errors = result.Diagnostics
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(diagnostic => diagnostic.ToString())
-            .ToList();
-        errors.ShouldBeEmpty("The probe has to compile before the walk over it means anything.");
+        result.Diagnostics.ShouldHaveNoErrors("The probe has to compile before the walk over it means anything.");
 
         return ImmutableArray.Create(stream.ToArray());
     }

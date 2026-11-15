@@ -148,13 +148,8 @@ public sealed class SdkCheckScriptTests
     /// <summary>Runs the committed script with <paramref name="bands" />, under bash as every CI step runs it.</summary>
     private static ChildProcess.ProcessResult CheckSdk(string stubDirectory, params string[] bands)
     {
-        string shell = ShellInterpreter.Require();
-        var startInfo = new ProcessStartInfo(shell) { WorkingDirectory = stubDirectory };
-        startInfo.ArgumentList.Add("-c");
-        startInfo.ArgumentList.Add("exec bash \"$0\" \"$@\"");
-        startInfo.ArgumentList.Add(ShellInterpreter.Posix(RepoRoot.Absolute(".github/scripts/check-sdk.sh")));
-        foreach (string band in bands) startInfo.ArgumentList.Add(band);
-        startInfo.Environment["PATH"] = ShellInterpreter.PrependedPath(stubDirectory);
+        ProcessStartInfo startInfo = ShellInterpreter.CommittedScript(
+            ".github/scripts/check-sdk.sh", stubDirectory, stubDirectory, bands);
 
         return ChildProcess.Run(startInfo, TimeSpan.FromMinutes(1));
     }

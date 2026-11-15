@@ -1,11 +1,10 @@
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Runtime.Loader;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Emit;
 using Shouldly;
 using SlideRule.Internal;
 using SlideRule.Tests.Extraction;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests;
@@ -22,18 +21,12 @@ public sealed class ExtensionIndexerAnchorTests : IDisposable
 
     public ExtensionIndexerAnchorTests()
     {
-        CSharpCompilation compilation = CompilationFactory.CreateCompilation("Indexers", [CompilationFactory.CoreLibrary], ("Ext.cs", """
-                                                                                                                                      namespace N;
-                                                                                                                                      public class Box {}
-                                                                                                                                      public static class Ext { extension(Box b) { public int this[int i] => i; } }
-                                                                                                                                      """));
-        using var image = new MemoryStream();
-        EmitResult emitted = compilation.Emit(image, cancellationToken: Ct);
-        if (!emitted.Success)
-            throw new InvalidOperationException($"Emitting the indexer fixture failed:\n{string.Join("\n", emitted.Diagnostics)}");
-
-        image.Position = 0;
-        _ext = _context.LoadFromStream(image).GetType("N.Ext", throwOnError: true)!;
+        byte[] image = SpecAssemblyCompiler.EmitImage("""
+                                                      namespace N;
+                                                      public class Box {}
+                                                      public static class Ext { extension(Box b) { public int this[int i] => i; } }
+                                                      """, "Indexers", [CompilationFactory.CoreLibrary]);
+        _ext = _context.LoadFromStream(new MemoryStream(image)).GetType("N.Ext", throwOnError: true)!;
     }
 
     public void Dispose()

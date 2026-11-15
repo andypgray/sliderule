@@ -6,7 +6,7 @@ namespace SlideRule.Tests;
 
 /// <summary>
 ///     The Shouldly surface over the warnings an analyzer reports: which came back, and what each one says and
-///     carries as properties.
+///     carries as properties; and over a compilation's diagnostics, that none is an error.
 /// </summary>
 /// <remarks>
 ///     Every failure message carries the whole reported set — each warning's ID, position and message —
@@ -77,6 +77,16 @@ internal static class DiagnosticAssertions
         string header = customMessage ?? $"Expected no {id}";
 
         matching.ShouldBeEmpty(reported.Describe(header));
+    }
+
+    /// <summary>Asserts no diagnostic is an error, naming every error and <paramref name="because" /> when one is.</summary>
+    internal static void ShouldHaveNoErrors(this IEnumerable<Diagnostic> diagnostics, string because)
+    {
+        List<string> errors = diagnostics.Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            .Select(diagnostic => diagnostic.ToString())
+            .ToList();
+
+        errors.ShouldBeEmpty(because);
     }
 
     /// <summary>Asserts the whole message, composed in the invariant culture.</summary>

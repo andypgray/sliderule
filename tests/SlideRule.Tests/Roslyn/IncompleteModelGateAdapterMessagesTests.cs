@@ -48,6 +48,21 @@ public sealed class IncompleteModelGateAdapterMessagesTests
     private const string LagLede =
         "the model is incomplete — the C# 15 compiler this tool carries cannot read all the code of 1 project";
 
+    private const string LagOptedIn =
+        "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
+        + "the C# 15 compiler this tool carries not reading all the code of 1 project:\n"
+        + $"  {LaggingProject}";
+
+    private static string LagRefusal =>
+        LagLede + ", so every rule test was skipped:\n"
+                + $"  {LaggingProject}\n"
+                + $"  {MsBuildBootstrap.SelectionNote()}\n"
+                + "Every rule would be measured over a codebase missing the code the compiler cannot read — a green "
+                + "run against a partial model would sign verdicts that were never reached. Update SlideRule to a "
+                + "release whose compiler reads it (dotnet tool update -g SlideRule.Cli, or a newer SlideRule.Xunit "
+                + "package), then retry. To check the partial model as it loaded, override AllowWorkspaceDiagnostics "
+                + "to true on the test class.";
+
     [Fact]
     public void AdapterRefusal_MissingProjectFile_NamesTheFileAndARemedyThatCanEndIt()
     {
@@ -88,15 +103,7 @@ public sealed class IncompleteModelGateAdapterMessagesTests
         // every cause a load reported.
         string refusal = IncompleteModelGate.AdapterRefusal(Diagnostics(lagging: [LaggingProject]));
 
-        refusal.ShouldBe(
-            LagLede + ", so every rule test was skipped:\n"
-                    + $"  {LaggingProject}\n"
-                    + $"  {MsBuildBootstrap.SelectionNote()}\n"
-                    + "Every rule would be measured over a codebase missing the code the compiler cannot read — a green "
-                    + "run against a partial model would sign verdicts that were never reached. Update SlideRule to a "
-                    + "release whose compiler reads it (dotnet tool update -g SlideRule.Cli, or a newer SlideRule.Xunit "
-                    + "package), then retry. To check the partial model as it loaded, override AllowWorkspaceDiagnostics "
-                    + "to true on the test class.");
+        refusal.ShouldBe(LagRefusal);
     }
 
     [Fact]
@@ -158,10 +165,7 @@ public sealed class IncompleteModelGateAdapterMessagesTests
     {
         string skip = IncompleteModelGate.AdapterOptedIn(Diagnostics(lagging: [LaggingProject]));
 
-        skip.ShouldBe(
-            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
-            + "the C# 15 compiler this tool carries not reading all the code of 1 project:\n"
-            + $"  {LaggingProject}");
+        skip.ShouldBe(LagOptedIn);
     }
 
     [Fact]
@@ -173,17 +177,10 @@ public sealed class IncompleteModelGateAdapterMessagesTests
             Diagnostics(lagging: [LaggingProject], loadFailures: [LagEvidence, OtherLoadLine]));
 
         refusal.ShouldBe(
-            LagLede + ", so every rule test was skipped:\n"
-                    + $"  {LaggingProject}\n"
-                    + $"  {MsBuildBootstrap.SelectionNote()}\n"
-                    + "Every rule would be measured over a codebase missing the code the compiler cannot read — a green "
-                    + "run against a partial model would sign verdicts that were never reached. Update SlideRule to a "
-                    + "release whose compiler reads it (dotnet tool update -g SlideRule.Cli, or a newer SlideRule.Xunit "
-                    + "package), then retry. To check the partial model as it loaded, override AllowWorkspaceDiagnostics "
-                    + "to true on the test class.\n"
-                    + "The workspace load reported:\n"
-                    + $"  {LagEvidence}\n"
-                    + $"  {OtherLoadLine}");
+            LagRefusal
+            + "\nThe workspace load reported:\n"
+            + $"  {LagEvidence}\n"
+            + $"  {OtherLoadLine}");
     }
 
     [Fact]
@@ -193,10 +190,8 @@ public sealed class IncompleteModelGateAdapterMessagesTests
             Diagnostics(lagging: [LaggingProject], loadFailures: [LagEvidence]));
 
         skip.ShouldBe(
-            "AllowWorkspaceDiagnostics is true: rule verdicts come from the partial model that loaded, despite "
-            + "the C# 15 compiler this tool carries not reading all the code of 1 project:\n"
-            + $"  {LaggingProject}\n"
-            + "The workspace load reported:\n"
+            LagOptedIn
+            + "\nThe workspace load reported:\n"
             + $"  {LagEvidence}");
     }
 

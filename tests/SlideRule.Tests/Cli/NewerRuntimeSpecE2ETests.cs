@@ -10,7 +10,8 @@ namespace SlideRule.Tests.Cli;
 ///     process: on the newest installed runtime it loads and checks green, and held on .NET 10 it is refused by name
 ///     rather than dying in discovery on <c>System.Runtime</c>.
 /// </summary>
-public sealed class NewerRuntimeSpecE2ETests
+public sealed class NewerRuntimeSpecE2ETests(NewerRuntimeSpecE2ETests.Net11Bed bed)
+    : IClassFixture<NewerRuntimeSpecE2ETests.Net11Bed>
 {
     private const string RuleId = "net11/lib-calls-no-second";
 
@@ -24,11 +25,10 @@ public sealed class NewerRuntimeSpecE2ETests
         SkipUnlessSdk11();
 
         // Arrange
-        using TempDirectory bed = TestTempRoot.Fresh("net11-spec");
-        (string solution, string specDll) = BuildNet11Bed(bed);
+        (string solution, string specDll) = bed.Built;
 
         // Act
-        ChildProcess.ProcessResult result = await RunCliAsync([], solution, specDll, bed.Path);
+        ChildProcess.ProcessResult result = await RunCliAsync([], solution, specDll, bed.Directory);
 
         // Assert
         string transcript = result.Transcript();
@@ -44,11 +44,10 @@ public sealed class NewerRuntimeSpecE2ETests
             "Holding the CLI on .NET 10 needs the .NET 10 runtime; without it --roll-forward Major takes 11.");
 
         // Arrange
-        using TempDirectory bed = TestTempRoot.Fresh("net11-spec");
-        (string solution, string specDll) = BuildNet11Bed(bed);
+        (string solution, string specDll) = bed.Built;
 
         // Act
-        ChildProcess.ProcessResult result = await RunCliAsync(["--roll-forward", "Major"], solution, specDll, bed.Path);
+        ChildProcess.ProcessResult result = await RunCliAsync(["--roll-forward", "Major"], solution, specDll, bed.Directory);
 
         // Assert
         string transcript = result.Transcript();
@@ -150,5 +149,36 @@ public sealed class NewerRuntimeSpecE2ETests
         if (result.ExitCode != 0) throw result.FailureOf($"dotnet {option}");
 
         return result.StandardOutput.Replace("\r", "", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     The class's one net11.0 bed, built on first use: each test only runs <c>check --no-cache</c> against it,
+    ///     which writes nothing into the bed. A test reads <see cref="Built" /> only after its own skips, so a
+    ///     machine without SDK 11 builds nothing.
+    /// </summary>
+    public sealed class Net11Bed : IDisposable
+    {
+        private readonly TempDirectory _directory = TestTempRoot.Fresh("net11-spec");
+
+        // Uncancellable: the build is shared by every test in the class.
+        private readonly Lazy<(string Solution, string SpecDll)> _built;
+
+        /// <summary>Creates the bed's directory; nothing is written or built until <see cref="Built" /> is read.</summary>
+        public Net11Bed()
+        {
+            _built = new Lazy<(string Solution, string SpecDll)>(() => BuildNet11Bed(_directory));
+        }
+
+        /// <summary>The bed's root, the working directory each test runs the CLI from.</summary>
+        internal string Directory => _directory.Path;
+
+        /// <summary>The built bed's solution and spec assembly, built by the first read.</summary>
+        internal (string Solution, string SpecDll) Built => _built.Value;
+
+        /// <summary>Deletes the bed.</summary>
+        public void Dispose()
+        {
+            _directory.Dispose();
+        }
     }
 }

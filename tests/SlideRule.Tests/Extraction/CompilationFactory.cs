@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Emit;
-using Shouldly;
 using SlideRule.Codebase;
 using SlideRule.Extraction;
 using SlideRule.Tests.TestSupport;
@@ -166,10 +165,8 @@ internal static class CompilationFactory
     public static CodebaseModel ShouldExtractWithoutErrors(string source)
     {
         CompilationInput input = Compile("TestProject", source);
-        IEnumerable<string> errors = input.Compilation.GetDiagnostics()
-            .Where(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
-            .Select(diagnostic => diagnostic.ToString());
-        errors.ShouldBeEmpty("the errors the compiler reports on the source");
+        input.Compilation.GetDiagnostics()
+            .ShouldHaveNoErrors("the errors the compiler reports on the source");
 
         return Harness.Extract([input]);
     }

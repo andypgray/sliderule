@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using SlideRule.Roslyn.Replay;
+using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Replay;
@@ -67,13 +68,10 @@ public sealed class BinlogReplayerUnitTests
         // Whichever order the build recorded the calls in, each framework's project takes its own.
         string projectFile = Path.GetFullPath("/repo/App/App.csproj");
         using var workspace = new AdhocWorkspace();
-        Solution solution = workspace.CurrentSolution;
-        var older = ProjectId.CreateNewId();
-        var newer = ProjectId.CreateNewId();
-        solution = solution
-            .AddProject(ProjectInfo.Create(older, VersionStamp.Default, "App", "App", LanguageNames.CSharp, projectFile))
-            .AddProject(ProjectInfo.Create(newer, VersionStamp.Default, "App", "App", LanguageNames.CSharp, projectFile));
-        var frameworks = new Dictionary<ProjectId, string> { [older] = "netstandard2.0", [newer] = "net10.0" };
+        ProjectInfo older = AdhocSolution.Empty("App", projectFile);
+        ProjectInfo newer = AdhocSolution.Empty("App", projectFile);
+        Solution solution = workspace.WithProjects(older, newer);
+        var frameworks = new Dictionary<ProjectId, string> { [older.Id] = "netstandard2.0", [newer.Id] = "net10.0" };
         RecordedCompile olderCall = new(projectFile, "netstandard2.0", "98", null);
         RecordedCompile newerCall = new(projectFile, "net10.0", "14.0", null);
         RecordedCompile[] recorded = reversed ? [newerCall, olderCall] : [olderCall, newerCall];
@@ -81,8 +79,8 @@ public sealed class BinlogReplayerUnitTests
         IReadOnlyDictionary<ProjectId, RecordedCompile> paired = RecordedCompiles.ByProject(solution, frameworks, recorded);
 
         paired.ShouldSatisfyAllConditions(
-            () => paired.GetValueOrDefault(older).ShouldBe(olderCall),
-            () => paired.GetValueOrDefault(newer).ShouldBe(newerCall));
+            () => paired.GetValueOrDefault(older.Id).ShouldBe(olderCall),
+            () => paired.GetValueOrDefault(newer.Id).ShouldBe(newerCall));
     }
 
     [Fact]
@@ -90,13 +88,12 @@ public sealed class BinlogReplayerUnitTests
     {
         string projectFile = Path.GetFullPath("/repo/App/App.csproj");
         using var workspace = new AdhocWorkspace();
-        var id = ProjectId.CreateNewId();
-        Solution solution = workspace.CurrentSolution
-            .AddProject(ProjectInfo.Create(id, VersionStamp.Default, "App", "App", LanguageNames.CSharp, projectFile));
+        ProjectInfo app = AdhocSolution.Empty("App", projectFile);
+        Solution solution = workspace.WithProjects(app);
         RecordedCompile call = new(projectFile, "net10.0", "14.0", null);
 
         RecordedCompiles.ByProject(solution, new Dictionary<ProjectId, string>(), [call])
-            .GetValueOrDefault(id)
+            .GetValueOrDefault(app.Id)
             .ShouldBe(call);
     }
 }
