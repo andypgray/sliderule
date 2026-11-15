@@ -33,7 +33,7 @@
 
     <!-- The support floor, and the reason this project exists: the oldest compiler API SlideRule
          runs against. It is a floor rather than a dependency to keep fresh, so the version is
-         deliberately NOT an exact range — an exact range cannot unify with the 5.9.0 the workspace
+         deliberately NOT an exact range — an exact range cannot unify with the 5.12.0 the workspace
          project pins, and the two resolve together in every graph that holds both. It carries no
          PrivateAssets either: the floor is part of the contract and has to reach the nuspec, so a
          consumer resolving this package learns which compiler version it needs. A test holds this

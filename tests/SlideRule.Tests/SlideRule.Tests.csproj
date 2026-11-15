@@ -68,7 +68,7 @@
              has to answer the editor of the day, and running it against the floor would be testing the
              one host nobody uses. It composes the same parts an editor composes, so the host services
              every workspace in this suite creates gain them too. -->
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.9.0" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.12.0" />
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
         <PackageReference Include="Shouldly" Version="4.3.0" />
         <!-- Differential-testing oracle: the ArchUnitNET core builds a rival architecture

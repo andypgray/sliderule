@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="CSharp15App.Consumer/CSharp15App.Consumer.csproj" />
+  <Project Path="CSharp15App.Domain/CSharp15App.Domain.csproj" />
+</Solution>

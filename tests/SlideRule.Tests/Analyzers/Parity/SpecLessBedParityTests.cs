@@ -8,8 +8,8 @@ namespace SlideRule.Tests.Analyzers.Parity;
 /// <summary>
 ///     The parity pin over the beds that carry no spec project, each crossed with the hazard it was built
 ///     for: one source file compiled into two projects, one project compiled for two frameworks, a
-///     generator that writes types into the project being built, and a type name a project and one of its
-///     references both declare.
+///     generator that writes types into the project being built, a type name a project and one of its
+///     references both declare, and code in a language version only the newest compiler reads.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -392,6 +392,70 @@ public sealed class SpecLessBedParityTests(ParityBeds beds) : IClassFixture<Pari
     }
 
     /// <summary>
+    ///     A ban whose subject is a union and whose target is one of its case types. The build reads the union
+    ///     with the consumer's compiler and the whole-solution check with the compiler the tool carries, so the
+    ///     two agree only while the carried compiler knows the language.
+    /// </summary>
+    [Fact]
+    public async Task TheBuildTier_OverABanFromAUnionToItsCaseType_AgreesWithTheWholeSolutionCheck()
+    {
+        ParitySubject subject = await CSharp15Async(
+            "CSharp15App/union",
+            arch => arch.Rule("csharp15/pet-holds-no-dog")
+                .Enforce(arch.Types.Named("Pet").MustNotReference(arch.Types.Named("Dog")))
+                .Because("A union's case list names its case types, so the list is a reference to each."));
+
+        // The difference guard: a union the carried compiler cannot bind selects nothing, and two legs that
+        // agree over an empty subject prove nothing.
+        subject.Expectation.Keys.Describe()
+            .ShouldBe(
+                [$"csharp15/pet-holds-no-dog [Reference] T:CSharp15App.Domain.Pets.Pet -> T:CSharp15App.Domain.Pets.Dog at {CSharp15Source("Pets.cs")}:7"],
+                "the union's case list naming the banned case type");
+
+        await subject.ShouldHoldOnBothLegsAsync(Ct);
+    }
+
+    /// <summary>
+    ///     A shape rule over the members of a closed hierarchy, whose base the compiler makes abstract and whose
+    ///     cases are left unsealed.
+    /// </summary>
+    [Fact]
+    public async Task TheBuildTier_OverTheCasesOfAClosedHierarchy_AgreesWithTheWholeSolutionCheck()
+    {
+        ParitySubject subject = await CSharp15Async(
+            "CSharp15App/closed",
+            arch => arch.Rule("csharp15/gate-cases-are-sealed")
+                .Enforce(arch.Types.DerivedFrom("CSharp15App.Domain.Gates.GateState").MustBeSealed())
+                .Because("A case of a closed hierarchy nobody may subclass is one the switch already covers."));
+
+        subject.Expectation.Keys.Describe()
+            .ShouldBe(
+                [
+                    $"csharp15/gate-cases-are-sealed [Shape] T:CSharp15App.Domain.Gates.Open at {CSharp15Source("Gates.cs")}:7",
+                    $"csharp15/gate-cases-are-sealed [Shape] T:CSharp15App.Domain.Gates.Shut at {CSharp15Source("Gates.cs")}:5"
+                ],
+                "both cases of the closed hierarchy, neither of them sealed");
+
+        await subject.ShouldHoldOnBothLegsAsync(Ct);
+    }
+
+    /// <summary>
+    ///     A ban on the class that declares an extension indexer, from the project that indexes through it. What
+    ///     either side records for the access is not pinned here; the row holds that the two sides agree.
+    /// </summary>
+    [Fact]
+    public async Task TheBuildTier_OverABanOnAnExtensionIndexersClass_AgreesWithTheWholeSolutionCheck()
+    {
+        ParitySubject subject = await CSharp15Async(
+            "CSharp15App/extension indexer",
+            arch => arch.Rule("csharp15/consumer-not-through-the-indexer")
+                .Enforce(arch.Namespace("CSharp15App.Consumer").MustNotReference(arch.Types.Named("SequenceIndexer")))
+                .Because("The consumer indexes sequences through the framework, never through a domain helper."));
+
+        await subject.ShouldHoldOnBothLegsAsync(Ct);
+    }
+
+    /// <summary>
     ///     Asserts a rule the classifier holds out reports exactly <paramref name="keys" /> from one
     ///     project's view whichever form the siblings arrive in — which is what makes a row's verdict about
     ///     the rule rather than about how a build happened to be wired.
@@ -428,6 +492,11 @@ public sealed class SpecLessBedParityTests(ParityBeds beds) : IClassFixture<Pari
         return Path.Combine(BedDirectory, "RazorApp", "RazorApp.Web", fileName);
     }
 
+    private static string CSharp15Source(string fileName)
+    {
+        return Path.Combine(BedDirectory, "CSharp15App", "CSharp15App.Domain", fileName);
+    }
+
     private static string BedSource(string bed, string project, string fileName)
     {
         return Path.Combine(BedDirectory, bed, project, fileName);
@@ -435,6 +504,11 @@ public sealed class SpecLessBedParityTests(ParityBeds beds) : IClassFixture<Pari
 
     private static string BedDirectory =>
         FixtureBeds.TestSolutionsRoot;
+
+    private Task<ParitySubject> CSharp15Async(string name, Action<Arch> define)
+    {
+        return BedAsync(name, FixtureBeds.CSharp15AppSolution, define);
+    }
 
     private Task<ParitySubject> LinkedAsync(string name, Action<Arch> define)
     {

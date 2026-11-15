@@ -123,7 +123,7 @@ internal static class ProjectFactsEvaluator
     // define an unset SolutionDir as *Undefined*, so an include spelled with it becomes a wildcard that matches no
     // file and evaluates to no item at all. Roslyn's
     // MSBuildProjectLoader.SetSolutionProperties defines SolutionDir alone, with this value and under this
-    // condition (Workspaces.MSBuild 5.9.0), and WorkspaceLoader passes no properties of its own to
+    // condition (Workspaces.MSBuild 5.12.0), and WorkspaceLoader passes no properties of its own to
     // MSBuildWorkspace.Create. A solution build also defines SolutionName, SolutionPath, SolutionExt and
     // SolutionFileName; the load does not, so neither does this. If either side changes, this set moves with it.
     internal static IReadOnlyDictionary<string, string> SolutionProperties(string? solutionFile)

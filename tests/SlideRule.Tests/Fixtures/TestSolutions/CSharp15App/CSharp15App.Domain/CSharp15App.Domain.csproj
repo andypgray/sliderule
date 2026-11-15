@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- C# 15 on a net10.0 project. LangVersion names the language outright, and Polyfills.cs declares the
+         three support types the net10.0 reference pack lacks, so the code binds on whichever SDK is installed:
+         a design-time build never runs csc, and the compiler the tool carries does the binding. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>15</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+</Project>

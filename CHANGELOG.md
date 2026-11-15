@@ -100,6 +100,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The CLI, the MCP server and the xUnit adapter now read C# 15 code and run the .NET 11 SDK's source
+  generators. They carry Microsoft.CodeAnalysis 5.12.0, up from 5.9.0, which read C# 15 as C# 14 and could not
+  load a generator built against a newer compiler. A union was left out of the model, and on a machine whose
+  newest SDK is 11 a Razor project's compiled views were missing, with nothing reported. A union is now a struct
+  that references each of its case types, as the build analyzer reports it.
 - `--spec` given the DLL a declared project builds now checks the solution as `--spec` given that project's
   `.csproj` does. The spec project is left out of the check and its sources are compared with its build, on a
   cold run, a cache hit and in the MCP server. The DLL form used to check the spec project's own code against

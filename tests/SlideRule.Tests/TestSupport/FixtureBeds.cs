@@ -36,6 +36,13 @@ internal static class FixtureBeds
     internal static string RazorAppSolution => Path.Combine(TestSolutionsRoot, "RazorApp", "RazorApp.slnx");
 
     /// <summary>
+    ///     The C# 15 bed's solution: a net10.0 domain project declaring a union, a closed hierarchy and an
+    ///     extension indexer, and a project that uses them.
+    /// </summary>
+    internal static string CSharp15AppSolution =>
+        Path.Combine(TestSolutionsRoot, "CSharp15App", "CSharp15App.slnx");
+
+    /// <summary>
     ///     The shadowed-name bed's solution, whose test project declares a full name a referenced package also
     ///     supplies.
     /// </summary>

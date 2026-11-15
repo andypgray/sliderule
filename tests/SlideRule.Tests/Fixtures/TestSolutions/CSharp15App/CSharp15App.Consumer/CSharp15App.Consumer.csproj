@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- Uses the domain project's C# 15 declarations across an assembly boundary, where a union and a closed
+         hierarchy are read back from metadata. -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <LangVersion>15</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>disable</ImplicitUsings> <!-- parity: raw CSharpCompilation has no implicit usings -->
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    </PropertyGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\CSharp15App.Domain\CSharp15App.Domain.csproj" />
+    </ItemGroup>
+</Project>

@@ -80,6 +80,8 @@ public sealed class SdkStyleProjectTests
         "UnopenedEntries.Core.csproj: SDK-style, no assets file",
         // The restored fixture solutions: SDK-style, and the assets file the classification predicts is
         // there. This is the pairing — the predicate earns the right to gate here, not in the XML.
+        "CSharp15App.Consumer.csproj: SDK-style, assets file present",
+        "CSharp15App.Domain.csproj: SDK-style, assets file present",
         "DriftedApp.Client.csproj: SDK-style, assets file present",
         "DriftedApp.Core.Ansi.csproj: SDK-style, assets file present",
         "DriftedApp.Core.csproj: SDK-style, assets file present",
