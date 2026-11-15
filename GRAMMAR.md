@@ -2842,6 +2842,14 @@ backticked name exactly (one definition, FQN in the model) and add namespace pre
 simple name that collides, which `Named` (§5.2) reaches every instance of. It costs FQN spelling
 at every site, and no exemption in the corpus collides today, so it waits on that collision.
 
+On the C# 15 type shapes (§5.2): `.ThatAreUnions()` and `.ThatAreClosed()`, with their
+`MustBeUnions()` and `MustBeClosed()` twins, since a fact family ships whole (§10). Until then a
+`union` declaration is the struct it compiles to, selected by name, and its case list is an
+ordinary reference to each case type. `DerivedFrom` on a closed class selects its cases along with
+anything derived from them. A case-type edge kind would sit beside that reference and never
+replace it, so a dependency rule keeps seeing every case. Each family waits on a consumer whose law
+today's vocabulary cannot spell.
+
 On correspondence (§5.3): the at-least-one twin `MustHaveCounterpart`, wanting a consumer whose
 law tolerates several
 counterparts; richer templates — a second placeholder (`{Namespace}`, `{Project}`), escaping for
