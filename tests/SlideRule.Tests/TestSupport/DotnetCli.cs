@@ -20,13 +20,30 @@ internal static class DotnetCli
     internal static void Run(string arguments, string workingDirectory)
     {
         var commandLine = $"{arguments} --disable-build-servers";
+        ChildProcess.ProcessResult result = Start(commandLine, workingDirectory);
+        if (result.ExitCode != 0) throw result.FailureOf($"dotnet {commandLine}");
+    }
+
+    /// <summary>
+    ///     <see cref="Run" /> for a command that must fail, such as a build whose compile is meant to be refused;
+    ///     throws <see cref="InvalidOperationException" /> when it exits zero.
+    /// </summary>
+    internal static void RunExpectingFailure(string arguments, string workingDirectory)
+    {
+        var commandLine = $"{arguments} --disable-build-servers";
+        ChildProcess.ProcessResult result = Start(commandLine, workingDirectory);
+        if (result.ExitCode == 0)
+            throw new InvalidOperationException($"dotnet {commandLine} succeeded, and was expected to fail.");
+    }
+
+    private static ChildProcess.ProcessResult Start(string commandLine, string workingDirectory)
+    {
         ProcessStartInfo startInfo = new("dotnet", commandLine)
         {
             WorkingDirectory = workingDirectory
         };
         DotnetCommand.ApplyCleanSdkEnvironment(startInfo);
 
-        ChildProcess.ProcessResult result = ChildProcess.Run(startInfo);
-        if (result.ExitCode != 0) throw result.FailureOf($"dotnet {commandLine}");
+        return ChildProcess.Run(startInfo);
     }
 }

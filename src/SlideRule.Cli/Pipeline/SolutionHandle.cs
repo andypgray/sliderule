@@ -20,8 +20,15 @@ internal sealed class SolutionHandle(
     Func<string, Func<SessionSpecResolution>, SessionSpecResolution>? warmSpecResolution = null,
     IReadOnlyDictionary<ProjectId, string>? targetFrameworks = null,
     bool isClosure = false,
-    Func<IReadOnlySet<string>?>? warmDeclaredMembers = null) : IDisposable
+    Func<IReadOnlySet<string>?>? warmDeclaredMembers = null,
+    IReadOnlyDictionary<ProjectId, string>? compilerAssemblies = null) : IDisposable
 {
+    /// <summary>
+    ///     The compiler assembly each replayed project's recorded compiler call ran, keyed by <see cref="ProjectId" />,
+    ///     for the cache to stamp; null on a load, whose compilers the cache finds from the load itself.
+    /// </summary>
+    public IReadOnlyDictionary<ProjectId, string>? CompilerAssemblies { get; } = compilerAssemblies;
+
     /// <summary>
     ///     Whether <see cref="Solution" /> holds only the projects a caller asked
     ///     <see cref="ISolutionSource.AcquireClosureAsync" /> for and their references, rather than the whole

@@ -57,7 +57,7 @@ public sealed class ExtractionCacheStoreTests
 
         version.ShouldNotBeNull("the extraction cache still declares a schema version");
         version.GetRawConstantValue()
-            .ShouldBe(59);
+            .ShouldBe(60);
     }
 
     [Fact]
@@ -1369,13 +1369,14 @@ public sealed class ExtractionCacheStoreTests
             string compiler = toolchain.WriteFile(
                 ["dotnet", "sdk", sdkVersion, "Roslyn", "bincore", "Microsoft.CodeAnalysis.CSharp.dll"], "compiler\n");
             int at = projects.FindIndex(project => project.ProjectName == name);
-            projects[at] = projects[at] with { CompilerAssemblyPath = compiler };
+            projects[at] = projects[at] with { CompilerAssemblyPaths = [compiler] };
         }
 
         public string CompilerAssemblyOf(string name)
         {
             return projects.Single(project => project.ProjectName == name)
-                .CompilerAssemblyPath!;
+                .CompilerAssemblyPaths!
+                .Single();
         }
 
         // Where an SDK of the given version sits under the dotnet root BuildWithSdk writes into.

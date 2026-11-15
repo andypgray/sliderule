@@ -6,6 +6,7 @@ using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Replay;
 using SlideRule.Tests.Cli;
 using SlideRule.Tests.Mcp.TestDoubles;
+using SlideRule.Tests.Roslyn;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
@@ -105,6 +106,42 @@ public sealed class BinlogCliE2ETests(BinlogFixtureWorkspace fixture)
             ]),
             () => block.Cache.ShouldNotBeNull()
                 .ShouldStartWith("cache: hit, 0 of "));
+    }
+
+    [Fact]
+    public async Task CheckTimings_ExplicitBinlogAfterItsCompilerChanged_IsAFragmentCacheMiss()
+    {
+        // A replay judges compiler lag by the compiler the build ran, so the fragment cache watches that compiler: one
+        // changed in place is a miss where the untouched one is a hit. The change is backdated so the binlog still
+        // postdates it, as it does when an SDK is repaired with its old timestamps.
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "The stand-in compiler is a Windows executable.");
+        using TempDirectory bed = TestTempRoot.Fresh("binlog-cli-compiler");
+        string compilerDirectory = StubAnalyzers.StandInCompiler(bed, 15);
+        bed.WriteFile(
+            ["App", "App.csproj"],
+            "<Project Sdk=\"Microsoft.NET.Sdk\">\n  <PropertyGroup>\n    <TargetFramework>net10.0</TargetFramework>\n"
+            + "  </PropertyGroup>\n</Project>\n");
+        bed.WriteFile(["App", "Widget.cs"], "namespace App { public sealed class Widget { } }\n");
+        string solution = bed.WriteFile(["App.slnx"], "<Solution>\n  <Project Path=\"App/App.csproj\" />\n</Solution>\n");
+        string binlog = bed.PathOf("App.binlog");
+        DotnetCli.RunExpectingFailure(
+            $"build \"{solution}\" -bl:LogFile=\"{binlog}\" -p:CscToolPath=\"{compilerDirectory}\"", bed.Path);
+        string cache = FreshCache();
+        string[] check = ["check", solution, "--binlog", binlog, "--spec", CleanSpec];
+
+        CliResult untimed = await RunAsync(cache, check);
+        CliResult hit = await RunAsync(cache, [.. check, "--timings"]);
+        string compiler = Path.Combine(compilerDirectory, "Microsoft.CodeAnalysis.CSharp.dll");
+        DateTime written = File.GetLastWriteTimeUtc(compiler);
+        StubAnalyzers.CompilerDeclaring(compiler, 14);
+        File.SetLastWriteTimeUtc(compiler, written.AddHours(-1));
+        CliResult miss = await RunAsync(cache, [.. check, "--timings"]);
+
+        TimingsBlock hitBlock = hit.ShouldAppendTimingsTo(untimed);
+        TimingsBlock missBlock = miss.ShouldAppendTimingsTo(untimed);
+        hitBlock.ShouldSatisfyAllConditions(
+            () => hitBlock.Cache.ShouldBe("cache: hit, 0 of 1 projects extracted"),
+            () => missBlock.Cache.ShouldBe("cache: miss, 1 of 1 projects extracted"));
     }
 
     // ── invalid capture ⇒ one notice + cold fallback ─────────────────────────────────────────────────────

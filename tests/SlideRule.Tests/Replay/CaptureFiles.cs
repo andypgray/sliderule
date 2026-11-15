@@ -30,6 +30,15 @@ internal static class CaptureFiles
         File.Delete(CacheLocations.CacheFilePath(solutionPath, cacheRoot));
     }
 
+    /// <summary>The path of every structural stamp the manifest records, in its order.</summary>
+    public static IReadOnlyList<string> StructuralStampPaths(string solutionPath, string cacheRoot)
+    {
+        var root = (JsonObject)JsonNode.Parse(File.ReadAllText(Manifest(solutionPath, cacheRoot)))!;
+        return root["StructuralStamps"]!.AsArray()
+            .Select(stamp => stamp!["Path"]!.GetValue<string>())
+            .ToList();
+    }
+
     /// <summary>Rewrites the manifest through <paramref name="edit" />, which changes its JSON object in place.</summary>
     public static void EditManifest(string solutionPath, string cacheRoot, Action<JsonObject> edit)
     {

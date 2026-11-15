@@ -62,32 +62,33 @@ internal static class BinlogReplayer
     ///     unreadable, corrupt or non-binlog file propagates unwrapped. The analyzer host is
     ///     <see cref="BasicAnalyzerKind.OnDisk" />, the shape the <c>MSBuildWorkspace</c> path itself produces;
     ///     the differential fidelity test gates that choice. The other-language project references are read off the
-    ///     build's evaluations in a second read of the binlog that overlaps the first.
+    ///     build's evaluations, and each compiler call's arguments and compiler off its command line, in two more reads
+    ///     of the binlog that overlap the first.
     /// </remarks>
     public static Task<ReplayedSolution> ReplayAsync(
         string binlogPath, string? solutionPath, Action<string>? diagnosticSink = null, CancellationToken ct = default)
     {
-        return ReplayCoreAsync(binlogPath, solutionPath, diagnosticSink, recordedOtherLanguageReferences: null, ct);
+        return ReplayCoreAsync(binlogPath, solutionPath, diagnosticSink, recorded: null, ct);
     }
 
     /// <summary>
     ///     Replays <paramref name="capture" />'s binlog copy as
     ///     <see cref="ReplayAsync(string, string?, Action{string}?, CancellationToken)" /> replays a binlog, reading
-    ///     it once: the other-language project references come from the references the capture recorded at ingest,
-    ///     which spares the second read.
+    ///     it once: the other-language project references and the compiler calls come from what the capture recorded
+    ///     at ingest, which spares the other reads.
     /// </summary>
     public static Task<ReplayedSolution> ReplayAsync(
         UsableCapture capture, string? solutionPath, Action<string>? diagnosticSink = null,
         CancellationToken ct = default)
     {
-        return ReplayCoreAsync(
-            capture.BinlogCopyPath, solutionPath, diagnosticSink, capture.OtherLanguageReferences, ct);
+        return ReplayCoreAsync(capture.BinlogCopyPath, solutionPath, diagnosticSink, capture, ct);
     }
 
-    // A null recordedOtherLanguageReferences reads them off the binlog in a second read beside the reader's own.
+    // A null recorded reads the other-language references and the compiler calls off the binlog, each in a read of
+    // its own beside the reader's.
     private static async Task<ReplayedSolution> ReplayCoreAsync(
-        string binlogPath, string? solutionPath, Action<string>? diagnosticSink,
-        IReadOnlyDictionary<string, IReadOnlyList<string>>? recordedOtherLanguageReferences, CancellationToken ct)
+        string binlogPath, string? solutionPath, Action<string>? diagnosticSink, UsableCapture? recorded,
+        CancellationToken ct)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(binlogPath);
         if (!File.Exists(binlogPath))
@@ -100,11 +101,13 @@ internal static class BinlogReplayer
         var unsupportedProjects = new HashSet<string>(PathComparison.Comparer);
         var replayedProjects = new HashSet<string>(PathComparison.Comparer);
 
-        // Without a recorded set, a second full read of the binlog, run beside the reader's own so the two overlap.
-        Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> otherLanguageReferences =
-            recordedOtherLanguageReferences is not null
-                ? Task.FromResult(recordedOtherLanguageReferences)
-                : Task.Run(() => OtherLanguageReferencesByProject(binlogPath, ct), CancellationToken.None);
+        // Without a capture, two more full reads of the binlog, run beside the reader's own so the three overlap.
+        Task<IReadOnlyDictionary<string, IReadOnlyList<string>>> otherLanguageReferences = recorded is not null
+            ? Task.FromResult(recorded.OtherLanguageReferences)
+            : Task.Run(() => OtherLanguageReferencesByProject(binlogPath, ct), CancellationToken.None);
+        Task<IReadOnlyList<RecordedCompile>> recordedCompiles = recorded is not null
+            ? Task.FromResult(recorded.RecordedCompiles)
+            : Task.Run(() => RecordedCompiles.Read(binlogPath, ct), CancellationToken.None);
 
         SolutionReader? reader = null;
         AdhocWorkspace? workspace = null;
@@ -161,6 +164,10 @@ internal static class BinlogReplayer
             foreach (UnresolvedReferences.Finding found in UnresolvedReferences.Detect(settled.Solution, settled.Report.Failed))
                 diagnosticSink?.Invoke(UnresolvedReferences.Message(found.ProjectPath, found.Names));
 
+            // Before anything compiles: a compile consumes the one load-failure event a generator raises.
+            IReadOnlyList<CompilerLagFailures.Finding> generatorLag = CompilerLagFailures.DetectGenerators(
+                settled.Solution, settled.Report.Failed);
+
             // As WorkspaceLoader runs it, and only for a sink, since it compiles the C# projects it inspects.
             if (diagnosticSink is not null)
             {
@@ -171,16 +178,32 @@ internal static class BinlogReplayer
                     diagnosticSink(CrossLanguageReferences.Message(found));
             }
 
+            IReadOnlyList<RecordedCompile> compiles = await recordedCompiles.ConfigureAwait(false);
+            Dictionary<ProjectId, CompilerLagFailures.RecordedLanguage> recordedLanguage = RecordedCompiles
+                .ByProject(settled.Solution, settled.TargetFrameworks, compiles)
+                .ToDictionary(
+                    pair => pair.Key,
+                    pair => new CompilerLagFailures.RecordedLanguage(
+                        pair.Value.LangVersion, CompilerLagFailures.CompilerAssemblyBeside(pair.Value.CompilerFilePath)));
+            IReadOnlyList<CompilerLagFailures.Finding> languageLag = CompilerLagFailures.DetectRecordedLanguage(
+                settled.Solution, recordedLanguage, settled.Report.Failed);
+            IReadOnlyList<string> compilerLag = CompilerLagFailures.LaggingProjects(
+                [.. generatorLag, .. languageLag], settled.Report.Failed, diagnosticSink);
+            Dictionary<ProjectId, string> compilerAssemblies = recordedLanguage
+                .Where(pair => pair.Value.CompilerAssemblyPath is not null)
+                .ToDictionary(pair => pair.Key, pair => pair.Value.CompilerAssemblyPath!);
+
             return new ReplayedSolution(
                 workspace, reader, settled.Solution, settled.TargetFrameworks, settled.ProjectFiles, settled.Report,
-                replayedReferences);
+                replayedReferences, compilerLag, compiles, compilerAssemblies);
         }
         catch
         {
-            // The second read never outlives the call: the capture store overwrites the binlog it reads, and the
+            // The other reads never outlive the call: the capture store overwrites the binlog they read, and the
             // first exception is the one rethrown. The cast matters: Task<TResult>.ConfigureAwait rejects
             // SuppressThrowing with an ArgumentOutOfRangeException that would replace it.
             await ((Task)otherLanguageReferences).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            await ((Task)recordedCompiles).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             workspace?.Dispose();
             reader?.Dispose();
             throw;

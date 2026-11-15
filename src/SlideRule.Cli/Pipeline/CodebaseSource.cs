@@ -659,7 +659,7 @@ internal sealed class CodebaseSource : IDisposable
             // On a partial the validation's stamps ride in, so only the dirty projects' changed documents are read
             // again; on a miss there are none and every input is stamped. A closure holds only some projects, so
             // it writes back only by carrying the rest.
-            IReadOnlyList<ProjectInputs> inputs = SolutionCacheInputs.Collect(solution);
+            IReadOnlyList<ProjectInputs> inputs = SolutionCacheInputs.Collect(solution, handle!.CompilerAssemblies);
             if (handle!.IsClosure) return store!.TryCaptureOverValidation(inputs, cacheRead.Validated, ct);
 
             IReadOnlyList<ForeignProjectInputs> foreignInputs = SolutionCacheInputs.CollectForeign(solution);

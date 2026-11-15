@@ -33,10 +33,12 @@ internal static class SolutionProjects
     ///     replayed, in ordinal name order. <paramref name="includeDocument" /> decides whether to track a
     ///     document, given the directory of the project it was found under and the document's absolute path; it
     ///     is asked per <see cref="Project" />, so a multi-targeted project answers it against the framework the
-    ///     document came from.
+    ///     document came from. <paramref name="compilerAssemblies" /> is the compiler assembly a replay read off each
+    ///     project's recorded call, which outranks the one found from the load.
     /// </summary>
     internal static IReadOnlyList<ProjectInputs> Collect(
-        Solution solution, Func<string, string, bool> includeDocument)
+        Solution solution, Func<string, string, bool> includeDocument,
+        IReadOnlyDictionary<ProjectId, string>? compilerAssemblies = null)
     {
         var byName = new Dictionary<string, Accumulator>(StringComparer.Ordinal);
         string? solutionSdk = CompilerLagFailures.LoadSdkOf(solution);
@@ -55,10 +57,14 @@ internal static class SolutionProjects
                     csprojPath,
                     projectDirectory,
                     project.OutputFilePath,
-                    project.CompilationOutputInfo.AssemblyPath,
-                    CompilerLagFailures.YardstickOf(project, null, solutionSdk));
+                    project.CompilationOutputInfo.AssemblyPath);
                 byName[project.Name] = accumulator;
             }
+
+            // Every framework's, because a change to any one of them can make the carried compiler lag that framework.
+            string? compiler = compilerAssemblies?.GetValueOrDefault(project.Id)
+                               ?? CompilerLagFailures.YardstickOf(project, null, solutionSdk);
+            if (compiler is not null) accumulator.Compilers.Add(compiler);
 
             AddDocuments(project, projectDirectory, includeDocument, accumulator.Documents);
 
@@ -122,19 +128,19 @@ internal static class SolutionProjects
         }
     }
 
-    // Accumulates one project's identity and its unioned, ordinal-sorted document and reference sets across
+    // Accumulates one project's identity and its unioned, ordinal-sorted document, reference and compiler sets across
     // frameworks.
     private sealed class Accumulator(
         string projectName,
         string csprojPath,
         string projectDirectory,
         string? evaluatedOutputPath,
-        string? intermediateAssemblyPath,
-        string? compilerAssemblyPath)
+        string? intermediateAssemblyPath)
     {
         public string ProjectName { get; } = projectName;
         public SortedSet<string> Documents { get; } = new(StringComparer.Ordinal);
         public SortedSet<string> References { get; } = new(StringComparer.Ordinal);
+        public SortedSet<string> Compilers { get; } = new(StringComparer.Ordinal);
 
         public ProjectInputs ToInputs()
         {
@@ -146,7 +152,7 @@ internal static class SolutionProjects
                 Documents.ToList(),
                 evaluatedOutputPath,
                 intermediateAssemblyPath,
-                compilerAssemblyPath);
+                Compilers.ToList());
         }
     }
 }

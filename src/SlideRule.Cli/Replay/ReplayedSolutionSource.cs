@@ -17,13 +17,14 @@ internal sealed class ReplayedSolutionSource(
     Solution replayedSolution,
     WorkspaceDiagnostics loadDiagnostics,
     IReadOnlyDictionary<ProjectId, string> targetFrameworks,
-    CanonicalProjectFiles projectFiles) : ISolutionSource
+    CanonicalProjectFiles projectFiles,
+    IReadOnlyDictionary<ProjectId, string> compilerAssemblies) : ISolutionSource
 {
     /// <inheritdoc />
     public Task<SolutionHandle> AcquireAsync(string solutionPath, CancellationToken ct)
     {
         return Task.FromResult(new SolutionHandle(
             replayedSolution, loadDiagnostics, null, targetFrameworks: targetFrameworks,
-            projectFiles: projectFiles));
+            projectFiles: projectFiles, compilerAssemblies: compilerAssemblies));
     }
 }

@@ -20,12 +20,13 @@ internal enum CaptureState
 }
 
 /// <summary>
-///     A capture fit to replay: the binlog copy, and the other-language references recorded at ingest, keyed by the
-///     referring project file.
+///     A capture fit to replay: the binlog copy, the other-language references recorded at ingest, keyed by the
+///     referring project file, and the C# compiler calls recorded beside them.
 /// </summary>
 internal sealed record UsableCapture(
     string BinlogCopyPath,
-    IReadOnlyDictionary<string, IReadOnlyList<string>> OtherLanguageReferences);
+    IReadOnlyDictionary<string, IReadOnlyList<string>> OtherLanguageReferences,
+    IReadOnlyList<RecordedCompile> RecordedCompiles);
 
 /// <summary>
 ///     The result of <see cref="BinlogCaptureStore.Validate" />. <see cref="Capture" /> is set only on
@@ -39,11 +40,12 @@ internal sealed record CaptureValidation(CaptureState State, UsableCapture? Capt
         return new CaptureValidation(CaptureState.Absent, null, null);
     }
 
-    internal static CaptureValidation Usable(string binlogCopyPath, IReadOnlyList<CaptureReferenceEntry> references)
+    internal static CaptureValidation Usable(
+        string binlogCopyPath, IReadOnlyList<CaptureReferenceEntry> references, IReadOnlyList<RecordedCompile> compiles)
     {
         Dictionary<string, IReadOnlyList<string>> byProject = references.ToDictionary(
             entry => entry.ProjectFilePath, entry => entry.References, PathComparison.Comparer);
-        var capture = new UsableCapture(binlogCopyPath, byProject);
+        var capture = new UsableCapture(binlogCopyPath, byProject, compiles);
         return new CaptureValidation(CaptureState.Usable, capture, null);
     }
 
@@ -84,7 +86,7 @@ internal sealed class BinlogCaptureStore
 {
     // The manifest schema this store reads and writes. A manifest written under any other version degrades
     // to one UnreadableNotice and re-captures — acceptable for disposable derived data, never a wrong answer.
-    private const int CurrentSchemaVersion = 5;
+    private const int CurrentSchemaVersion = 6;
 
     /// <summary>The <see cref="CaptureState.Invalid" /> notice for a garbled/torn/missing-copy/schema case.</summary>
     internal const string UnreadableNotice =
@@ -184,7 +186,8 @@ internal sealed class BinlogCaptureStore
     /// <summary>
     ///     Sanity-checks <paramref name="replayed" />, just replayed from the absolute
     ///     <paramref name="binlogFullPath" />, and if it passes persists the capture with its
-    ///     <see cref="ReplayedSolution.OtherLanguageReferences" />, returning false when a best-effort I/O step
+    ///     <see cref="ReplayedSolution.OtherLanguageReferences" /> and <see cref="ReplayedSolution.RecordedCompiles" />,
+    ///     returning false when a best-effort I/O step
     ///     failed. Refusals quote <paramref name="binlogArgument" />, the user's as-typed <c>--binlog</c> value,
     ///     verbatim.
     /// </summary>
@@ -205,7 +208,7 @@ internal sealed class BinlogCaptureStore
             throw new UserErrorException(SolutionFilterNotSupportedMessage(Path.GetFileName(solutionPath)));
 
         Solution replayedSolution = replayed.Solution;
-        IReadOnlyList<ProjectInputs> inputs = CollectProjects(replayedSolution);
+        IReadOnlyList<ProjectInputs> inputs = CollectProjects(replayedSolution, replayed.CompilerAssemblies);
         IReadOnlyList<ForeignProjectInputs> foreignInputs = SolutionProjects.CollectForeign(replayedSolution, static (_, _) => true);
         IReadOnlyList<string> structuralPaths = ProjectCone.SolutionStructuralPaths(solutionPath, inputs, foreignInputs);
         List<CaptureProjectEntry> projects = inputs.Select(ToEntry).ToList();
@@ -218,7 +221,8 @@ internal sealed class BinlogCaptureStore
         RefuseIfStale(structuralPaths, binlogFullPath, binlogArgument, ct);
         RefuseIfCoverageMismatch(projects, binlogArgument);
 
-        return TryPersist(projects, foreignProjects, references, structuralPaths, binlogFullPath, ct);
+        return TryPersist(
+            projects, foreignProjects, references, replayed.RecordedCompiles, structuralPaths, binlogFullPath, ct);
     }
 
     private static void RefuseIfStale(
@@ -284,8 +288,8 @@ internal sealed class BinlogCaptureStore
 
     private bool TryPersist(
         IReadOnlyList<CaptureProjectEntry> projects, IReadOnlyList<CaptureForeignProjectEntry> foreignProjects,
-        IReadOnlyList<CaptureReferenceEntry> references, IReadOnlyList<string> structuralPaths, string binlogFullPath,
-        CancellationToken ct)
+        IReadOnlyList<CaptureReferenceEntry> references, IReadOnlyList<RecordedCompile> compiles,
+        IReadOnlyList<string> structuralPaths, string binlogFullPath, CancellationToken ct)
     {
         List<FileStamp> structuralStamps;
         try
@@ -305,7 +309,7 @@ internal sealed class BinlogCaptureStore
         ct.ThrowIfCancellationRequested();
         var manifest = new CaptureManifest(
             CurrentSchemaVersion, FileStamping.CurrentToolVersion, structuralStamps, projects, foreignProjects,
-            references, FileStamping.StampOf(captureBinlogPath));
+            references, compiles, FileStamping.StampOf(captureBinlogPath));
         return TryWriteManifestAtomic(manifest);
     }
 
@@ -373,7 +377,7 @@ internal sealed class BinlogCaptureStore
         }
 
         PromoteIfChanged(manifest, refreshedStructural);
-        return CaptureValidation.Usable(captureBinlogPath, manifest.OtherLanguageReferences);
+        return CaptureValidation.Usable(captureBinlogPath, manifest.OtherLanguageReferences, manifest.RecordedCompiles);
     }
 
     // The SDK-glob add a stat sweep cannot see: a source in neither the cone files nor the documents recorded.
@@ -396,10 +400,12 @@ internal sealed class BinlogCaptureStore
     // the binlog's command line fixes and replay cannot regenerate, so a clean that deletes one must invalidate
     // the capture rather than let replay drift from the real build. That predicate is this store's only
     // departure from the shared collapse; everything else, the multi-target-framework collapse included, is
-    // SolutionProjects' answer and the fragment cache's too.
-    private static IReadOnlyList<ProjectInputs> CollectProjects(Solution solution)
+    // SolutionProjects' answer and the fragment cache's too. The recorded compilers join the structural stamps, so a
+    // compiler changed in place invalidates the capture.
+    private static IReadOnlyList<ProjectInputs> CollectProjects(
+        Solution solution, IReadOnlyDictionary<ProjectId, string> compilerAssemblies)
     {
-        return SolutionProjects.Collect(solution, static (_, _) => true);
+        return SolutionProjects.Collect(solution, static (_, _) => true, compilerAssemblies);
     }
 
     private static CaptureForeignProjectEntry ToForeignEntry(ForeignProjectInputs project)

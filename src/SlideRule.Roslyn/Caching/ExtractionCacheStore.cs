@@ -122,6 +122,8 @@ internal sealed record ValidatedProject(
 ///     <paramref name="ProjectReferences" /> is the compiler's closure, as on <see cref="ProjectCacheEntry" />.
 ///     <paramref name="EvaluatedOutputPath" /> and <paramref name="IntermediateAssemblyPath" />, null when the
 ///     workspace carried none, are the pair <see cref="IntermediateOutputTree.AssetsPathsOf" /> reads.
+///     <paramref name="CompilerAssemblyPaths" /> are the compiler assemblies its builds read C# with, one per framework
+///     that ran a different one, ordinal-sorted; null or empty when none was found.
 /// </remarks>
 internal sealed record ProjectInputs(
     string ProjectName,
@@ -131,7 +133,7 @@ internal sealed record ProjectInputs(
     IReadOnlyList<string> DocumentPaths,
     string? EvaluatedOutputPath = null,
     string? IntermediateAssemblyPath = null,
-    string? CompilerAssemblyPath = null);
+    IReadOnlyList<string>? CompilerAssemblyPaths = null);
 
 /// <summary>
 ///     A loaded project in a language other than C#, as the caller knows it before any file is statted. The model
@@ -208,7 +210,7 @@ internal sealed class ExtractionCacheStore
     // gains a slot, even one that deserializes to a harmless default, so a reader never reasons about which
     // slots a file predates. The suite cannot catch a missed bump — every run gets a fresh cache directory — so
     // the discipline is the only guard.
-    private const int CurrentSchemaVersion = 59;
+    private const int CurrentSchemaVersion = 60;
 
     private static readonly IReadOnlySet<string> NoDocuments = new HashSet<string>(PathComparison.Comparer);
 

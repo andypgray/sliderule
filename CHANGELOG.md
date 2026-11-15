@@ -94,6 +94,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   references to projects in other languages, which the replay used to read from the binlog a second time. As
   after any upgrade, a capture saved by an earlier version is not replayed: each run falls back to a
   design-time build until a run with `--binlog` captures the build again.
+- A replayed `--binlog` or saved build capture lists `compilerLagProjects` as a design-time build does.
+  A project's C# version is the one its recorded compiler call passed, an alias is
+  measured against the compiler that call ran, and source generators are loaded as on a design-time build.
+  The capture records each compiler call and stamps the compiler, so a capture saved by an earlier version is
+  not replayed, and the first check after the update extracts every project again.
 - The root `AGENTS.md` block lists each rule as its ID, its sentence and its citation. A rule's `Because`
   prints on the layer and scope cards, in `explain`, in the MCP server's `arch_explain` and in a failed
   rule's `check` output. The root block loads into every agent session, and the reasons were most of its

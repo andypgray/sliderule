@@ -133,7 +133,7 @@ internal static class WorkspaceLoader
 
             IReadOnlyList<CompilerLagFailures.Finding> languageLag = CompilerLagFailures.DetectLanguage(
                 inspected, settled.TargetFrameworks, settled.Report.Failed, inspected.FilePath, ct);
-            IReadOnlyList<string> compilerLag = LaggingProjects(
+            IReadOnlyList<string> compilerLag = CompilerLagFailures.LaggingProjects(
                 [.. generatorLag, .. languageLag], [.. settled.Report.Failed, .. restoreFailed], diagnosticLog);
 
             return new LoadedSolution(
@@ -145,24 +145,6 @@ internal static class WorkspaceLoader
             workspace.Dispose();
             throw;
         }
-    }
-
-    // The lagging projects no other cause already names, ordinal-sorted, each finding's evidence logged once.
-    private static IReadOnlyList<string> LaggingProjects(
-        IReadOnlyList<CompilerLagFailures.Finding> findings, IReadOnlyList<string> otherwiseBlamed,
-        Action<string>? diagnosticLog)
-    {
-        var blamed = new HashSet<string>(otherwiseBlamed, PathComparison.Comparer);
-        var lagging = new SortedSet<string>(StringComparer.Ordinal);
-        foreach (CompilerLagFailures.Finding finding in findings)
-        {
-            if (blamed.Contains(finding.ProjectPath)) continue;
-
-            lagging.Add(finding.ProjectPath);
-            diagnosticLog?.Invoke(finding.Evidence);
-        }
-
-        return lagging.ToList();
     }
 
     /// <summary>

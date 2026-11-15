@@ -397,6 +397,19 @@ public sealed class ManifestJsonTests
                     ProjectFilePath: "C:/repo/src/App/App.csproj",
                     References: ["C:/repo/src/Native/Native.vcxproj", "C:/repo/src/Db/Db.sqlproj"])
             ],
+            RecordedCompiles:
+            [
+                new RecordedCompile(
+                    ProjectFilePath: "C:/repo/src/App/App.csproj",
+                    TargetFramework: "net10.0",
+                    LangVersion: "14.0",
+                    CompilerFilePath: "C:/dotnet/sdk/10.0.401/Roslyn/bincore/csc.exe"),
+                new RecordedCompile(
+                    ProjectFilePath: "C:/repo/src/Tool/Tool.csproj",
+                    TargetFramework: null,
+                    LangVersion: null,
+                    CompilerFilePath: null)
+            ],
             BinlogCopyStamp: binlogCopyStamp);
     }
 }

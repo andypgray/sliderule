@@ -55,6 +55,12 @@ internal static class CompilerLagFailures
     internal readonly record struct Finding(string ProjectPath, string Evidence);
 
     /// <summary>
+    ///     What a recorded compiler call says about one project: the <c>/langversion</c> it passed, null when it passed
+    ///     none, and the compiler assembly beside the compiler it ran, null when none is on disk.
+    /// </summary>
+    internal readonly record struct RecordedLanguage(string? Asked, string? CompilerAssemblyPath);
+
+    /// <summary>
     ///     Whether a project lags, from what its evaluation asks for (<paramref name="asked" />, null when the
     ///     evaluation failed), the version the load parsed it at, and the newest C# major its build's compiler and
     ///     the carried one declare, 0 where the build's compiler could not be read.
@@ -214,6 +220,79 @@ internal static class CompilerLagFailures
         }
 
         return findings.Values.ToList();
+    }
+
+    /// <summary>
+    ///     <see cref="DetectLanguage" /> for a replayed solution, from the compiler call each project's build recorded
+    ///     (<paramref name="recorded" />) in place of an evaluation: the version it asked for is the one its command
+    ///     line passed, and its yardstick is the compiler it ran. A project with no recorded call is not judged.
+    /// </summary>
+    internal static IReadOnlyList<Finding> DetectRecordedLanguage(
+        Solution solution, IReadOnlyDictionary<ProjectId, RecordedLanguage> recorded,
+        IReadOnlyList<string> alreadyFailed)
+    {
+        var skip = new HashSet<string>(alreadyFailed, PathComparison.Comparer);
+        var highestByAssembly = new Dictionary<string, int>(PathComparison.Comparer);
+        var findings = new SortedDictionary<string, Finding>(StringComparer.Ordinal);
+        foreach (Project project in solution.Projects)
+        {
+            if (!ProjectLanguages.IsCSharp(project) || project.FilePath is null) continue;
+            if (project.ParseOptions is not CSharpParseOptions parseOptions) continue;
+            if (!recorded.TryGetValue(project.Id, out RecordedLanguage call)) continue;
+
+            string projectPath = Path.GetFullPath(project.FilePath);
+            if (skip.Contains(projectPath) || findings.ContainsKey(projectPath)) continue;
+
+            // A command line with no /langversion asks for the compiler's default.
+            string asked = call.Asked ?? "";
+            var yardstickHighest = 0;
+            if (call.CompilerAssemblyPath is { } compiler && !highestByAssembly.TryGetValue(compiler, out yardstickHighest))
+            {
+                yardstickHighest = HighestLanguageVersion(compiler);
+                highestByAssembly[compiler] = yardstickHighest;
+            }
+
+            CompilerLag? lag = Judge(
+                asked, parseOptions.SpecifiedLanguageVersion, yardstickHighest, CarriedHighestLanguageVersion);
+            if (lag is { } kind)
+                findings[projectPath] = new Finding(
+                    projectPath, LanguageEvidence(projectPath, kind, asked, yardstickHighest));
+        }
+
+        return findings.Values.ToList();
+    }
+
+    /// <summary>
+    ///     The lagging projects of <paramref name="findings" /> that <paramref name="otherwiseBlamed" /> does not
+    ///     already name, ordinal-sorted, with each such finding's evidence written to <paramref name="log" /> once.
+    /// </summary>
+    internal static IReadOnlyList<string> LaggingProjects(
+        IReadOnlyList<Finding> findings, IReadOnlyList<string> otherwiseBlamed, Action<string>? log)
+    {
+        var blamed = new HashSet<string>(otherwiseBlamed, PathComparison.Comparer);
+        var lagging = new SortedSet<string>(StringComparer.Ordinal);
+        foreach (Finding finding in findings)
+        {
+            if (blamed.Contains(finding.ProjectPath)) continue;
+
+            lagging.Add(finding.ProjectPath);
+            log?.Invoke(finding.Evidence);
+        }
+
+        return lagging.ToList();
+    }
+
+    /// <summary>
+    ///     Where the compiler assembly sits beside the compiler executable at <paramref name="compilerFilePath" />, as a
+    ///     build recorded it, whether or not it is on disk: a binlog from another machine names a compiler this one may
+    ///     install later, and the caches stamp its absence so that its appearance is a change. Null for a path that is
+    ///     not one.
+    /// </summary>
+    internal static string? CompilerAssemblyBeside(string? compilerFilePath)
+    {
+        if (compilerFilePath is not { Length: > 0 } || FullPathOrNull(compilerFilePath) is not { } full) return null;
+
+        return Path.GetDirectoryName(full) is { } directory ? Path.Combine(directory, CompilerAssemblyName) : null;
     }
 
     /// <summary>

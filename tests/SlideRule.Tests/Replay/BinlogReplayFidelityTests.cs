@@ -92,6 +92,8 @@ public sealed class BinlogReplayFidelityTests(BinlogFixtureWorkspace fixture) : 
 
         replayed.FailedProjects.ShouldBeEmpty();
         replayed.UncheckedProjects.ShouldBeEmpty();
+        // A build by the SDK this suite runs on, whose compiler the carried one reads, refuses nothing for lag.
+        replayed.LoadDiagnosticsWith(diagnostics).CompilerLagProjects.ShouldBeEmpty();
         diagnostics.ShouldBeEmpty();
     }
 

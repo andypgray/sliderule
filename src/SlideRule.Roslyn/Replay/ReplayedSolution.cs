@@ -36,7 +36,10 @@ internal sealed class ReplayedSolution : IDisposable
         IReadOnlyDictionary<ProjectId, string> targetFrameworks,
         CanonicalProjectFiles projectFiles,
         ProjectLoadReport report,
-        IReadOnlyDictionary<string, IReadOnlyList<string>> otherLanguageReferences)
+        IReadOnlyDictionary<string, IReadOnlyList<string>> otherLanguageReferences,
+        IReadOnlyList<string> compilerLagProjects,
+        IReadOnlyList<RecordedCompile> recordedCompiles,
+        IReadOnlyDictionary<ProjectId, string> compilerAssemblies)
     {
         _workspace = workspace;
         _reader = reader;
@@ -44,6 +47,8 @@ internal sealed class ReplayedSolution : IDisposable
         TargetFrameworks = targetFrameworks;
         ProjectFiles = projectFiles;
         OtherLanguageReferences = otherLanguageReferences;
+        RecordedCompiles = recordedCompiles;
+        CompilerAssemblies = compilerAssemblies;
         FailedProjects = report.Failed;
         UncheckedProjects = report.Unchecked;
         _loadVerdict = WorkspaceDiagnostics.OfLoad(
@@ -54,8 +59,9 @@ internal sealed class ReplayedSolution : IDisposable
             // as it stands on disk now, so reading one here would stamp today's restore onto yesterday's model, and
             // a capture replayed because it was structurally valid is a capture of a build that compiled.
             restoreFailedProjects: [],
-            // Empty on this path: the replay reader hides the recorded command lines a version verdict needs.
-            compilerLagProjects: [],
+            // Judged from each project's recorded compiler call, the version its command line passed and the compiler
+            // it ran, since no evaluation runs on this path; the generators as on an MSBuild load.
+            compilerLagProjects: compilerLagProjects,
             // The solution file's entries, as on an MSBuild load, joined with the compiler invocations the C#-only
             // predicate declined from the capture.
             unsupportedProjects: report.Unsupported,
@@ -79,6 +85,16 @@ internal sealed class ReplayedSolution : IDisposable
     ///     distinct and ordinal-sorted.
     /// </summary>
     public IReadOnlyDictionary<string, IReadOnlyList<string>> OtherLanguageReferences { get; }
+
+    /// <summary>Every C# compiler call the binlog recorded, as a capture of it records them.</summary>
+    public IReadOnlyList<RecordedCompile> RecordedCompiles { get; }
+
+    /// <summary>
+    ///     The compiler assembly beside the compiler each replayed project's recorded call ran, keyed by
+    ///     <see cref="ProjectId" />; absent for a project whose call could not be told apart or whose compiler is not
+    ///     on disk. The caches stamp it, because it decides whether the carried compiler lags.
+    /// </summary>
+    public IReadOnlyDictionary<ProjectId, string> CompilerAssemblies { get; }
 
     /// <summary>The <c>.csproj</c> paths of the projects that failed to load.</summary>
     /// <remarks>

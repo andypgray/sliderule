@@ -247,12 +247,15 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         validation.Notice.ShouldBe(BinlogCaptureStore.VersionMismatchNotice);
     }
 
-    [Fact]
-    public async Task Validate_SchemaVersionMismatch_InvalidUnreadable()
+    [Theory]
+    [InlineData(999)]
+    [InlineData(5)]
+    public async Task Validate_SchemaVersionMismatch_InvalidUnreadable(int schemaVersion)
     {
-        // Arrange
+        // Arrange — 5 is the schema whose manifest records no compiler calls, so a replay of it would judge no
+        // project's C# version.
         BinlogCaptureStore store = await ShouldIngestFullCaptureAsync();
-        MutateManifest(root => root["SchemaVersion"] = 999);
+        MutateManifest(root => root["SchemaVersion"] = schemaVersion);
 
         // Act
         CaptureValidation validation = store.Validate(Ct);
@@ -345,7 +348,7 @@ public sealed class BinlogCaptureStoreTests(BinlogFixtureWorkspace fixture)
         var report = new ProjectLoadReport([], [], [], []);
         return new ReplayedSolution(
             workspace, reader, solution: null!, new Dictionary<ProjectId, string>(), projectFiles, report,
-            new Dictionary<string, IReadOnlyList<string>>());
+            new Dictionary<string, IReadOnlyList<string>>(), [], [], new Dictionary<ProjectId, string>());
     }
 
     [Fact]

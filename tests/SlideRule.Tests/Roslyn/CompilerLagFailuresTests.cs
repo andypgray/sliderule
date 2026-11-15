@@ -1,16 +1,20 @@
+using System.Text.Json.Nodes;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SlideRule.Roslyn;
+using SlideRule.Roslyn.Caching;
 using SlideRule.Roslyn.Diagnostics;
+using SlideRule.Roslyn.Replay;
+using SlideRule.Tests.Replay;
 using SlideRule.Tests.TestSupport;
 using Xunit;
 
 namespace SlideRule.Tests.Roslyn;
 
 /// <summary>
-///     The compiler-lag guard: the pure verdict, the metadata readers, and the loader's list over real projects whose C#
-///     version or source generators the carried compiler cannot read.
+///     The compiler-lag guard: the pure verdict, the metadata readers, and the list a load and a binlog replay give over
+///     real projects whose C# version or source generators the carried compiler cannot read.
 /// </summary>
 public sealed class CompilerLagFailuresTests
 {
@@ -75,14 +79,18 @@ public sealed class CompilerLagFailuresTests
         CompilerLagFailures.SdkDirectoryOf(path).ShouldBe(normalizedExpected);
     }
 
-    [Fact]
-    public async Task LoadAsync_ALangVersionTheCarriedCompilerRejects_ListsTheProject()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LoadAsync_ALangVersionTheCarriedCompilerRejects_ListsTheProject(bool replay)
     {
+        // The build refuses the version too, and its binlog still records the compiler call a replay reads.
         using TempDirectory temp = TestTempRoot.Fresh("lag-langversion");
         string csproj = WriteProject(temp, "App", "<LangVersion>99</LangVersion>");
         string solution = WriteSolution(temp, "App");
 
-        (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ShouldLoadRestoredAsync(solution);
+        (WorkspaceDiagnostics verdict, List<string> diagnostics) =
+            await ShouldReadAsync(solution, replay, buildFails: true);
 
         verdict.CompilerLagProjects.ShouldBe([csproj]);
         diagnostics.ShouldContain(
@@ -90,14 +98,16 @@ public sealed class CompilerLagFailuresTests
             + "code was read as another C# version.");
     }
 
-    [Fact]
-    public async Task LoadAsync_APlainProject_ListsNothing()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LoadAsync_APlainProject_ListsNothing(bool replay)
     {
         using TempDirectory temp = TestTempRoot.Fresh("lag-plain");
         WriteProject(temp, "App", "");
         string solution = WriteSolution(temp, "App");
 
-        (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ShouldLoadRestoredAsync(solution);
+        (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ShouldReadAsync(solution, replay);
 
         verdict.CompilerLagProjects.ShouldBeEmpty(string.Join("\n", diagnostics));
     }
@@ -115,15 +125,17 @@ public sealed class CompilerLagFailuresTests
         loaded.LoadDiagnosticsWith(diagnostics).CompilerLagProjects.ShouldBeEmpty(string.Join("\n", diagnostics));
     }
 
-    [Fact]
-    public async Task LoadAsync_AGeneratorBuiltForANewerCompiler_ListsTheProject()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LoadAsync_AGeneratorBuiltForANewerCompiler_ListsTheProject(bool replay)
     {
         using TempDirectory temp = TestTempRoot.Fresh("lag-newer-generator");
         string generator = StubAnalyzers.NewerCompilerGenerator(temp);
         string csproj = WriteProject(temp, "App", "", generator);
         string solution = WriteSolution(temp, "App");
 
-        (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ShouldLoadRestoredAsync(solution);
+        (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ShouldReadAsync(solution, replay);
 
         verdict.CompilerLagProjects.ShouldBe([csproj]);
         diagnostics.ShouldContain(
@@ -173,22 +185,29 @@ public sealed class CompilerLagFailuresTests
             + "compiler this tool carries, so its code was read as an older C# version.");
     }
 
-    [Fact]
-    public async Task LoadAsync_AnAnalyzerOnlyAssemblyBuiltForANewerCompiler_ListsNothing()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LoadAsync_AnAnalyzerOnlyAssemblyBuiltForANewerCompiler_ListsNothing(bool replay)
     {
         using TempDirectory temp = TestTempRoot.Fresh("lag-newer-analyzer");
         string analyzer = StubAnalyzers.NewerCompilerAnalyzer(temp);
         WriteProject(temp, "App", "", analyzer);
         string solution = WriteSolution(temp, "App");
 
-        (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ShouldLoadRestoredAsync(solution);
+        (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ShouldReadAsync(solution, replay);
 
         verdict.CompilerLagProjects.ShouldBeEmpty(string.Join("\n", diagnostics));
     }
 
-    [Fact]
-    public async Task LoadAsync_AGeneratorOnAProjectReferencingAnotherLanguage_IsListedDespiteTheCrossLanguageCompile()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LoadAsync_AGeneratorOnAProjectReferencingAnotherLanguage_IsListedDespiteTheCrossLanguageCompile(
+        bool replay)
     {
+        // The one row whose load compiles before it returns: the cross-language check compiles a project that
+        // references another language, on a replay only when there is a sink to report to, as there is here.
         using TempDirectory temp = TestTempRoot.Fresh("lag-generator-cross-language");
         string generator = StubAnalyzers.NewerCompilerGenerator(temp);
         string csproj = WriteProject(
@@ -207,10 +226,153 @@ public sealed class CompilerLagFailuresTests
             ["App.slnx"],
             "<Solution>\n  <Project Path=\"App/App.csproj\" />\n  <Project Path=\"Legacy/Legacy.vbproj\" />\n</Solution>\n");
 
-        (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ShouldLoadRestoredAsync(solution);
+        (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ShouldReadAsync(solution, replay);
 
         verdict.CompilerLagProjects.ShouldBe([csproj], string.Join("\n", diagnostics));
     }
+
+    [Fact]
+    public async Task ReplayAsync_AProjectWhoseFrameworksAskForDifferentVersions_JudgesEachFrameworkByItsOwnCall()
+    {
+        // One project file compiled once per framework. Only the netstandard2.0 call asks for a version the carried
+        // compiler rejects, so a framework judged by the other framework's command line names the wrong version or
+        // none.
+        using TempDirectory temp = TestTempRoot.Fresh("lag-replay-frameworks");
+        string csproj = temp.WriteFile(
+            ["App", "App.csproj"],
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
+                <LangVersion Condition="'$(TargetFramework)' == 'netstandard2.0'">98</LangVersion>
+              </PropertyGroup>
+            </Project>
+            """);
+        temp.WriteFile(["App", "Widget.cs"], "namespace App { public sealed class Widget { } }\n");
+        string solution = WriteSolution(temp, "App");
+
+        (WorkspaceDiagnostics verdict, List<string> diagnostics) = await ReplayBuiltAsync(solution, buildFails: true);
+
+        verdict.CompilerLagProjects.ShouldBe([csproj], string.Join("\n", diagnostics));
+        diagnostics.ShouldBe(
+        [
+            $"'{csproj}' asks for C# version '98', which the C# 15 compiler this tool carries does not know, so its "
+            + "code was read as another C# version."
+        ]);
+    }
+
+    [Fact]
+    public async Task ReplayAsync_AnAliasTheRecordedCompilerReadsAsANewerVersion_ListsTheProject()
+    {
+        // The yardstick on this path is the compiler the build ran, found beside the executable its call recorded.
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "The stand-in compiler is a Windows executable.");
+        using TempDirectory temp = TestTempRoot.Fresh("lag-replay-alias");
+        string compiler = StubAnalyzers.StandInCompiler(temp, 16);
+        string csproj = WriteProject(temp, "App", "<LangVersion>latest</LangVersion>");
+        string solution = WriteSolution(temp, "App");
+
+        (WorkspaceDiagnostics verdict, List<string> diagnostics) =
+            await ReplayBuiltAsync(solution, buildFails: true, $"-p:CscToolPath=\"{compiler}\"");
+
+        verdict.CompilerLagProjects.ShouldBe([csproj], string.Join("\n", diagnostics));
+        diagnostics.ShouldContain(
+            $"'{csproj}' asks for C# 'latest', which its build's compiler reads as C# 16, newer than the C# 15 "
+            + "compiler this tool carries, so its code was read as an older C# version.");
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReplayAsync_OfAStoredCapture_JudgesTheCompilerCallsTheCaptureRecorded(bool recordedNone)
+    {
+        // A capture's replay reads no binlog for its compiler calls, so what its manifest records is what it judges:
+        // the call the build made, or, with the record emptied, nothing.
+        using TempDirectory temp = TestTempRoot.Fresh("lag-replay-capture");
+        using TempDirectory cache = TestTempRoot.Fresh("lag-replay-capture-cache");
+        string csproj = WriteProject(temp, "App", "<LangVersion>99</LangVersion>");
+        string solution = WriteSolution(temp, "App");
+        string binlog = BuildWithBinlog(solution, buildFails: true);
+        var store = new BinlogCaptureStore(solution, cache.Path);
+        using (ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(binlog, solution, ct: Ct))
+        {
+            store.Ingest(replayed, binlog, binlog, Ct).ShouldBeTrue();
+        }
+
+        if (recordedNone) CaptureFiles.EditManifest(solution, cache.Path, root => root["RecordedCompiles"] = new JsonArray());
+
+        CaptureValidation validation = store.Validate(Ct);
+        validation.Notice.ShouldBeNull();
+        var diagnostics = new List<string>();
+        using ReplayedSolution fromCapture = await BinlogReplayer.ReplayAsync(
+            validation.Capture.ShouldNotBeNull(), solution, diagnostics.Add, Ct);
+
+        fromCapture.LoadDiagnosticsWith(diagnostics).CompilerLagProjects.ShouldBe(
+            recordedNone ? [] : [csproj], string.Join("\n", diagnostics));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ReplayAsync_TheRecordedCompiler_IsWhatTheCaptureAndTheCacheStamp(bool onDisk)
+    {
+        // The compiler a replayed build ran decides whether the carried one lags, so both stores watch it, and one
+        // that is not on disk yet is watched for appearing, as the binlog of another machine's build records one.
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "The stand-in compiler is a Windows executable.");
+        using TempDirectory temp = TestTempRoot.Fresh("lag-replay-stamp");
+        using TempDirectory cache = TestTempRoot.Fresh("lag-replay-stamp-cache");
+        string compilerAssembly = Path.Combine(StubAnalyzers.StandInCompiler(temp, 15), CompilerAssemblyName);
+        WriteProject(temp, "App", "");
+        string solution = WriteSolution(temp, "App");
+        string binlog = BuildWithBinlog(
+            solution, buildFails: true, $"-p:CscToolPath=\"{Path.GetDirectoryName(compilerAssembly)}\"");
+        if (!onDisk) File.Delete(compilerAssembly);
+
+        using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(binlog, solution, ct: Ct);
+        new BinlogCaptureStore(solution, cache.Path).Ingest(replayed, binlog, binlog, Ct).ShouldBeTrue();
+
+        SolutionCacheInputs.Collect(replayed.Solution, replayed.CompilerAssemblies)
+            .ShouldHaveSingleItem()
+            .CompilerAssemblyPaths.ShouldBe([compilerAssembly]);
+        CaptureFiles.StructuralStampPaths(solution, cache.Path).ShouldContain(compilerAssembly);
+    }
+
+    [Fact]
+    public async Task ReplayAsync_AProjectWhoseFrameworksRanDifferentCompilers_IsStampedWithEach()
+    {
+        // Either framework's compiler can make the carried one lag, so a change to either must reach the stores.
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "The stand-in compiler is a Windows executable.");
+        using TempDirectory temp = TestTempRoot.Fresh("lag-replay-stamp-frameworks");
+        using TempDirectory cache = TestTempRoot.Fresh("lag-replay-stamp-frameworks-cache");
+        string modern = Path.Combine(StubAnalyzers.StandInCompiler(temp, 15, "modern"), CompilerAssemblyName);
+        string legacy = Path.Combine(StubAnalyzers.StandInCompiler(temp, 15, "legacy"), CompilerAssemblyName);
+        temp.WriteFile(
+            ["App", "App.csproj"],
+            $"""
+             <Project Sdk="Microsoft.NET.Sdk">
+               <PropertyGroup>
+                 <TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
+                 <CscToolPath Condition="'$(TargetFramework)' == 'net10.0'">{Path.GetDirectoryName(modern)}</CscToolPath>
+                 <CscToolPath Condition="'$(TargetFramework)' == 'netstandard2.0'">{Path.GetDirectoryName(legacy)}</CscToolPath>
+               </PropertyGroup>
+             </Project>
+             """);
+        temp.WriteFile(["App", "Widget.cs"], "namespace App { public sealed class Widget { } }\n");
+        string solution = WriteSolution(temp, "App");
+        string binlog = BuildWithBinlog(solution, buildFails: true);
+
+        using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(binlog, solution, ct: Ct);
+        new BinlogCaptureStore(solution, cache.Path).Ingest(replayed, binlog, binlog, Ct).ShouldBeTrue();
+
+        IReadOnlyList<string> stamped = CaptureFiles.StructuralStampPaths(solution, cache.Path);
+        stamped.ShouldSatisfyAllConditions(
+            () => stamped.ShouldContain(modern),
+            () => stamped.ShouldContain(legacy));
+        SolutionCacheInputs.Collect(replayed.Solution, replayed.CompilerAssemblies)
+            .ShouldHaveSingleItem()
+            .CompilerAssemblyPaths.ShouldBe([legacy, modern]);
+    }
+
+    private const string CompilerAssemblyName = "Microsoft.CodeAnalysis.CSharp.dll";
 
     private static string WriteProject(
         TempDirectory temp, string name, string properties, string? analyzer = null, string items = "")
@@ -237,6 +399,33 @@ public sealed class CompilerLagFailuresTests
     private static string WriteSolution(TempDirectory temp, string name)
     {
         return temp.WriteFile([$"{name}.slnx"], $"<Solution>\n  <Project Path=\"{name}/{name}.csproj\" />\n</Solution>\n");
+    }
+
+    // The verdict and the load's lines from a load of the solution, or from a replay of the binlog a build of it wrote.
+    private static Task<(WorkspaceDiagnostics Verdict, List<string> Diagnostics)> ShouldReadAsync(
+        string solution, bool replay, bool buildFails = false)
+    {
+        return replay ? ReplayBuiltAsync(solution, buildFails) : ShouldLoadRestoredAsync(solution);
+    }
+
+    private static async Task<(WorkspaceDiagnostics Verdict, List<string> Diagnostics)> ReplayBuiltAsync(
+        string solution, bool buildFails = false, string buildProperties = "")
+    {
+        string binlog = BuildWithBinlog(solution, buildFails, buildProperties);
+        var diagnostics = new List<string>();
+        using ReplayedSolution replayed = await BinlogReplayer.ReplayAsync(binlog, solution, diagnostics.Add, ct: Ct);
+        return (replayed.LoadDiagnosticsWith(diagnostics), diagnostics);
+    }
+
+    // A build of the solution that writes a binlog beside it; a bed whose compile is meant to be refused must fail.
+    private static string BuildWithBinlog(string solution, bool buildFails, string buildProperties = "")
+    {
+        string binlog = Path.ChangeExtension(solution, ".binlog");
+        var arguments = $"build \"{solution}\" -bl:LogFile=\"{binlog}\" {buildProperties}";
+        string directory = Path.GetDirectoryName(solution)!;
+        if (buildFails) DotnetCli.RunExpectingFailure(arguments, directory);
+        else DotnetCli.Run(arguments, directory);
+        return binlog;
     }
 
     // Restored first, because a project with no assets file is a restore failure, and a project already blamed for
@@ -319,6 +508,17 @@ internal static class StubAnalyzers
         var source =
             $"namespace Microsoft.CodeAnalysis.CSharp {{ public enum LanguageVersion {{ CSharp{highestMajor} = {highestMajor * 100} }} }}";
         return Write(path, SpecAssemblyCompiler.EmitImage(source, "Microsoft.CodeAnalysis.CSharp", WithCompiler()));
+    }
+
+    // A directory a build's CscToolPath can name: an executable that starts and fails, so the build records its call
+    // and compiles nothing, beside a compiler assembly declaring C# up to highestMajor.
+    internal static string StandInCompiler(TempDirectory temp, int highestMajor, string name = "compiler")
+    {
+        string directory = temp.PathOf(name);
+        Directory.CreateDirectory(directory);
+        File.Copy(Environment.ProcessPath!, Path.Combine(directory, "csc.exe"));
+        CompilerDeclaring(Path.Combine(directory, "Microsoft.CodeAnalysis.CSharp.dll"), highestMajor);
+        return directory;
     }
 
     private static string Write(string path, byte[] image)

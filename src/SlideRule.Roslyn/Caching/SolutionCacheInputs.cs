@@ -18,12 +18,18 @@ namespace SlideRule.Roslyn.Caching;
 /// </remarks>
 internal static class SolutionCacheInputs
 {
-    internal static IReadOnlyList<ProjectInputs> Collect(Solution solution)
+    /// <summary>
+    ///     The C# projects of <paramref name="solution" />, with <paramref name="compilerAssemblies" /> as
+    ///     <see cref="SolutionProjects.Collect" /> takes it.
+    /// </summary>
+    internal static IReadOnlyList<ProjectInputs> Collect(
+        Solution solution, IReadOnlyDictionary<ProjectId, string>? compilerAssemblies = null)
     {
         var buildOutput = new BuildOutputDirectories();
         return SolutionProjects.Collect(
             solution,
-            (projectDirectory, documentPath) => !buildOutput.IsUnderBuildOutput(projectDirectory, documentPath));
+            (projectDirectory, documentPath) => !buildOutput.IsUnderBuildOutput(projectDirectory, documentPath),
+            compilerAssemblies);
     }
 
     /// <summary>

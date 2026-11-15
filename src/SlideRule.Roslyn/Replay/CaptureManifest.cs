@@ -10,7 +10,9 @@ namespace SlideRule.Roslyn.Replay;
 /// <remarks>
 ///     <paramref name="StructuralStamps" /> are full <see cref="FileStamp" />s, SHA-256 and absence included, of
 ///     the same structural set <c>ExtractionCacheStore</c> fingerprints. <paramref name="ToolVersion" /> is the
-///     writing tool's informational version, per-commit during development. <paramref name="BinlogCopyStamp" />
+///     writing tool's informational version, per-commit during development. <paramref name="RecordedCompiles" /> are
+///     the binlog's C# compiler calls, which a replay of the capture judges compiler lag from in place of reading the
+///     binlog for them. <paramref name="BinlogCopyStamp" />
 ///     is recorded for completeness: the copy's bytes are never re-hashed against it.
 /// </remarks>
 internal sealed record CaptureManifest(
@@ -20,6 +22,7 @@ internal sealed record CaptureManifest(
     IReadOnlyList<CaptureProjectEntry> Projects,
     IReadOnlyList<CaptureForeignProjectEntry> ForeignProjects,
     IReadOnlyList<CaptureReferenceEntry> OtherLanguageReferences,
+    IReadOnlyList<RecordedCompile> RecordedCompiles,
     FileStamp BinlogCopyStamp);
 
 /// <summary>

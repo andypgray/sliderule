@@ -42,4 +42,61 @@ public sealed class BinlogReplayerUnitTests
         BinlogReplayer.EnsureAssemblyExtension(outputPath, outputKind)
             .ShouldBe(expected);
     }
+
+    [Theory]
+    [InlineData("/langversion:99", "99")]
+    [InlineData("-langversion:12", "12")]
+    [InlineData("/LangVersion:\"latest\"", "latest")]
+    // The compiler takes the last one, whichever form each is written in.
+    [InlineData("/langversion:7.3|-langversion:preview", "preview")]
+    [InlineData("-langversion:preview|/langversion:7.3", "7.3")]
+    [InlineData("/nullable:enable|/langversionx", null)]
+    [InlineData("", null)]
+    public void LangVersionOf_IsTheLastLangVersionOption(string arguments, string? expected)
+    {
+        string[] split = arguments.Length == 0 ? [] : arguments.Split('|');
+
+        RecordedCompiles.LangVersionOf(split).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ByProject_AProjectCompiledPerFramework_PairsEachFrameworkWithItsOwnCall(bool reversed)
+    {
+        // Whichever order the build recorded the calls in, each framework's project takes its own.
+        string projectFile = Path.GetFullPath("/repo/App/App.csproj");
+        using var workspace = new AdhocWorkspace();
+        Solution solution = workspace.CurrentSolution;
+        var older = ProjectId.CreateNewId();
+        var newer = ProjectId.CreateNewId();
+        solution = solution
+            .AddProject(ProjectInfo.Create(older, VersionStamp.Default, "App", "App", LanguageNames.CSharp, projectFile))
+            .AddProject(ProjectInfo.Create(newer, VersionStamp.Default, "App", "App", LanguageNames.CSharp, projectFile));
+        var frameworks = new Dictionary<ProjectId, string> { [older] = "netstandard2.0", [newer] = "net10.0" };
+        RecordedCompile olderCall = new(projectFile, "netstandard2.0", "98", null);
+        RecordedCompile newerCall = new(projectFile, "net10.0", "14.0", null);
+        RecordedCompile[] recorded = reversed ? [newerCall, olderCall] : [olderCall, newerCall];
+
+        IReadOnlyDictionary<ProjectId, RecordedCompile> paired = RecordedCompiles.ByProject(solution, frameworks, recorded);
+
+        paired.ShouldSatisfyAllConditions(
+            () => paired.GetValueOrDefault(older).ShouldBe(olderCall),
+            () => paired.GetValueOrDefault(newer).ShouldBe(newerCall));
+    }
+
+    [Fact]
+    public void ByProject_AProjectWithOneCall_TakesItWithNoFramework()
+    {
+        string projectFile = Path.GetFullPath("/repo/App/App.csproj");
+        using var workspace = new AdhocWorkspace();
+        var id = ProjectId.CreateNewId();
+        Solution solution = workspace.CurrentSolution
+            .AddProject(ProjectInfo.Create(id, VersionStamp.Default, "App", "App", LanguageNames.CSharp, projectFile));
+        RecordedCompile call = new(projectFile, "net10.0", "14.0", null);
+
+        RecordedCompiles.ByProject(solution, new Dictionary<ProjectId, string>(), [call])
+            .GetValueOrDefault(id)
+            .ShouldBe(call);
+    }
 }
