@@ -58,8 +58,9 @@ public sealed class HandoffEndpointTests
             .Distinct()
             .ToList();
 
-        // Assert
-        granted.ShouldBe([WindowsIdentity.GetCurrent().User!.Value]);
+        // Assert: CurrentUserOnly grants the token's owner, which is the user's own SID except under an elevated
+        // token, whose owner is the Administrators group.
+        granted.ShouldBe([WindowsIdentity.GetCurrent().Owner!.Value]);
     }
 
     [Fact]

@@ -11,7 +11,8 @@ namespace SlideRule.Cli.Hooks.Handoff;
 ///     <para>
 ///         On Windows the endpoint is a named pipe, and its owner holds a <c>Local\</c> mutex named after it for the
 ///         server's lifetime. Windows lets several processes create instances of one pipe name, so the mutex is
-///         what keeps two servers from splitting the clients between them.
+///         what keeps two servers from splitting the clients between them. The pipe grants the process token's owner,
+///         which is the user except under an elevated token, whose owner is the Administrators group.
 ///     </para>
 ///     <para>
 ///         Elsewhere it is a Unix domain socket in a directory of this user's under <c>/tmp</c>, and its owner holds
