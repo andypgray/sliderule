@@ -22,11 +22,29 @@ jobs:
   # 16/17/18 envelope. `windows-latest` is the VS-2026-only image (VS Enterprise 18.x, no VS 2022 and
   # no Build Tools 17 anywhere on it) and `windows-2022` is the VS 17 machine, so the non-SDK-style
   # projects in the 2003 MSBuild XML namespace that the README claims are proven on both.
+  #
+  # One leg more runs SDK 11 on ubuntu, with SDK 10 beside it: the newest SDK picks the MSBuild and the
+  # generators a workspace load sees, and the test host still runs on .NET 10, so that pair is what a
+  # consumer machine with SDK 11 installed looks like. `sdk` is the band in use, `beside` the bands the
+  # leg also installs, and `dotnet` what setup-dotnet is asked for. The name keeps the four SDK 10 legs'
+  # check names as they were.
   build-and-test:
+    name: ${{ matrix.sdk == '10.0' && format('build-and-test ({0})', matrix.os) || format('build-and-test ({0}, SDK {1})', matrix.os, matrix.sdk) }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, windows-2022, macos-latest]
+        sdk: ['10.0']
+        include:
+          - sdk: '10.0'
+            beside: ''
+            dotnet: '10.0.x'
+          - os: ubuntu-latest
+            sdk: '11.0'
+            beside: '10.0'
+            dotnet: |
+              10.0.x
+              11.0.x
 
     runs-on: ${{ matrix.os }}
 
@@ -45,11 +63,15 @@ jobs:
 
       - uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: ${{ matrix.dotnet }}
 
-      - name: Check that the job runs SDK 10.0 and no other
+      - name: Check that the job runs the SDK band it asked for and no other
         shell: bash
-        run: bash .github/scripts/check-sdk.sh 10.0
+        env:
+          SDK_BAND: ${{ matrix.sdk }}
+          SDK_BESIDE: ${{ matrix.beside }}
+        # SDK_BESIDE is unquoted so an empty value passes no argument.
+        run: bash .github/scripts/check-sdk.sh "$SDK_BAND" $SDK_BESIDE
 
       # Relock for Dependabot NuGet PRs, so everything below tests the bump; the script says why. The shell
       # is named so the Windows legs run it under Git Bash, as every Windows step here does, rather than
@@ -188,13 +210,13 @@ jobs:
       # to read what a given leg left out.
       #
       # One fact reaches the network: the citation link check HEADs every page the committed context
-      # blocks cite. It is opt-in, and ubuntu is the single leg that opts in — one outward leg, the
-      # same shape as the manifest-version job's nuget.org read — so the other three skip with the
-      # reason rather than making a public run depend on learn.microsoft.com four times over. A
-      # runner that cannot reach the pages at all reports the same skip, naming them.
+      # blocks cite. It is opt-in, and the SDK 10 ubuntu leg is the single leg that opts in — one outward
+      # leg, the same shape as the manifest-version job's nuget.org read — so the other legs skip with the
+      # reason rather than making a public run depend on learn.microsoft.com on every leg. A runner that
+      # cannot reach the pages at all reports the same skip, naming them.
       - name: Test
         env:
-          SLIDERULE_LINK_CHECK: ${{ matrix.os == 'ubuntu-latest' && 'true' || '' }}
+          SLIDERULE_LINK_CHECK: ${{ matrix.os == 'ubuntu-latest' && matrix.sdk == '10.0' && 'true' || '' }}
         run: dotnet test SlideRule.slnx --no-build --output Detailed
 
   # Packs on Linux, then does two things with the result. First, asserts the MCP manifest lands at

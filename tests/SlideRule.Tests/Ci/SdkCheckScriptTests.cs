@@ -8,8 +8,8 @@ namespace SlideRule.Tests.Ci;
 
 /// <summary>
 ///     Runs the committed <c>.github/scripts/check-sdk.sh</c> as a real child process against a stub <c>dotnet</c>,
-///     and holds it to what every CI job relies on after setup-dotnet: it passes only when the SDK in use and every
-///     SDK listed are in the band the job asked for, and a refusal names the SDK it found.
+///     and holds it to what every CI job relies on after setup-dotnet: it passes only when the SDK in use is in the
+///     first band the job names and every SDK listed is in a band it names, and a refusal names the SDK it found.
 /// </summary>
 public sealed class SdkCheckScriptTests
 {
@@ -64,6 +64,56 @@ public sealed class SdkCheckScriptTests
         result.StandardError.ShouldBe("::error::check-sdk.sh takes one SDK band, such as 10.0, not '10.0.x'.\n");
     }
 
+    [Fact]
+    public void TheBandInUseWithAnotherAskedBesideIt_PassesAndNamesTheSdkInUse()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("check-sdk");
+        string stub = Stub(temp, "11.0.100", "10.0.404 [/sdks]\n11.0.100 [/sdks]\n");
+
+        ChildProcess.ProcessResult result = CheckSdk(stub, "11.0", "10.0");
+
+        result.ExitCode.ShouldBe(0, result.Transcript());
+        result.StandardOutput.ShouldBe($"SDK 11.0.100 from {ShouldReadShellSpelling(stub)}/dotnet\n");
+        result.StandardError.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void TheBandBesideInUse_FailsNamingTheSdkInUse()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("check-sdk");
+        string stub = Stub(temp, "10.0.404", "10.0.404 [/sdks]\n11.0.100 [/sdks]\n");
+
+        ChildProcess.ProcessResult result = CheckSdk(stub, "11.0", "10.0");
+
+        result.ExitCode.ShouldBe(1, result.Transcript());
+        result.StandardError.ShouldBe("::error::This job asks for SDK 11.0 but runs 10.0.404.\n");
+    }
+
+    [Fact]
+    public void AThirdBandListedBesideTheTwoAskedFor_FailsNamingIt()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("check-sdk");
+        string stub = Stub(temp, "11.0.100", "9.0.321 [/other]\n10.0.404 [/sdks]\n11.0.100 [/sdks]\n");
+
+        ChildProcess.ProcessResult result = CheckSdk(stub, "11.0", "10.0");
+
+        result.ExitCode.ShouldBe(1, result.Transcript());
+        result.StandardError
+            .ShouldBe("::error::This job asks for SDK 11.0, and 10.0 beside it, and dotnet also lists: 9.0.321 [/other]\n");
+    }
+
+    [Fact]
+    public void ABandBesideThatIsNotMajorDotMinor_ExitsTwoNamingIt()
+    {
+        using TempDirectory temp = TestTempRoot.Fresh("check-sdk");
+        string stub = Stub(temp, "11.0.100", "10.0.404 [/sdks]\n11.0.100 [/sdks]\n");
+
+        ChildProcess.ProcessResult result = CheckSdk(stub, "11.0", "10");
+
+        result.ExitCode.ShouldBe(2, result.Transcript());
+        result.StandardError.ShouldBe("::error::check-sdk.sh takes SDK bands such as 10.0, and '10' is not one.\n");
+    }
+
     /// <summary>A stub <c>dotnet</c> answering <c>--version</c> and <c>--list-sdks</c>, in its own directory.</summary>
     private static string Stub(TempDirectory temp, string version, string listSdks)
     {
@@ -95,15 +145,15 @@ public sealed class SdkCheckScriptTests
         return result.StandardOutput.TrimEnd('\n');
     }
 
-    /// <summary>Runs the committed script with <paramref name="band" />, under bash as every CI step runs it.</summary>
-    private static ChildProcess.ProcessResult CheckSdk(string stubDirectory, string band)
+    /// <summary>Runs the committed script with <paramref name="bands" />, under bash as every CI step runs it.</summary>
+    private static ChildProcess.ProcessResult CheckSdk(string stubDirectory, params string[] bands)
     {
         string shell = ShellInterpreter.Require();
         var startInfo = new ProcessStartInfo(shell) { WorkingDirectory = stubDirectory };
         startInfo.ArgumentList.Add("-c");
         startInfo.ArgumentList.Add("exec bash \"$0\" \"$@\"");
         startInfo.ArgumentList.Add(ShellInterpreter.Posix(RepoRoot.Absolute(".github/scripts/check-sdk.sh")));
-        startInfo.ArgumentList.Add(band);
+        foreach (string band in bands) startInfo.ArgumentList.Add(band);
         startInfo.Environment["PATH"] = ShellInterpreter.PrependedPath(stubDirectory);
 
         return ChildProcess.Run(startInfo, TimeSpan.FromMinutes(1));
