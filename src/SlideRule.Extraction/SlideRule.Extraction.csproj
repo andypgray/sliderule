@@ -41,6 +41,10 @@
          first dependency-update run raises the floor silently. -->
     <ItemGroup>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.0.1" />
+        <!-- A build-time analyzer for this project alone, at the version the four compiler-hosted projects
+             declare rather than the 3.3.2 the floor brings transitively. Declared and private, so a
+             dependency-update run moves it with theirs instead of pinning the transitive copy. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.12.0" PrivateAssets="all" />
     </ItemGroup>
 
 </Project>

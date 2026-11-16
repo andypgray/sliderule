@@ -73,7 +73,7 @@
         <!-- A build-time analyzer for this project alone, at the newest stable version rather than the
              3.3.2 the floor brings transitively — which is too old to enforce the extended analyzer rules
              the property above asks for. -->
-        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.12.0" PrivateAssets="all" />
         <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
         <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
     </ItemGroup>

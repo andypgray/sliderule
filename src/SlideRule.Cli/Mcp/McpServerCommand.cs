@@ -27,11 +27,6 @@ namespace SlideRule.Cli.Mcp;
 internal static class McpServerCommand
 {
     /// <summary>
-    ///     The one protocol revision the server speaks: the newest that keeps the <c>initialize</c> handshake.
-    /// </summary>
-    internal const string ProtocolVersion = "2025-11-25";
-
-    /// <summary>
     ///     Runs the stdio server until <paramref name="ct" /> is cancelled or the transport closes,
     ///     returning the process exit code.
     /// </summary>
@@ -93,17 +88,10 @@ internal static class McpServerCommand
     }
 
     /// <summary>
-    ///     Sets the server's identity, instructions and protocol revision in one place, so the server and the
-    ///     in-process test harness answer the handshake alike.
+    ///     Sets the server's identity and instructions in one place, so the server and the in-process test harness
+    ///     answer the handshake alike. The protocol revision is left to the SDK, which negotiates whichever one the
+    ///     client asks for, by <c>server/discover</c> or by <c>initialize</c>.
     /// </summary>
-    /// <remarks>
-    ///     The pin to <see cref="ProtocolVersion" /> is what lets a client fall back. A client on the SDK's
-    ///     defaults probes first with <c>server/discover</c> at 2026-07-28 and sends <c>initialize</c> when the
-    ///     probe is refused or its reply is late. Unpinned, the server records the probe's revision for the session
-    ///     as it reads the probe, and then refuses that <c>initialize</c>. Pinned, it refuses the probe before
-    ///     recording anything. The cost is that no client can use the discover path, and every <c>initialize</c>
-    ///     is answered with this revision whatever the client asked for.
-    /// </remarks>
     internal static void ConfigureServer(McpServerOptions options, string instructions)
     {
         options.ServerInstructions = instructions;
@@ -113,7 +101,6 @@ internal static class McpServerCommand
             Title = "SlideRule architecture spec",
             Version = ServerVersion.SemVer
         };
-        options.ProtocolVersion = ProtocolVersion;
     }
 
     /// <summary>

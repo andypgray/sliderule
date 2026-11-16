@@ -4,7 +4,6 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Client;
 using ModelContextProtocol.Protocol;
-using Shouldly;
 using SlideRule.Cli.Mcp;
 using SlideRule.Cli.Mcp.Infrastructure;
 using SlideRule.Cli.Mcp.Pipeline;
@@ -112,9 +111,8 @@ internal sealed class McpPipelineHarness : IAsyncDisposable
     }
 
     /// <summary>
-    ///     Builds the host bound to <paramref name="binding" />, starts it, and connects a client over the pipe pair,
-    ///     asserting that the handshake negotiated the server's pinned protocol revision. A start that fails tears
-    ///     down what it began.
+    ///     Builds the host bound to <paramref name="binding" />, starts it, and connects a client over the pipe pair.
+    ///     A start that fails tears down what it began.
     /// </summary>
     /// <param name="binding">The solution + spec the composed server answers for.</param>
     /// <param name="cancellationToken">Cancels host start and the client handshake.</param>
@@ -182,9 +180,6 @@ internal sealed class McpPipelineHarness : IAsyncDisposable
 
             StreamClientTransport clientTransport = new(clientToServer.Writer.AsStream(), clientReads.AsStream());
             harness._client = await McpClient.CreateAsync(clientTransport, clientOptions, cancellationToken: cancellationToken);
-            harness._client.NegotiatedProtocolVersion.ShouldBe(
-                McpServerCommand.ProtocolVersion,
-                customMessage: "the harness client negotiated a protocol revision other than the server's pinned one");
         }
         catch
         {
