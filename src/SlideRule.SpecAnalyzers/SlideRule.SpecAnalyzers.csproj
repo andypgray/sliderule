@@ -37,7 +37,7 @@
         <!-- A build-time analyzer for this project alone, at the newest stable version rather than the
              3.3.2 the floor brings transitively — which is too old to enforce the extended analyzer rules
              the property above asks for. -->
-        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.12.0" PrivateAssets="all" />
         <!-- The contract, and nothing else. Every verdict reported here is decided by the same types the
              spec loader decides with, so the warning at the literal and the error at load cannot come to
              say different things; the extraction, checking and rendering machinery has no part in reading
