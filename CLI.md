@@ -709,7 +709,7 @@ Commands that do not evaluate rules exit 0 on success. `status` exits 0 even ove
 
 Other parse failures exit 2 and print the error on stderr. Root help follows when no command was named, the command was mistyped or an unknown option appeared at the root. A group without its subcommand, such as `sliderule baseline`, prints that group's help. Errors and accompanying help both use stderr, leaving stdout empty.
 
-Cancellation by Ctrl+C or a termination signal prints `Cancelled.` on stderr and exits 2 if the run stops within System.CommandLine's termination grace. SlideRule uses the default grace of 2 seconds in System.CommandLine 2.0.14. If the run outlives it, System.CommandLine terminates the process with exit 130 after Ctrl+C or 143 after a termination signal.
+Cancellation by Ctrl+C or a termination signal prints `Cancelled.` on stderr and exits 2 if the run stops within System.CommandLine's termination grace. SlideRule uses the default grace of 2 seconds in System.CommandLine 3.0.0. If the run outlives it, System.CommandLine terminates the process with exit 130 after Ctrl+C or 143 after a termination signal.
 
 ## Documents and versions
 
