@@ -368,7 +368,9 @@ public sealed class CompilerLagFailuresTests
     {
         // A RoslynTargetsPath outside any SDK names the compiler the build reads C# with, so the verdict is judged
         // against it, and a cache that stamped only the SDK's compiler would miss a change to the one judged. The
-        // SDK's is stamped beside it, because the cache finds SDKs installed beside the load's through it.
+        // SDK's is stamped beside it, because the cache finds SDKs installed beside the load's through it. That is
+        // the SDK the load took its analyzers from, which differs from the in-process SDK wherever a newer SDK is
+        // installed beside the one the test host runs on.
         using TempDirectory temp = TestTempRoot.Fresh("lag-compiler-package");
         string probe = WriteProject(temp, "Probe", "");
         CompilerFacts sdkCompiler = ProjectFactsEvaluator
@@ -377,8 +379,6 @@ public sealed class CompilerLagFailuresTests
             .ShouldNotBeNull();
         string package = StubAnalyzers.CompilerPackage(temp, sdkCompiler.RoslynTargetsPath, 16);
         string compilerAssembly = Path.Combine(package, StubAnalyzers.CompilerAssemblyName);
-        string sdkCompilerAssembly = Path.Combine(
-            Path.GetFullPath(sdkCompiler.RoslynTargetsPath), "bincore", StubAnalyzers.CompilerAssemblyName);
         string csproj = WriteProject(
             temp, "App",
             "<LangVersion>latest</LangVersion><RoslynCompilerType>Custom</RoslynCompilerType>"
@@ -390,6 +390,8 @@ public sealed class CompilerLagFailuresTests
         using LoadedSolution loaded = await WorkspaceLoader.LoadAsync(solution, diagnostics.Add, ct: Ct);
 
         loaded.LoadDiagnosticsWith(diagnostics).CompilerLagProjects.ShouldBe([csproj], string.Join("\n", diagnostics));
+        string loadSdk = CompilerLagFailures.LoadSdkOf(loaded.Solution).ShouldNotBeNull();
+        string sdkCompilerAssembly = Path.Combine(loadSdk, "Roslyn", "bincore", StubAnalyzers.CompilerAssemblyName);
         SolutionCacheInputs.Collect(loaded.Solution, loaded.CompilerAssemblies)
             .ShouldHaveSingleItem()
             .CompilerAssemblyPaths.ShouldBe(new[] { compilerAssembly, sdkCompilerAssembly }.Order(StringComparer.Ordinal));
