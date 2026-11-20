@@ -48,7 +48,7 @@
          registration, which the CLI's replay path performs up front. No engine assemblies ship (see the
          ExcludeAssets="runtime" block below); the SDK's are resolved on the host after registration. -->
     <ItemGroup>
-        <PackageReference Include="Basic.CompilerLog.Util" Version="0.9.66" />
+        <PackageReference Include="Basic.CompilerLog.Util" Version="0.9.67" />
     </ItemGroup>
 
     <!-- The binlog reader complog pulls, declared because the replay also reads the build's own project
