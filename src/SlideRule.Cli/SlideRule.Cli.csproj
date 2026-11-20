@@ -51,7 +51,7 @@
              current versions, all present in the local NuGet cache. -->
         <PackageReference Include="ModelContextProtocol" Version="2.4.0" />
         <PackageReference Include="Microsoft.Extensions.Hosting" Version="11.0.0" />
-        <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+        <PackageReference Include="Serilog.Extensions.Hosting" Version="11.0.0" />
         <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
     </ItemGroup>
 
